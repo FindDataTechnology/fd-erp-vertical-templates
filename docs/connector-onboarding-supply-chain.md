@@ -199,10 +199,14 @@
 - `supplier-portal`：目录无任何 SRM/供应商门户 provider，**保持 optional 并如实报缺口**；
   新增 provider 属对侧立项，不在本仓绕。
 - 已于 2026-11-08 落地的一条（不需要猜客户品牌）：**`wms-snapshot` 降为 `optional: true`**，
-  并把理由写进该绑定的 `note`。原因：它原先非 optional 却指向目录里不存在的 `wms`，
-  安装门会永久挂一条「未解决」——而这条**用户接任何账号都关不上**，属于错误指引而不是
+  并把理由写进**本文档**（不是绑定 `note`，见下）。原因：它原先非 optional 却指向目录里不存在的
+  `wms`，安装门会永久挂一条「未解决」——而这条**用户接任何账号都关不上**，属于错误指引而不是
   能力缺口。降 optional 后它在状态面上如实显示为 `unwired`（能力缺口），不再冒充待办；
   客户 WMS 品牌确认后改真 service id 并恢复非 optional（两份副本同步改，逐字节一致门守着）。
+- **`note` 是面向客户的字段，不是工程日志**：首版把它写成「目录无 wms、最近项 wangdian 只有 read 面」
+  这类内部分析，等于把供应链短板印在货架上。已改为一句对外陈述（品牌待确认 → 选接项 →
+  未接通如实标注、不阻塞安装 → 品牌确认后改必接），分析留在本节。改 `note` 时先问：
+  这句话给客户看是否成立、是否泄露内部分析。
 - 仍待你拍板的两条（都不影响上面的落地，逐条可独立开）：
   1. `wms`/`carrier-portal` 是否**写死真厂商**（`wangdian` / `sf_express` + 备选 `kuaidi100`）：
      面向「用这几个厂商的客户」直接可用，换厂商要改包。
@@ -237,3 +241,19 @@
   ②把 `wms-snapshot` 改回 `optional: false` → 门变红并指名
   `wms-snapshot（provider=wms）— 角色名却不能 optional`。全量 108 passed / 15 skipped。
 
+
+### 4.6 市场侧现状（2026-11-08 只读核对）
+
+- 已发布包 `y8gnMHFMze-Mylsd6JXpkA`（市场 v1，作者 aloadtree@gmail.com）实读
+  `GET /api/packs/<id>`，与源 `templates/supply-chain/connector-pack/pack.json` **逐字段比对**：
+  只有 `connector_bindings` 一处不同，就是 `wms-snapshot` 的 `optional`（市场 false / 源 true）
+  与随之改写的 `note`。**市场仍挂着「非 optional 但指向不存在 provider」的旧声明**，
+  即本次修复尚未到达用户；重发走版本通道（`publish_pack.py <pack.json> --author … --pack-id
+  y8gnMHFMze-Mylsd6JXpkA`，限流 10 次/时），属对外发布动作，待拍板。
+- 漂移哨此前**看不见**这个包：`fleet-packs/scripts/check_drift.py` 把源路径硬编码成
+  `REPO/<src>/manifest.json`，而本仓模板包在 finddata 根、文件叫 `pack.json`，于是常年报
+  `源缺失` 而不对拍。已修为四路解析（fleet-packs 仓 / finddata 根 × manifest.json / pack.json），
+  修后四包三绿一真红——真红就是上面这条 `connector_bindings`。
+- 重发时别忘：`fd-appliance/tenants/supply-chain/content/erp-templates/supply-chain-connector-pack.json`
+  必须与源逐字节一致（`tests/test_manifest.py::test_appliance_copies_match_template_sources`），
+  paas 侧的 `test/fixtures/connector-bindings/supply-chain-after.json` 同批跟上。
