@@ -37,7 +37,7 @@ REFRESH = REPO / "scripts" / "refresh_connector_catalog_ids.py"
 ROLE_PROVIDERS: dict[str, dict[str, str]] = {
     "wms": {
         "reason": "客户 WMS 品牌未定（接口形态待锚点客户确认），只能用角色名占位",
-        "decision": "客户确认品牌后改真 id（目录现有最近项 wangdian，仅 read 面）或降 optional；见 docs/connector-onboarding-supply-chain.md §4.3",
+        "decision": "已降 optional（非 optional 却无从连接 = 安装门挂一条用户处理不了的项）；客户确认品牌后改真 id（目录现有最近项 wangdian，仅 read 面）并恢复非 optional。见 docs/connector-onboarding-supply-chain.md §4.3",
     },
     "supplier-portal": {
         "reason": "目录没有任何 SRM/供应商门户 provider，角色名无厂商可填",
@@ -100,22 +100,22 @@ def test_role_provider_registry_entries_carry_reason_and_decision():
         assert len(entry["reason"]) > 10 and len(entry["decision"]) > 10, f"{provider}: 理由与决策太短"
 
 
-def test_non_optional_role_provider_is_reported_not_silently_shipped(capsys):
-    """非 optional + 角色 provider = 永远关不上的安装门项。不判红（要产品拍板），
-    但每次跑测试都把它打印出来，避免「静默通过」。"""
-    blocking = [
-        f"{where}: {b.get('key')}（provider={b.get('provider')}）"
+def test_non_optional_binding_must_name_a_real_provider():
+    """非 optional = 「装完之后这条必须已满足」。指向目录里不存在的 id 时它永远满足不了，
+    安装门就永久挂着一条用户无从处理的未解决项（客户接什么账号都关不上）——那不是
+    「能力缺口」，是对用户的错误指引。所以角色名只允许出现在 optional 绑定上。
+
+    沿用历史：`wms-snapshot` 原本非 optional + provider=wms，就是这条规则的第一个违规；
+    2026-11-08 降为 optional（客户 WMS 品牌未定），真 id 确认后改回。"""
+    violations = [
+        f"{where}: {b.get('key')}（provider={b.get('provider')}）— 角色名却不能 optional"
         for where, bindings in _connector_packs()
         for b in bindings
         if b.get("provider") in ROLE_PROVIDERS and not b.get("optional")
     ]
-    print("\n[connector-bindings] 非 optional 且 provider 是角色名（永久 unresolved）："
-          f"\n  " + ("\n  ".join(blocking) if blocking else "无"))
-    # 至少把当前事实钉住：供应链包的 wms-snapshot 属此类，改成 optional 或真 id 之前
-    # 不该悄悄消失（消失了说明有人动了声明，应当同时更新 ROLE_PROVIDERS 与文档）。
-    assert any("wms-snapshot" in line for line in blocking), (
-        "wms-snapshot 不再是「非 optional 角色 provider」——如果已改成真 id 或 optional，"
-        "请同步更新 ROLE_PROVIDERS 与 docs/connector-onboarding-supply-chain.md §4.3"
+    assert not violations, (
+        "非 optional 绑定声明了目录里不存在的 provider（安装门永久未解决）：\n  "
+        + "\n  ".join(violations)
     )
 
 

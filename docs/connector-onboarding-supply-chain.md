@@ -196,15 +196,20 @@
 
 ### 4.3 建议（未实施，需产品拍板）
 
-- `wms-snapshot`：`wms` → `wangdian`（read 面够；作业指令面另议）。
-- `carrier-portal`：`carrier-portal` → `sf_express`，`alternativeProviders: ["kuaidi100"]`。
 - `supplier-portal`：目录无任何 SRM/供应商门户 provider，**保持 optional 并如实报缺口**；
   新增 provider 属对侧立项，不在本仓绕。
-- 拍板点（两条路线，不叠加）：
-  1. **写死真厂商**（上表三行）：包面向「用这几个厂商的客户」直接可用，换厂商要改包。
-  2. **加一层角色到 provider 的映射**（客户自选自己的 WMS 品牌）：表达力强，但是新机制
+- 已于 2026-11-08 落地的一条（不需要猜客户品牌）：**`wms-snapshot` 降为 `optional: true`**，
+  并把理由写进该绑定的 `note`。原因：它原先非 optional 却指向目录里不存在的 `wms`，
+  安装门会永久挂一条「未解决」——而这条**用户接任何账号都关不上**，属于错误指引而不是
+  能力缺口。降 optional 后它在状态面上如实显示为 `unwired`（能力缺口），不再冒充待办；
+  客户 WMS 品牌确认后改真 service id 并恢复非 optional（两份副本同步改，逐字节一致门守着）。
+- 仍待你拍板的两条（都不影响上面的落地，逐条可独立开）：
+  1. `wms`/`carrier-portal` 是否**写死真厂商**（`wangdian` / `sf_express` + 备选 `kuaidi100`）：
+     面向「用这几个厂商的客户」直接可用，换厂商要改包。
+  2. 是否**加一层角色到 provider 的映射**（客户自选自己的 WMS 品牌）：表达力强，但是新机制
      （绑定声明→实例映射的落点、状态面口径、安装门语义都要重新定义），成本高一个量级。
-- 无论选哪条，`add-connector-bindings` 的解析层都不用改：它按 `provider` 查目录，
+     两条路线不叠加。
+- 无论哪条，`add-connector-bindings` 的解析层都不用改：它按 `provider` 查目录，
   错在声明侧。
 
 ### 4.4 顺带的产品事实（供定价/承诺口径用）
@@ -225,9 +230,10 @@
   手法与 paas `lib/wire-tool-risk.js` 一致：快照入库、本地刷新、有 checkout 时逐值比对。
 - `tests/test_connector_binding_providers.py`：每个声明（含 `alternativeProviders`）的
   provider 必须在快照里，或在 `ROLE_PROVIDERS` 登记表里带 `reason` + `decision` 说明为什么
-  只能用角色名；登记项不许腐坏（没人用就得删）。非 optional 的角色 provider 不判红
-  （要产品拍板）但每次跑测试都打印出来，并把 `wms-snapshot` 这条事实钉住。
-- 负向实证：临时塞一个 `provider: "erp-system"` 的假声明 → 门变红并指名
-  `templates/zz-negtest-connector-pack.json: erp-thing → provider 'erp-system' 不在目录`；
-  删除后复绿。全量 108 passed / 15 skipped。
+  只能用角色名；登记项不许腐坏（没人用就得删）。**且角色名只允许出现在 `optional` 绑定上**
+  ——非 optional 却指向目录里不存在的 id，等于安装门永久挂一条用户处理不了的项，直接判红。
+- 负向实证（两条，都验过红再恢复）：①塞一个 `provider: "erp-system"` 的假声明 → 门变红并
+  指名 `templates/zz-negtest-connector-pack.json: erp-thing → provider 'erp-system' 不在目录`；
+  ②把 `wms-snapshot` 改回 `optional: false` → 门变红并指名
+  `wms-snapshot（provider=wms）— 角色名却不能 optional`。全量 108 passed / 15 skipped。
 
