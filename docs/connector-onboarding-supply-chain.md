@@ -148,3 +148,69 @@
 | 金蝶云星空 | `kingdee.json` 在目录，12 通用 action，K3Cloud Web API，无 trigger | 接通验证（3.1）；专用 action 按需上游新增 | 可启动接通验证 |
 | 支付渠道（微信/支付宝/银联） | **无**；国际 PSP 有 10 家（仅 Stripe 有 webhook trigger） | 商户侧只读 provider + 回调记录（3.2） | 需在 open-connector-mt 新增 |
 | 客户 WMS | **无**任何 WMS provider | 按连接器 SDK 新增（3.3） | 需新增；工作量待客户接口形态确认 |
+
+> 上表是 2026-11-07 的核验快照，**其中两行已被现实推翻**（支付渠道已新增、WMS 类 provider 已存在）。
+> 现行结论以 §四 为准；此表保留原样以对齐已归档的 tasks 记述，不再逐行改。
+
+---
+
+## 四、2026-11-08 复核：目录增量与「声明的是角色、不是 provider」这个真问题
+
+> 复核对象：`open-connector-mt/catalog/apps/`（**1570** provider）与 `catalog/apps/<service>.json` 的
+> `actions[].operationType`。只读复核，未改任何一侧。
+> 触发原因：`add-connector-bindings`（paas，2026-11-08 归档）落地后，绑定解析改用连接器
+> `catalog-coverage` 判四态，供应链包的 5 条声明里有 3 条当场报 `unwired`——需要分清
+> 「目录真的没有」还是「声明写错了」。
+
+### 4.1 对上表两行的更正
+
+- **支付渠道：已有。** `wechatpay.json`（`WeChat Pay`，Finance，`custom_credential`，**2 个 action 全 read**）
+  与 `alipay.json`（`Alipay`，同构，2 个 action 全 read）已在目录里，即 §二「目录无微信支付/无支付宝」
+  的结论作废（`add-supply-chain-provider-onboarding` 落地所致，见 tasks 3.2 注记）。银联仍无。
+- **WMS：已有最接近项。** `wangdian.json`（`Wangdian ERP`，`custom_credential`，**7 个 action 全 read**）。
+  §三 当时按「wms / warehouse / 3PL 品牌名（含通天晓、科箭、C-WMS）」检索，**漏了拼音 id**，
+  于是得出「无任何 WMS 类 provider」。旺店通是订单/库存/商品面的 SaaS，
+  对「库存单向同步读」这一条需求（§三 3.2 的 read 面）够用；出入库**作业指令**面仍无。
+- **承运商：§一到§三 从未核验过这一类**（本包 `carrier-portal` 的立项材料缺失）。现目录有
+  `sf_express.json`（`SF Express`，**155 个 action：59 read / 86 write / 10 destructive**）与
+  `kuaidi100.json`（`Kuaidi100`，9 个：7 read / 1 write / 1 destructive，`api_key`），
+  「运单/轨迹只读」这一面可直接兑现。
+
+### 4.2 真问题：包里声明的是角色，不是 provider
+
+`supply-chain-connector-pack` 的 5 条 `connector_bindings`（两份副本逐字节一致：本仓
+`templates/supply-chain/connector-pack/pack.json` 与 `fd-appliance/tenants/supply-chain/content/erp-templates/supply-chain-connector-pack.json`）：
+
+| binding key | 声明 provider | 目录里存在？ | 绑定解析结果 |
+|---|---|---|---|
+| `kingdee-cloud` | `kingdee` | 有（3 read / 4 write / 5 destructive） | `satisfied`（接通后） |
+| `payments-merchant` | `wechatpay`（备选 `alipay`） | 有（各 2 read） | `satisfied` |
+| `wms-snapshot` | `wms` | **无此 service id** | `unwired`（永久） |
+| `supplier-portal` | `supplier-portal` | **无此 service id** | `unwired`（永久，optional） |
+| `carrier-portal` | `carrier-portal` | **无此 service id** | `unwired`（永久，optional） |
+
+三条 `unwired` 里，**两条不是覆盖缺口而是声明错位**：`wms` / `carrier-portal` 是业务角色名，
+连接器的 service id 是具体厂商（`wangdian` / `sf_express` / `kuaidi100`）。按现协议
+`provider` 必须写目录 service id，所以这三条无论客户接什么账号都永远关不上——
+`wms-snapshot` 还是**非 optional**，会长期计入安装门的 `unresolved`。
+
+### 4.3 建议（未实施，需产品拍板）
+
+- `wms-snapshot`：`wms` → `wangdian`（read 面够；作业指令面另议）。
+- `carrier-portal`：`carrier-portal` → `sf_express`，`alternativeProviders: ["kuaidi100"]`。
+- `supplier-portal`：目录无任何 SRM/供应商门户 provider，**保持 optional 并如实报缺口**；
+  新增 provider 属对侧立项，不在本仓绕。
+- 拍板点（两条路线，不叠加）：
+  1. **写死真厂商**（上表三行）：包面向「用这几个厂商的客户」直接可用，换厂商要改包。
+  2. **加一层角色到 provider 的映射**（客户自选自己的 WMS 品牌）：表达力强，但是新机制
+     （绑定声明→实例映射的落点、状态面口径、安装门语义都要重新定义），成本高一个量级。
+- 无论选哪条，`add-connector-bindings` 的解析层都不用改：它按 `provider` 查目录，
+  错在声明侧。
+
+### 4.4 顺带的产品事实（供定价/承诺口径用）
+
+- 供应链包 5 条绑定里，**今天真正可兑现的是 2 条**（金蝶 + 支付）；按 4.3 建议 1 改完是 **4 条**，
+  供应商门户那条依赖对侧新增 provider。
+- 五条绑定全部只申请 `read`/`write`，**没有一条申请 `destructive`**——金蝶的 5 个 destructive
+  action（保存/删单/反审核等）不在绑定授权面内，写面只到「提交/审核/下推」这类 write。
+
