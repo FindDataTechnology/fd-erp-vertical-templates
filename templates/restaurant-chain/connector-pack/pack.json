@@ -141,5 +141,23 @@
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
   "note": "pack v2 形状免自指。首个 POS 厂商适配器待首单客户确定（挂账，客户驱动）；渠道 live 面实测后声明。publish-ready：上架挂账。"
+ },
+ "i18n": {
+  "en": {
+   "name": "Restaurant chain reconciliation connector pack",
+   "description": "Connector pack for the restaurant chain reconciliation template: a POS BYOK adapter framework (one framework, vendors plugged in one at a time — the first adapter is decided by the first customer's actual vendor, no vendor list is presumed; unadapted vendors are reported honestly and served by an export-file fallback channel) plus merchant-side settlement reads (WeChat Pay / Alipay / Meituan settlement statements, live surface only claimed once measured) and delivery-platform settlement reads (Meituan and others, scoped after measurement). Credentials are granted per store via injected BYOK environment variables, never stored and never logged. Read-only beachhead: zero writes to channels or platforms, and no fund-execution surface (the second-clearing red line).",
+   "tags": [
+    "ERP",
+    "restaurant chain",
+    "reconciliation",
+    "POS",
+    "BYOK"
+   ],
+   "skills": {
+    "erp-restaurant-recon-discipline": {
+     "description": "Restaurant chain reconciliation discipline: three-way store reconciliation, the three stages of daily close, unadapted vendors reported honestly, an export-file fallback channel, zero writes to the channel side, and the fund red line."
+    }
+   }
+  }
  }
 }

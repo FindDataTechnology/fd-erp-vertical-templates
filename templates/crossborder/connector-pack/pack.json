@@ -148,5 +148,23 @@
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
   "note": "连接器 pack 为 pack v2 形状且免自指（fleet target 指向在册 fleet-board-contribution 真实 packId）。对账舰队蓝图见 recon-fleet/template.json（本包随四件套清单分发）。publish-ready：谦面市场上架为独立部署步骤（挂账）。"
+ },
+ "i18n": {
+  "en": {
+   "name": "Cross-border e-commerce reconciliation connector pack",
+   "description": "Connector pack for the cross-border e-commerce reconciliation template: Shopify store reads (reusing the already-adopted a1-x-tech/mcp-shopify-admin read surface: orders / payouts / inventory flow) plus read-only access to Chinese platforms (mcp-cn-commerce; supported surface measured, not presumed: Taobao / Tmall / JD; Pinduoduo is not offered because its upstream schema is missing). Credentials are injected as BYOK environment variables (ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN), never stored and never logged. Read-only beachhead: zero writes to external systems; real-store writes stay deferred per the crm-board ruling of 2026-10-30 until merchants bring their own credentials per store.",
+   "tags": [
+    "ERP",
+    "cross-border e-commerce",
+    "reconciliation",
+    "connector",
+    "BYOK"
+   ],
+   "skills": {
+    "erp-crossborder-recon-discipline": {
+     "description": "Cross-border e-commerce reconciliation discipline: three-party flow alignment, four classes of discrepancy with references on both sides, multi-currency reconciliation in original currency with a sourced exchange rate, fees as an independent dimension, zero writes to the platform side, and honest boundary-keeping."
+    }
+   }
+  }
  }
 }
