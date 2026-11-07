@@ -252,3 +252,32 @@ def test_threshold_alerts_and_disposal_lane(tmp_path):
                                    title="逾期应收催收（锚点实例）")
     ev.reject_disposal_task(task2["request_id"], "证据不足", decided_by="owner")
     assert ev.pending_tasks() == []  # 一个确认派发、一个拒绝留痕
+
+
+def test_handoff_lines_drive_planning_without_key_mismatch(tmp_path, supply_md):
+    """确认车道交出的 handoff 行必须能直接喂给履约编排（键名不得错配）。
+
+    2026-11-08 产上首现：`confirm_order` 写进 handoff 的 lines 是**取价后**的
+    形状（商品键叫 `product`），而 `plan_fulfillment` 只认 `product_code` ——
+    标准「确认 → 履约」流会拿空编码查主档，报「商品未建档：」。这里直接消费
+    handoff 载荷里的行，锁死两条车道对同一行的理解一致。
+    """
+    m = supply_md
+    m.confirm_request(m.create_entity("customer", {"code": "C-CUST",
+                                                   "name": "客户丙"}
+                                      )["request_id"], decided_by="owner")
+    ff = FulfillmentOrchestrator("tpl-supply", tmp_path / "data", m,
+                                 DemoWmsAdapter([]), DemoLogisticsAdapter())
+    handoff_ref, order_ref = _handoff(
+        tmp_path, m, [{"product_code": "P-DS", "qty": 1, "unit": "件"}])
+    handoff = next(e for e in ff._handoff_log.events()
+                   if e.get("ref") == handoff_ref)
+    plan = ff.plan_fulfillment(handoff_ref, order_ref, ids_customer(m),
+                               handoff["payload"]["lines"])  # 原样消费，不改形状
+    assert plan["lines"][0]["product_code"] == "P-DS"
+    assert plan["lines"][0]["path"] == "dropship"
+
+    with pytest.raises(TemplateError) as ei:
+        ff.plan_fulfillment(handoff_ref, order_ref, ids_customer(m),
+                            [{"qty": "1"}])
+    assert ei.value.code == "INVALID_ARGUMENT"

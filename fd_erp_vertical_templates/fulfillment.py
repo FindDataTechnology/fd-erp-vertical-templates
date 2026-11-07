@@ -144,7 +144,17 @@ class FulfillmentOrchestrator:
 
         plan_lines: list[dict[str, Any]] = []
         for ln in lines:
-            code = str(ln.get("product_code") or "")
+            # 行键名兼容（2026-11-08 产上首现）：订单编排 confirm_order 交出的
+            # handoff 载荷带的是**取价后的 `product` 键**，本函数此前只认
+            # `product_code`，于是「确认 → 履约编排」这条标准流会拿空编码去查主档，
+            # 报「商品未建档：（空）」——看着像数据缺失，实为两模块键名不一致。
+            # 三种键都收（product_code 优先），仍缺则如实报 INVALID_ARGUMENT。
+            code = str(ln.get("product_code") or ln.get("product")
+                       or ln.get("productId") or "").strip()
+            if not code:
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"履约行缺商品编码（product_code/product/productId）：{ln!r}")
             qty = Decimal(str(ln.get("qty") or "0"))
             path = self._line_path(code)
             if path["path"] == "dropship":
