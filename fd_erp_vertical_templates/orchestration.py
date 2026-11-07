@@ -317,9 +317,16 @@ class ProcurementOrchestrator:
             raise TemplateError("INVALID_ARGUMENT", "发货反馈行不得为空")
         norm: list[dict[str, Any]] = []
         for ln in lines:
-            code = str(ln.get("product_code") or "").strip()
+            # 行键名兼容（2026-11-08 跨入口实测）：小程序发货反馈页发的是
+            # `{product, qty}`（pages/sp/delivery-feedback/index.tsx），本函数此前
+            # 只认 `product_code` —— 真前端走这条路径必 400，而单测手工造的是
+            # product_code 所以全绿（跨入口形状漂移，单侧测试是伪证）。
+            code = str(ln.get("product_code") or ln.get("product")
+                       or ln.get("productId") or "").strip()
             if not code:
-                raise TemplateError("INVALID_ARGUMENT", "发货反馈行缺 product_code")
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"发货反馈行缺商品编码（product_code/product/productId）：{ln!r}")
             qty = _dec(ln.get("qty"), "发货数量")
             if qty <= 0:
                 raise TemplateError("INVALID_ARGUMENT", "发货数量须 > 0")

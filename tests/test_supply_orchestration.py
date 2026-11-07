@@ -345,3 +345,26 @@ class _RaisingKernel:
 
     def release_credit(self, *a, **k):  # pragma: no cover
         raise AssertionError("未登记额度时不得回冲信用")
+
+
+def test_delivery_feedback_accepts_miniapp_line_shape(tmp_path, md):
+    """发货反馈必须吃小程序发的 `{product, qty}`（跨入口形状漂移回归）。
+
+    2026-11-08 产上实测：`pages/sp/delivery-feedback` 提交的是 {product, qty}，
+    而模板层只认 product_code → 真前端必 400；单测此前只造 product_code，
+    故全绿（单侧测试是伪证）。
+    """
+    m, ids = md
+    from fd_erp_vertical_templates.orchestration import ProcurementOrchestrator
+    proc = ProcurementOrchestrator("tpl-supply", tmp_path / "data", m)
+    demand = proc.submit_demand("manual", [{"product_code": "P001", "qty": "10",
+                                            "unit": "件"}])
+    agg = proc.aggregate_demand([demand["ref"]])
+    po = proc.propose_purchase_order(agg["ref"], ids["supplier"])
+    proc.confirm_purchase_order(po["request_id"])
+    proc.record_push(po["ref"], channel="supplier-portal")
+
+    out = proc.record_delivery_feedback(po["ref"], [{"product": "P001", "qty": 10}],
+                                        carrier="CARRIER-1", waybill_no="WB-1")
+    assert out["lines"][0]["product_code"] == "P001"
+    assert out["arrival_ref"]  # 发货反馈自动生成到货预告
