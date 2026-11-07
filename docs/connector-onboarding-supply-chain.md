@@ -214,3 +214,20 @@
 - 五条绑定全部只申请 `read`/`write`，**没有一条申请 `destructive`**——金蝶的 5 个 destructive
   action（保存/删单/反审核等）不在绑定授权面内，写面只到「提交/审核/下推」这类 write。
 
+### 4.5 机器门：这坑不许再踩第二遍
+
+「声明的 provider 在目录里不存在」这类错误此前**没有任何一层能拦住**：paas 的
+`lib/pack-manifest.js` 只校验形状（它在 CI 里读不到连接器目录），绑定解析只会在运行时
+如实报 `unwired`——而那时包已经发布了。所以在本仓加了一道门：
+
+- `scripts/refresh_connector_catalog_ids.py` → 把目录 `catalog/apps/*.json` 的 `service`
+  集快照进 `tests/fixtures/connector-catalog-service-ids.json`（1570 个 id；`--check` 只比对）。
+  手法与 paas `lib/wire-tool-risk.js` 一致：快照入库、本地刷新、有 checkout 时逐值比对。
+- `tests/test_connector_binding_providers.py`：每个声明（含 `alternativeProviders`）的
+  provider 必须在快照里，或在 `ROLE_PROVIDERS` 登记表里带 `reason` + `decision` 说明为什么
+  只能用角色名；登记项不许腐坏（没人用就得删）。非 optional 的角色 provider 不判红
+  （要产品拍板）但每次跑测试都打印出来，并把 `wms-snapshot` 这条事实钉住。
+- 负向实证：临时塞一个 `provider: "erp-system"` 的假声明 → 门变红并指名
+  `templates/zz-negtest-connector-pack.json: erp-thing → provider 'erp-system' 不在目录`；
+  删除后复绿。全量 108 passed / 15 skipped。
+
