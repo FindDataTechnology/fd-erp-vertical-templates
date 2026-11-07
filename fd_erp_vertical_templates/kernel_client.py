@@ -140,6 +140,7 @@ class McpKernelClient:
         首跑即暴露（demo e2e 走的是 InProcess 形态）。
         """
         import asyncio
+        import concurrent.futures
 
         from fastmcp import Client  # 惰性导入：仅生产路径需要
 
@@ -153,7 +154,20 @@ class McpKernelClient:
                     return data
                 return getattr(result, "structured_content", result)
 
-        return asyncio.run(_run())
+        # 2026-11-08 缺陷修复（产上首现，比 11-07 那个更隐蔽）：REST 面是
+        # FastAPI **async** 端点，在运行中的事件循环里调 asyncio.run 会抛
+        # `RuntimeError: asyncio.run() cannot be called from a running event
+        # loop`，被统一壳兜成 500 INTERNAL —— 凡碰内核的端点全中（对账单的
+        # list_proposals、下单的 reserve_credit、对账的 run_reconciliation）。
+        # 单测/demo e2e 走同步上下文（无运行循环）故全绿，只有
+        # `transport=mcp` + 真 HTTP 请求这个组合才炸。修法：已有运行循环时把
+        # 协程丢到独立线程的新循环里跑（线程内 asyncio.run 合法）。
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(_run())  # 同步上下文（fleet 车道 / 脚本 / 测试）
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, _run()).result()
 
     def submit_proposal(self, stable_id, lines, source_ref=None, kind="journal",
                         reversal_of=None, lane_fleet=None, lane_post=None,

@@ -147,3 +147,52 @@ def test_optional_pack_kinds_rejected_when_invalid(tmp_path):
     with pytest.raises(TemplateError) as ei:
         load_template_manifest(bad_dir)
     assert "rate_source" in ei.value.message
+
+
+def test_mcp_kernel_client_call_is_loop_safe():
+    """回归：MCP 内核客户端必须能在**已运行的事件循环内**被同步调用。
+
+    产上首现（2026-11-08）：REST 面是 FastAPI async 端点，`_call` 里裸调
+    `asyncio.run()` 抛 `RuntimeError: asyncio.run() cannot be called from a
+    running event loop`，凡碰内核的端点（对账单/下单信用/对账）全 500。
+    这里用假 fastmcp Client 复现两种上下文：无循环（脚本/测试）与有循环
+    （async 端点），断言两条路径都拿得到业务结果、且不串循环。
+    """
+    import asyncio
+    import sys
+    import types
+
+    from fd_erp_vertical_templates.kernel_client import McpKernelClient
+
+    class _FakeResult:
+        def __init__(self, data):
+            self.data = data
+
+    class _FakeClient:
+        def __init__(self, url):
+            self.url = url
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call_tool(self, tool, args):
+            return _FakeResult({"tool": tool, "tenant": args.get("tenant_id")})
+
+    fake = types.ModuleType("fastmcp")
+    fake.Client = _FakeClient
+    sys.modules["fastmcp"] = fake
+    try:
+        client = McpKernelClient("http://kernel.test/mcp", "acme")
+        # ① 同步上下文
+        assert client.list_proposals()["tool"] == "list_proposals"
+        # ② 已在运行的事件循环内（async 端点形态）
+        async def inside_loop():
+            return client.list_proposals()
+
+        got = asyncio.run(inside_loop())
+        assert got == {"tool": "list_proposals", "tenant": "acme"}
+    finally:
+        sys.modules.pop("fastmcp", None)
