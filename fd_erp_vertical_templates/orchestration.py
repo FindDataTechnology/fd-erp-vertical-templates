@@ -463,7 +463,33 @@ class OrderOrchestrator:
                            **({"note": ln["note"]} if ln.get("note") else {})})
 
         # ---- 2) 信用校验（fail-closed 可解释拒单）----
-        credit = self._kernel.query_credit(str(customer_id)) or {}
+        # 「未登记额度」必须与「额度不足」区分（2026-11-08 产上首现）：此前
+        # query_credit 回 NOT_FOUND（MCP 形态是 {ok:false,...} 错误壳，进程内形态
+        # 抛 ErpError），下一行 `_dec(None)` 把它报成
+        # `INVALID_ARGUMENT: 信用额度 limit 非法：None` —— 看着像调用方传错参数，
+        # 实则是运维前置动作（set_credit_limit）没做。先判形态，给可执行的错误码。
+        try:
+            credit = self._kernel.query_credit(str(customer_id)) or {}
+        except Exception as exc:  # 进程内形态：ErpError NOT_FOUND
+            if getattr(exc, "code", None) != "NOT_FOUND":
+                raise
+            raise TemplateError(
+                "CREDIT_NOT_REGISTERED",
+                f"该客户未登记信用额度，不能受理订单：{customer_id}",
+                detail={"customer_id": str(customer_id),
+                        "remedy": "运维在内核登记信用额度（set_credit_limit）后重试"}) from exc
+        if not isinstance(credit, dict) or credit.get("ok") is False \
+                or credit.get("limit") in (None, ""):
+            err = (credit.get("error") or {}) if isinstance(credit, dict) else {}
+            if isinstance(credit, dict) and credit.get("ok") is False \
+                    and err.get("code") not in (None, "NOT_FOUND"):
+                raise TemplateError(str(err.get("code")),
+                                    str(err.get("message") or "信用查询失败"))
+            raise TemplateError(
+                "CREDIT_NOT_REGISTERED",
+                f"该客户未登记信用额度，不能受理订单：{customer_id}",
+                detail={"customer_id": str(customer_id),
+                        "remedy": "运维在内核登记信用额度（set_credit_limit）后重试"})
         limit = _dec(credit.get("limit"), "信用额度 limit")
         ar = _dec(credit.get("ar_balance"), "应收余额 ar_balance")
         reserved = _dec(credit.get("reserved"), "已占用 reserved")

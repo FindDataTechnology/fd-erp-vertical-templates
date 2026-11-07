@@ -17,6 +17,7 @@ class TemplateError(Exception):
         "MANIFEST_INVALID",      # 模板四件套清单非法
         "BOUNDARY_VIOLATION",    # 模板边界审计发现违规
         "MASTER_DATA_STATE",     # 主数据状态非法（如已停业门店再出日结）
+        "CREDIT_NOT_REGISTERED",  # 客户未登记信用额度（下单前置运维动作缺失）
         "WORKFLOW_STATE",        # 编排工作流状态非法（如未确认的采购单再推送）
         "SHARE_EXECUTION_DENIED",  # 试图输出资金执行面（红线，模板层直接拒绝）
     )

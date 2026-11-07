@@ -297,3 +297,51 @@ def test_inprocess_kernel_new_tools_fail_closed(kernel):
     with pytest.raises(ErpError) as ei:  # 缺 stable_id：内核如实拒绝（不伪造）
         kernel.bill_event({"kind": "storage"})
     assert "stable_id" in ei.value.message
+
+
+def test_accept_order_unregistered_credit_is_explicit(tmp_path, md):
+    """未登记信用额度 → CREDIT_NOT_REGISTERED（不是 INVALID_ARGUMENT）。
+
+    2026-11-08 产上首现：query_credit 回 NOT_FOUND（MCP 形态是错误壳、进程内形态
+    抛 ErpError），旧代码下一行 `_dec(None)` 把它报成「信用额度 limit 非法：None」
+    —— 看着像调用方参数错，实则运维没登记额度。两种形态都要给同一个可执行错误。
+    """
+    m, ids = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+
+    class _NotFoundKernel:
+        """MCP 形态：返回 {ok:false,error:{code:NOT_FOUND}} 错误壳。"""
+
+        def query_credit(self, customer_id):
+            return {"ok": False, "error": {"code": "NOT_FOUND",
+                                           "message": "该客户未登记信用额度"}}
+
+        def reserve_credit(self, *a, **k):  # pragma: no cover - 不该被调用
+            raise AssertionError("未登记额度时不得占用信用")
+
+        def release_credit(self, *a, **k):  # pragma: no cover
+            raise AssertionError("未登记额度时不得回冲信用")
+
+    for kernel in (_NotFoundKernel(), _RaisingKernel()):
+        board = OrderOrchestrator("tpl-supply", tmp_path / "data", kernel, m, book)
+        with pytest.raises(TemplateError) as ei:
+            board.accept_order(ids["customer"], [
+                {"product_code": "P001", "qty": 1, "unit": "件"}], DAY)
+        assert ei.value.code == "CREDIT_NOT_REGISTERED"
+        assert "未登记信用额度" in ei.value.message
+        assert ei.value.detail.get("remedy")
+        assert board.pending_requests() == []  # fail-closed：不落订单
+
+
+class _RaisingKernel:
+    """进程内形态：ErpError(NOT_FOUND) 直接抛出。"""
+
+    def query_credit(self, customer_id):
+        from fd_erp_vertical_templates.errors import TemplateError
+        raise TemplateError("NOT_FOUND", "该客户未登记信用额度")
+
+    def reserve_credit(self, *a, **k):  # pragma: no cover
+        raise AssertionError("未登记额度时不得占用信用")
+
+    def release_credit(self, *a, **k):  # pragma: no cover
+        raise AssertionError("未登记额度时不得回冲信用")
