@@ -194,32 +194,35 @@
 `provider` 必须写目录 service id，所以这三条无论客户接什么账号都永远关不上——
 `wms-snapshot` 还是**非 optional**，会长期计入安装门的 `unresolved`。
 
-### 4.3 建议（未实施，需产品拍板）
+### 4.3 建议（**已裁决，见 §4.7**；本节保留为决策史）
+
+> 两条候选里选了路线 2（角色 → provider 映射），已在 paas 侧实现并归档
+> （`add-connector-role-mapping`，2026-11-08）。下面原文里的「保持 optional / 降 optional」
+> 与「待拍板」都已被 §4.7 取代，读结论请直接跳到 §4.7/§4.8。
 
 - `supplier-portal`：目录无任何 SRM/供应商门户 provider，**保持 optional 并如实报缺口**；
   新增 provider 属对侧立项，不在本仓绕。
 - 已于 2026-11-08 落地的一条（不需要猜客户品牌）：**`wms-snapshot` 降为 `optional: true`**，
   并把理由写进**本文档**（不是绑定 `note`，见下）。原因：它原先非 optional 却指向目录里不存在的
   `wms`，安装门会永久挂一条「未解决」——而这条**用户接任何账号都关不上**，属于错误指引而不是
-  能力缺口。降 optional 后它在状态面上如实显示为 `unwired`（能力缺口），不再冒充待办；
-  客户 WMS 品牌确认后改真 service id 并恢复非 optional（两份副本同步改，逐字节一致门守着）。
+  能力缺口。降 optional 后它在状态面上如实显示为 `unwired`（能力缺口），不再冒充待办。
 - **`note` 是面向客户的字段，不是工程日志**：首版把它写成「目录无 wms、最近项 wangdian 只有 read 面」
-  这类内部分析，等于把供应链短板印在货架上。已改为一句对外陈述（品牌待确认 → 选接项 →
-  未接通如实标注、不阻塞安装 → 品牌确认后改必接），分析留在本节。改 `note` 时先问：
+  这类内部分析，等于把供应链短板印在货架上。已改为一句对外陈述。改 `note` 时先问：
   这句话给客户看是否成立、是否泄露内部分析。
-- 仍待你拍板的两条（都不影响上面的落地，逐条可独立开）：
+- 当时待拍板的两条（**已选 2**）：
   1. `wms`/`carrier-portal` 是否**写死真厂商**（`wangdian` / `sf_express` + 备选 `kuaidi100`）：
      面向「用这几个厂商的客户」直接可用，换厂商要改包。
   2. 是否**加一层角色到 provider 的映射**（客户自选自己的 WMS 品牌）：表达力强，但是新机制
      （绑定声明→实例映射的落点、状态面口径、安装门语义都要重新定义），成本高一个量级。
      两条路线不叠加。
-- 无论哪条，`add-connector-bindings` 的解析层都不用改：它按 `provider` 查目录，
-  错在声明侧。
 
 ### 4.4 顺带的产品事实（供定价/承诺口径用）
 
-- 供应链包 5 条绑定里，**今天真正可兑现的是 2 条**（金蝶 + 支付）；按 4.3 建议 1 改完是 **4 条**，
-  供应商门户那条依赖对侧新增 provider。
+- 供应链包 5 条绑定里，**声明侧可兑现 4 条**：金蝶 + 支付本来就指向真实 provider；
+  WMS / 供应商门户 / 承运商门户三条改为角色绑定后，能否兑现取决于**客户自己连了什么**
+  （客户连了自己的 WMS 并且该 provider 的操作面覆盖所需类目 ⇒ 可兑现），不再取决于
+  目录有没有同名 provider。剩下的不确定性从"我们的目录覆盖"变成"客户的账号"，这是
+  谈单时可以说清的一件事，而不是一句"暂不支持"。
 - 五条绑定全部只申请 `read`/`write`，**没有一条申请 `destructive`**——金蝶的 5 个 destructive
   action（保存/删单/反审核等）不在绑定授权面内，写面只到「提交/审核/下推」这类 write。
 
@@ -232,14 +235,19 @@
 - `scripts/refresh_connector_catalog_ids.py` → 把目录 `catalog/apps/*.json` 的 `service`
   集快照进 `tests/fixtures/connector-catalog-service-ids.json`（1570 个 id；`--check` 只比对）。
   手法与 paas `lib/wire-tool-risk.js` 一致：快照入库、本地刷新、有 checkout 时逐值比对。
-- `tests/test_connector_binding_providers.py`：每个声明（含 `alternativeProviders`）的
-  provider 必须在快照里，或在 `ROLE_PROVIDERS` 登记表里带 `reason` + `decision` 说明为什么
-  只能用角色名；登记项不许腐坏（没人用就得删）。**且角色名只允许出现在 `optional` 绑定上**
-  ——非 optional 却指向目录里不存在的 id，等于安装门永久挂一条用户处理不了的项，直接判红。
-- 负向实证（两条，都验过红再恢复）：①塞一个 `provider: "erp-system"` 的假声明 → 门变红并
-  指名 `templates/zz-negtest-connector-pack.json: erp-thing → provider 'erp-system' 不在目录`；
-  ②把 `wms-snapshot` 改回 `optional: false` → 门变红并指名
-  `wms-snapshot（provider=wms）— 角色名却不能 optional`。全量 108 passed / 15 skipped。
+- `tests/test_connector_binding_providers.py`：认的是**显式开关**，不是"名字看起来像不像厂商"——
+  ①`providerRole: true` ⇒ provider 必须是 `ROLE_PROVIDERS` 里登记过的角色名（带 `reason` +
+  `decision`），且不得声明 `alternativeProviders`（映射由客户选定，没有回退）；
+  ②没有该开关 ⇒ provider（含备选）必须 ∈ 目录快照，角色名不能再靠"看起来像业务词"混过；
+  ③`providerRole: true` 而 provider 恰是真实 service id ⇒ 判红（那会把一个厂商写成角色）；
+  ④登记项不许腐坏（没人用就得删）。
+  **2026-11-08 起「角色名只允许出现在 optional 绑定上」这条已废止**（见 §4.7）：非 optional
+  的角色绑定现在可被客户选定后闭环，不再是"用户处理不了的项"。
+- 负向实证（都验过红再恢复）：①塞一个 `provider: "erp-system"` 的假声明 → 门变红并指名
+  `templates/zz-negtest-connector-pack.json: erp-thing → provider 'erp-system' 不在目录`；
+  ②把 `wms-snapshot` 的 `providerRole` 删掉、只留 `provider: "wms"` → 门变红并指名
+  「角色名缺 providerRole: true」；③给角色绑定加 `alternativeProviders: ["wangdian"]` → 判红。
+  全量 109 passed / 15 skipped。
 
 
 ### 4.6 市场侧现状（2026-11-08 只读核对）
@@ -257,3 +265,47 @@
 - 重发时别忘：`fd-appliance/tenants/supply-chain/content/erp-templates/supply-chain-connector-pack.json`
   必须与源逐字节一致（`tests/test_manifest.py::test_appliance_copies_match_template_sources`），
   paas 侧的 `test/fixtures/connector-bindings/supply-chain-after.json` 同批跟上。
+
+### 4.7 角色绑定落地（2026-11-08，路线 2 已建成）
+
+paas 侧 `add-connector-role-mapping` 已归档，绑定可以用**角色形态**声明：
+
+```json
+{ "key": "wms-snapshot", "provider": "wms", "providerRole": true, "allowOperations": ["read"] }
+```
+
+- `providerRole: true` 是显式开关：有它，`provider` 按**角色名**解释（不再去目录找同名
+  service id）；没有它，语义与以前完全一致。
+- 客户在连接器卡片的该行下拉框里**选定自己实际在用的系统**（候选只列他**已连通**、
+  且操作面覆盖所需类目的那些；覆盖不足的会带缺口原因列出，不假装可选）。选定后绑定
+  就地满足、可授权，不用我们改包。
+- 未选定 ⇒ 状态面报 **`unmapped`（待选系统）**，与 `unwired`（我们的目录缺能力）、
+  `missing`（客户选了但没连）三种状态、三种修法分开计数。这是本条路线的全部价值：
+  把"我们没覆盖"和"你还没说"分开。
+
+**本仓这一版做了什么（pack 1.0.1 → 1.1.0）：**
+
+| 绑定 | 之前 | 现在 |
+| --- | --- | --- |
+| `wms-snapshot` | `provider: "wms"`，无开关，永久 `unwired`（故已降 optional） | `providerRole: true`，客户选定即可满足；仍 optional |
+| `supplier-portal` | 同上 | `providerRole: true`；仍 optional |
+| `carrier-portal` | 同上 | `providerRole: true`；仍 optional |
+| `kingdee-cloud` / `payments-merchant` | 真实 service id | 不变 |
+
+**为什么三条仍是 optional：** optional 回答的是"这个包能不能在没有它的情况下用"，与
+"能不能被满足"是两件事。角色绑定让它们**可以被满足**了，但"仓配分销是否必须接 WMS"
+是产品范围问题，要有锚点客户的真实诉求再改（改法：把该绑定 `optional` 置 false，
+机制侧无需改动——paas 的 `add-connector-role-mapping` 用例已覆盖非 optional 未映射
+即可关闭的路径）。别把范围决策混进机制改造里一次做完。
+
+### 4.8 市场重发与三处副本（执行清单）
+
+改这个包时**四处必须同步**，少一处就有一条门变红（都是既有门，不是新加的）：
+
+1. 源：`templates/supply-chain/connector-pack/pack.json`
+2. 整机镜像：`fd-appliance/tenants/supply-chain/content/erp-templates/supply-chain-connector-pack.json`
+   （**逐字节一致**，`tests/test_manifest.py::test_appliance_copies_match_template_sources` 守着）
+3. paas 夹具：`paas/test/fixtures/connector-bindings/supply-chain-after.json`
+   （`scripts/test-connector-bindings-manifest.mjs` 断言它过 `validatePackManifest`）
+4. 市场：`fleet-packs/scripts/publish_pack.py <源 pack.json> --author <email> --pack-id y8gnMHFMze-Mylsd6JXpkA`
+   （出 v3；限流 10 次/时），发完用 `fleet-packs/scripts/check_drift.py` 复核源=市场逐字段一致。
