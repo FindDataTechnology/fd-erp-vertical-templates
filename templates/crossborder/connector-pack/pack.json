@@ -1,15 +1,25 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商对账连接器包",
- "version": "1.0.0",
+ "version": "1.1.0",
  "description": "跨境电商对账模板·连接器 pack：Shopify 店铺读取（复用已采纳 a1-x-tech/mcp-shopify-admin 的读面：订单/收款 payouts/库存流）+ 国内平台只读（mcp-cn-commerce，支持面以实测为准：淘宝/天猫/京东；拼多多上游 schema 缺失当前不提供）。凭证 BYOK 环境变量注入（ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN）零落库零日志。只读滩头：对外部系统零写入；真实店读写沿 crm-board 2026-10-30 裁决暂缓，待商家自带凭证逐店上线。运行时形态 = fd-erp-vertical-templates Python 包（对账驱动 sidecar），本包为市场分发与 pack v2 兼容清单。",
- "tags": ["ERP", "跨境电商", "对账", "连接器", "BYOK"],
+ "tags": [
+  "ERP",
+  "跨境电商",
+  "对账",
+  "连接器",
+  "BYOK"
+ ],
  "visibility": "public",
  "category": "facet",
  "connectors": {
   "shopify": {
    "adopted_from": "a1-x-tech/mcp-shopify-admin",
-   "flows": ["orders", "payments(payouts)", "inventory"],
+   "flows": [
+    "orders",
+    "payments(payouts)",
+    "inventory"
+   ],
    "credential_env": "ERP_BYOK_SHOPIFY_TOKEN",
    "writes_external": false,
    "real_store_writes": "暂缓（crm-board 2026-10-30 裁决）"
@@ -17,10 +27,31 @@
   "cn_commerce": {
    "server": "mcp-cn-commerce",
    "support_surface": {
-    "taobao": {"flows": ["orders", "payments"], "measured_at": "2026-11-06"},
-    "tmall": {"flows": ["orders", "payments"], "measured_at": "2026-11-06"},
-    "jd": {"flows": ["orders", "payments"], "measured_at": "2026-11-06"},
-    "pinduoduo": {"flows": [], "note": "上游接口 schema 缺失，当前不提供（如实守界）"}
+    "taobao": {
+     "flows": [
+      "orders",
+      "payments"
+     ],
+     "measured_at": "2026-11-06"
+    },
+    "tmall": {
+     "flows": [
+      "orders",
+      "payments"
+     ],
+     "measured_at": "2026-11-06"
+    },
+    "jd": {
+     "flows": [
+      "orders",
+      "payments"
+     ],
+     "measured_at": "2026-11-06"
+    },
+    "pinduoduo": {
+     "flows": [],
+     "note": "上游接口 schema 缺失，当前不提供（如实守界）"
+    }
    },
    "credential_env": "ERP_BYOK_CN_COMMERCE_TOKEN",
    "writes_external": false
@@ -29,6 +60,36 @@
    "status": "不接入：出现合格开源 MCP server 前不接入（spec 如实守界）"
   }
  },
+ "connector_bindings": [
+  {
+   "key": "shopify-store",
+   "external_system": "Shopify 店铺",
+   "surface": "订单 + 收款 payouts + 库存流只读",
+   "direction": "read-only",
+   "credential": "BYOK：ERP_BYOK_SHOPIFY_TOKEN（凭证不出库）",
+   "note": "复用已采纳的 mcp-shopify-admin 读面；真实店读写沿 crm-board 2026-10-30 裁决暂缓，商家自带凭证逐店上线。",
+   "provider": "shopify",
+   "allowOperations": [
+    "read"
+   ],
+   "connectionHint": "Shopify 店铺",
+   "optional": true
+  },
+  {
+   "key": "cn-commerce-store",
+   "external_system": "国内电商店铺（淘宝/天猫/京东）",
+   "surface": "订单 + 收款流水只读（支持面以实测为准）",
+   "direction": "read-only",
+   "credential": "BYOK：ERP_BYOK_CN_COMMERCE_TOKEN",
+   "note": "客户在连接器卡片选定自己实际在用的平台及其账号。拼多多的上游接口 schema 目前缺失，故不声明——声明了就是一条永远关不上的缺口。",
+   "provider": "cn-commerce",
+   "providerRole": true,
+   "allowOperations": [
+    "read"
+   ],
+   "optional": true
+  }
+ ],
  "skills": [
   {
    "name": "erp-crossborder-recon-discipline",
@@ -43,7 +104,14 @@
  "mcpServers": [
   {
    "registryName": "fd-erp-ledger-mcp",
-   "allowTools": ["run_reconciliation", "get_recon_report", "query_balance", "query_entries", "list_proposals", "submit_proposal"]
+   "allowTools": [
+    "run_reconciliation",
+    "get_recon_report",
+    "query_balance",
+    "query_entries",
+    "list_proposals",
+    "submit_proposal"
+   ]
   }
  ],
  "fleet": {
@@ -53,14 +121,32 @@
     "ref": "xb-recon-operator",
     "title": "对账产出位",
     "parentRef": null,
-    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
-    "kpiSlots": [{"key": "stores_reconciled", "label": "已对店铺"}, {"key": "diffs_found", "label": "差异条目"}]
+    "target": {
+     "kind": "pack-preset",
+     "packId": "Mo3_aWe7tF2eFVzkqFT9mA",
+     "presetId": "erp-ledger-board-post"
+    },
+    "kpiSlots": [
+     {
+      "key": "stores_reconciled",
+      "label": "已对店铺"
+     },
+     {
+      "key": "diffs_found",
+      "label": "差异条目"
+     }
+    ]
    }
   ],
-  "orchestration": {"mode": "supervisor", "edges": []}
+  "orchestration": {
+   "mode": "supervisor",
+   "edges": []
+  }
  },
  "_casting": {
-  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "packDependencies": {
+   "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
+  },
   "note": "连接器 pack 为 pack v2 形状且免自指（fleet target 指向在册 fleet-board-contribution 真实 packId）。对账舰队蓝图见 recon-fleet/template.json（本包随四件套清单分发）。publish-ready：谦面市场上架为独立部署步骤（挂账）。"
  }
 }

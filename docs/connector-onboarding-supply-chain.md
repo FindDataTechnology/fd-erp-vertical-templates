@@ -309,3 +309,36 @@ paas 侧 `add-connector-role-mapping` 已归档，绑定可以用**角色形态*
    （`scripts/test-connector-bindings-manifest.mjs` 断言它过 `validatePackManifest`）
 4. 市场：`fleet-packs/scripts/publish_pack.py <源 pack.json> --author <email> --pack-id y8gnMHFMze-Mylsd6JXpkA`
    （出 v3；限流 10 次/时），发完用 `fleet-packs/scripts/check_drift.py` 复核源=市场逐字段一致。
+
+## 五、另两条行业线的连接器包（2026-11-08 补齐机器字段）
+
+此前只有供应链包的连接需求是机器可读的（`connector_bindings`）；餐饮连锁与跨境电商两个
+对账连接器包把需求写在旧的 `connectors` 说明字段里，**壹座的绑定链完全看不见它们**——
+没有安装门、没有状态面、没有范围授权、也没有「选择你的系统」。两个包都还没上架（市场台账
+里只有 supply-chain-connector-pack），所以这是上市前的补齐，无客户可见变更。
+
+补法与本仓既有的判断一致：**能写真 id 的写 id，品牌随客户变的写角色**。
+
+| 包 | 绑定 | provider | 形态 | optional |
+| --- | --- | --- | --- | --- |
+| 餐饮连锁 | `pos-sales` | `pos` | 角色 | 是 |
+| 餐饮连锁 | `payments-merchant` | `wechatpay`（备选 `alipay`/`meituan`） | 真 id | 是 |
+| 餐饮连锁 | `delivery-settlement` | `meituan` | 真 id | 是 |
+| 跨境电商 | `shopify-store` | `shopify` | 真 id | 是 |
+| 跨境电商 | `cn-commerce-store` | `cn-commerce` | 角色 | 是 |
+
+两处判断，都是「如实」而不是「好看」：
+
+1. **餐饮三条全 optional**：包自己写明未适配厂商走导出文件替代通道，所以 POS 未接通不能
+   阻塞安装；支付/外卖的 live 面在所有文档里都是「实测后声明」，写成必接就等于承诺没测过
+   的东西。
+2. **跨境两条全 optional，且不声明拼多多**：跨境对账面对的是两个互斥客群（只做 Shopify
+   的、只做国内平台的），任何一条写必接都会让另一半客群装不上；拼多多上游 schema 缺失，
+   声明了就是一条永远关不上的缺口——按既有裁决（crm-board 2026-10-30）不声明。
+3. `meituan` 同时出现在支付备选与外卖结算两处：两者是**两个面**（外卖结算单 ≠ 支付流水），
+   分别对账，故用两条 key 表达，而不是一条绑定兜住两件事。
+
+同时补了一条门的盲点：`tests/test_manifest.py` 的 appliance 逐字节镜像门原本只扫
+supply-chain 一个租户，另外两个租户的副本落后时门还是绿的（实测：crossborder 与
+restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三租户 × 全部副本，并做了
+负向实证（改坏 crossborder 副本 → 门红并指名）。

@@ -1,28 +1,88 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "餐饮连锁对账连接器包",
- "version": "1.0.0",
+ "version": "1.1.0",
  "description": "餐饮连锁对账模板·连接器 pack：POS BYOK 适配器框架（框架一个、厂商逐个插拔；首个适配厂商由首单客户的实际厂商决定，不预设名单；未适配厂商如实报出 + 导出文件替代通道）+ 收款渠道商户侧适配（微信支付/支付宝/美团商户侧 API 结算流水拉取，可用面以实测为准，未实测不宣称 live）+ 外卖结算读取（美团等，实测后写入适配器范围）。凭证逐店授权 BYOK 环境变量注入零落库。只读滩头：对渠道/平台侧零写入；无资金执行面（二清红线）。",
- "tags": ["ERP", "餐饮连锁", "对账", "POS", "BYOK"],
+ "tags": [
+  "ERP",
+  "餐饮连锁",
+  "对账",
+  "POS",
+  "BYOK"
+ ],
  "visibility": "public",
  "category": "facet",
  "connectors": {
   "pos_framework": {
    "model": "framework-one-vendor-pluggable",
    "production_vendors": [],
-   "registered": ["synthetic（测试）", "export-file（导出文件替代通道）"],
+   "registered": [
+    "synthetic（测试）",
+    "export-file（导出文件替代通道）"
+   ],
    "per_store_authorization": "ERP_BYOK_POS_<厂商>_<店> 环境变量，逐店开通",
    "fallback": "未适配厂商：商户后台导出 CSV → 导出文件通道（不以人工补录冒充自动接入）",
    "writes_external": false
   },
   "payment_channels": {
-   "framework_channels": ["wechat-pay", "alipay", "meituan", "synthetic"],
+   "framework_channels": [
+    "wechat-pay",
+    "alipay",
+    "meituan",
+    "synthetic"
+   ],
    "live_surfaces": {},
    "note": "框架就绪；live 面须实测证据后声明（design D7：spec 只约束行为不预设接口）",
    "credential_env": "ERP_BYOK_PAY_<渠道>",
    "writes_external": false
   }
  },
+ "connector_bindings": [
+  {
+   "key": "pos-sales",
+   "external_system": "门店 POS（厂商按客户插拔）",
+   "surface": "销售流水/订单明细只读（日结对账口径）",
+   "direction": "read-only",
+   "credential": "BYOK：ERP_BYOK_POS_<厂商>_<店>（逐店授权，凭证不出库）",
+   "note": "适配器框架一个、厂商逐个插拔；客户在连接器卡片选定自己实际在用的 POS。未适配厂商走导出文件替代通道，不以人工补录冒充自动接入。",
+   "provider": "pos",
+   "providerRole": true,
+   "allowOperations": [
+    "read"
+   ],
+   "optional": true
+  },
+  {
+   "key": "payments-merchant",
+   "external_system": "收款渠道（微信支付/支付宝/美团，商户侧）",
+   "surface": "商户侧结算流水 + 手续费明细只读",
+   "direction": "read-only",
+   "credential": "BYOK：ERP_BYOK_PAY_<渠道>",
+   "note": "可用面以实测为准，未实测不宣称 live；平台零资金执行面（二清红线）。",
+   "provider": "wechatpay",
+   "allowOperations": [
+    "read"
+   ],
+   "alternativeProviders": [
+    "alipay",
+    "meituan"
+   ],
+   "optional": true
+  },
+  {
+   "key": "delivery-settlement",
+   "external_system": "外卖平台结算（美团等）",
+   "surface": "外卖订单结算单/佣金明细只读",
+   "direction": "read-only",
+   "credential": "BYOK：ERP_BYOK_PAY_<平台>",
+   "note": "与收款渠道是两个面（外卖结算单 ≠ 支付流水），分别对账；实测后写入适配器范围。",
+   "provider": "meituan",
+   "allowOperations": [
+    "read"
+   ],
+   "optional": true
+  }
+ ],
  "skills": [
   {
    "name": "erp-restaurant-recon-discipline",
@@ -37,7 +97,14 @@
  "mcpServers": [
   {
    "registryName": "fd-erp-ledger-mcp",
-   "allowTools": ["run_reconciliation", "get_recon_report", "query_balance", "query_entries", "list_proposals", "submit_proposal"]
+   "allowTools": [
+    "run_reconciliation",
+    "get_recon_report",
+    "query_balance",
+    "query_entries",
+    "list_proposals",
+    "submit_proposal"
+   ]
   }
  ],
  "fleet": {
@@ -47,14 +114,32 @@
     "ref": "rest-recon-operator",
     "title": "对账产出位",
     "parentRef": null,
-    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
-    "kpiSlots": [{"key": "stores_closed", "label": "已日结门店"}, {"key": "diffs_found", "label": "差异条目"}]
+    "target": {
+     "kind": "pack-preset",
+     "packId": "Mo3_aWe7tF2eFVzkqFT9mA",
+     "presetId": "erp-ledger-board-post"
+    },
+    "kpiSlots": [
+     {
+      "key": "stores_closed",
+      "label": "已日结门店"
+     },
+     {
+      "key": "diffs_found",
+      "label": "差异条目"
+     }
+    ]
    }
   ],
-  "orchestration": {"mode": "supervisor", "edges": []}
+  "orchestration": {
+   "mode": "supervisor",
+   "edges": []
+  }
  },
  "_casting": {
-  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "packDependencies": {
+   "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
+  },
   "note": "pack v2 形状免自指。首个 POS 厂商适配器待首单客户确定（挂账，客户驱动）；渠道 live 面实测后声明。publish-ready：上架挂账。"
  }
 }

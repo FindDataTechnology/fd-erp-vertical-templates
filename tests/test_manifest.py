@@ -237,32 +237,56 @@ def test_blueprint_pack_presets_resolve_to_local_agents():
 # （三成员指向不存在的岗）。副本必须是逐字段拷贝，否则打包发出去的是旧世界。
 # --------------------------------------------------------------------------
 
-APPLIANCE_TENANT = REPO.parent / "fd-appliance" / "tenants" / "supply-chain" / "content"
+APPLIANCE_TENANTS = REPO.parent / "fd-appliance" / "tenants"
+APPLIANCE_TENANT = APPLIANCE_TENANTS / "supply-chain" / "content"
 
+# 三个行业租户各自的副本清单。只守 supply-chain 时，crossborder 与 restaurant-chain
+# 的连接器包副本会悄悄落后（2026-11-08 实测：两个租户的 connector-pack 都不是逐字节
+# 拷贝，而门只扫一个租户，于是门是绿的、打包出去的却是旧世界）。
 _APPLIANCE_COPIES = {
-    "erp-templates/supply-chain-connector-pack.json": "connector-pack/pack.json",
-    "erp-templates/supply-chain-account-mapping-pack.json": "account-mapping/pack.json",
-    "erp-templates/supply-chain-report-preset.json": "report-preset/preset.json",
-    "erp-templates/supply-chain-pricing-rules-pack.json": "pricing-rules/pack.json",
-    "fleet/warehousing-fleet.json": "warehousing-fleet/template.json",
+    "supply-chain": {
+        "erp-templates/supply-chain-connector-pack.json": "connector-pack/pack.json",
+        "erp-templates/supply-chain-account-mapping-pack.json": "account-mapping/pack.json",
+        "erp-templates/supply-chain-report-preset.json": "report-preset/preset.json",
+        "erp-templates/supply-chain-pricing-rules-pack.json": "pricing-rules/pack.json",
+        "fleet/warehousing-fleet.json": "warehousing-fleet/template.json",
+    },
+    "crossborder": {
+        "erp-templates/crossborder-connector-pack.json": "connector-pack/pack.json",
+        "erp-templates/crossborder-account-mapping-pack.json": "account-mapping/pack.json",
+        "erp-templates/crossborder-report-preset.json": "report-preset/preset.json",
+    },
+    "restaurant-chain": {
+        "erp-templates/restaurant-connector-pack.json": "connector-pack/pack.json",
+        "erp-templates/restaurant-account-mapping-pack.json": "account-mapping/pack.json",
+        "erp-templates/restaurant-report-preset.json": "report-preset/preset.json",
+    },
 }
 
 
 def test_appliance_copies_match_template_sources():
     """appliance 内的副本必须与模板源逐字段相等（不含格式差异）。"""
-    if not APPLIANCE_TENANT.exists():
-        pytest.skip(f"appliance 副本目录不存在（{APPLIANCE_TENANT}）——本仓单独检出时跳过")
+    if not APPLIANCE_TENANTS.exists():
+        pytest.skip(f"appliance 副本目录不存在（{APPLIANCE_TENANTS}）——本仓单独检出时跳过")
     drifted: list[str] = []
-    for rel, src_rel in _APPLIANCE_COPIES.items():
-        copy_path = APPLIANCE_TENANT / rel
-        src_path = SUPPLY_CHAIN / src_rel
-        assert src_path.exists(), f"模板源缺失：{src_path}"
-        if not copy_path.exists():
-            drifted.append(f"{rel}: appliance 副本缺失")
+    for tenant, copies in _APPLIANCE_COPIES.items():
+        tenant_dir = APPLIANCE_TENANTS / tenant / "content"
+        template_dir = REPO / "templates" / tenant
+        if not tenant_dir.exists():
+            drifted.append(f"{tenant}: appliance 租户目录缺失")
             continue
-        a = json.loads(copy_path.read_text(encoding="utf-8"))
-        b = json.loads(src_path.read_text(encoding="utf-8"))
-        if a != b:
-            extra_a, extra_b = sorted(set(a) - set(b)), sorted(set(b) - set(a))
-            drifted.append(f"{rel}: 与 {src_rel} 不一致（appliance 独有键 {extra_a} / 模板独有键 {extra_b}）")
+        for rel, src_rel in copies.items():
+            copy_path = tenant_dir / rel
+            src_path = template_dir / src_rel
+            assert src_path.exists(), f"模板源缺失：{src_path}"
+            if not copy_path.exists():
+                drifted.append(f"{tenant}/{rel}: appliance 副本缺失")
+                continue
+            a = json.loads(copy_path.read_text(encoding="utf-8"))
+            b = json.loads(src_path.read_text(encoding="utf-8"))
+            if a != b:
+                extra_a, extra_b = sorted(set(a) - set(b)), sorted(set(b) - set(a))
+                drifted.append(
+                    f"{tenant}/{rel}: 与 {src_rel} 不一致（appliance 独有键 {extra_a} / 模板独有键 {extra_b}）"
+                )
     assert drifted == [], f"appliance 副本落后于模板：{drifted}"
