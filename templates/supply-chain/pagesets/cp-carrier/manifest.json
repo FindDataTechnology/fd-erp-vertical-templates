@@ -1,0 +1,148 @@
+{
+  "packType": "pageset/v1",
+  "id": "supply-chain-cp-carrier",
+  "name": "CP 承运商页面集",
+  "surface": "承运商门户移动端（CP, 承运商/司机）",
+  "surface_en": "Carrier portal mobile (CP, carrier/driver)",
+  "name_en": "CP Carrier Pageset",
+  "description_en": "Mobile carrier surface: waybill acceptance, dock reservation, pickup check-in, POD reporting, tracking and freight statements. Location/photo capture is opt-in and gated on an approved privacy declaration.",
+  "i18n": {
+    "en": {
+      "name": "CP Carrier Pageset",
+      "surface": "Carrier portal mobile (CP, carrier/driver)",
+      "description": "Mobile carrier surface: waybill acceptance, dock reservation, pickup check-in, POD reporting, tracking and freight statements. Location/photo capture is opt-in and gated on an approved privacy declaration."
+    }
+  },
+  "version": "0.1.0",
+  "specTrace": {
+    "change": "add-supply-chain-vertical",
+    "tasks": ["6.1", "6.4"],
+    "capability": "erp-miniapp-surfaces"
+  },
+  "base": {
+    "platform": "壹座 miniapp（paas 仓 paas/miniapp）",
+    "framework": "Taro 4.2.1 + React 18.3",
+    "designSystem": "Daylight（paas/miniapp/DESIGN.md，The Daylight Pocket）",
+    "minBaseContract": "pageset-base/v1",
+    "reusedBasePages": [
+      "pages/chat/index",
+      "pages/login/index",
+      "pages/bind-guide/index"
+    ],
+    "reusedBaseLibs": [
+      "src/lib/bind-scan.ts（扫码绑定，提货打卡扫码可复用同实现）",
+      "src/lib/runtime.ts（token/WS/REST 运行时）",
+      "src/lib/taro-http.ts",
+      "src/lib/taro-socket.ts"
+    ],
+    "baseNote": "底座自身演进按 paas 仓 openspec 根治理；页面集声明最低兼容面，不锁死底座 patch 版本"
+  },
+  "authorization": {
+    "pagesetKey": "supply-chain.cp",
+    "grantModel": "按租户授权组合启用；未授权页面集对租户不可见",
+    "identity": "承运商/司机账号，经底座扫码绑定登录；映射到承运商档案与在途运单",
+    "dataScope": "仅本租户推送给本承运商档案的运单与作业任务",
+    "requiredGrants": [
+      "waybill.read",
+      "waybill.accept",
+      "dock.reserve",
+      "pickup.checkin",
+      "pod.report",
+      "freight.statement.read",
+      "ai.chat"
+    ]
+  },
+  "blueprint": {
+    "source": "锚点客户蓝图 CP 承运商 13 功能点（change tasks 6.4 枚举：运单接收 / 月台预约 / 提货打卡 / 签收上报）",
+    "granularityNote": "本 pack 按 tasks 6.4 功能域映射到页面；锚点 310 点逐条映射待其清单资产化后核对（挂账见 pack 备注）",
+    "coverage": { "coveredAreas": 4, "pendingTrimAreas": 0 },
+    "trimNote": "功能域全数有页面承载；一期是否含 CP 端属客户侧范围决策，不在此裁剪"
+  },
+  "confirmGatePattern": "提交→服务器确认→拒绝回显→超时兜底（底座既有交互模式）；签收上报为外部执行事实回流，回执以交付编排面同源状态机为准",
+  "pages": [
+    {
+      "id": "cp-home",
+      "title": "承运商工作台",
+      "covers": ["工作台聚合（待接运单/今日任务/异常）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/cp/workspace"
+      ]
+    },
+    {
+      "id": "cp-waybill-accept",
+      "title": "运单接收",
+      "covers": ["运单接收"],
+      "apis": [
+        "GET /erp/supply-chain/v1/cp/waybills",
+        "GET /erp/supply-chain/v1/cp/waybills/{waybillId}",
+        "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/accept"
+      ],
+      "confirmGate": true,
+      "notes": "运单任务下发与承运回执；全单物流视图（spec：运单轨迹、电子回单）数据同源"
+    },
+    {
+      "id": "cp-dock-reserve",
+      "title": "月台预约",
+      "covers": ["月台预约"],
+      "apis": [
+        "GET /erp/supply-chain/v1/cp/dock-slots",
+        "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/dock-reservation"
+      ],
+      "notes": "月台时段查询与预约；预约与仓库作业编排联动"
+    },
+    {
+      "id": "cp-pickup-checkin",
+      "title": "提货打卡",
+      "covers": ["提货打卡"],
+      "apis": [
+        "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/pickup-checkin"
+      ],
+      "notes": "到场打卡（时间/定位/影像为可选采集，采集范围沿底座隐私纪律）；扫码提货复用底座 bind-scan 扫码实现"
+    },
+    {
+      "id": "cp-pod-report",
+      "title": "签收上报",
+      "covers": ["签收上报"],
+      "apis": [
+        "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/pod"
+      ],
+      "notes": "签收影像/回单上传（电子回单），驱动运单结单与计费事件"
+    },
+    {
+      "id": "cp-track",
+      "title": "运单跟踪",
+      "covers": ["运单接收（在途视图）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/cp/waybills/{waybillId}/events"
+      ],
+      "notes": "本承运商运单的事件流/轨迹；客户侧全单物流视图与之同源"
+    },
+    {
+      "id": "cp-reconciliation",
+      "title": "运费对账",
+      "covers": ["对账（运费单）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/cp/freight-statements",
+        "GET /erp/supply-chain/v1/cp/freight-statements/{statementId}",
+        "POST /erp/supply-chain/v1/cp/freight-statements/{statementId}/confirm"
+      ],
+      "confirmGate": true,
+      "notes": "运费单确认；计费来自计费规则引擎（tasks 7.2 结算与资金组），与账本同源"
+    },
+    {
+      "id": "cp-ai-assistant",
+      "title": "AI 助手",
+      "covers": ["AI 助手入口（spec：AI 助手入口）"],
+      "apis": [
+        "WS 底座 chat 通道（复用 pages/chat/index 与 wsSend 契约）"
+      ],
+      "aiEntry": true,
+      "notes": "运单/任务问答与页面同源；动作类输出经确认门"
+    }
+  ],
+  "sharedNotes": [
+    "本 pack 全部页面消费的后端数据与 MCP 工具面同源（同一内核与编排层），无平行取数路径",
+    "CP 端是交付编排的外部执行方回流面：运单接收/月台/提货/签收与中台运单状态机同源，不建第二状态机；编排层 MUST NOT 直接写外部 WMS 台账（spec 纪律对 CP 端同构）",
+    "锚点 310 点逐条映射挂账：清单资产化后在本 manifest 的 blueprint 段回填逐点核对结果"
+  ]
+}

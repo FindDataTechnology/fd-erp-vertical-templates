@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fd-erp-vertical-templates"
+version = "0.1.0"
+description = "ERP 行业模板（跨境 + 餐饮连锁）：四件套资产 + 科目映射契约 + 三方对账驱动，运行时只经 fd-erp-ledger-mcp 内核工具面"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "psycopg[binary]>=3.1",
+    "psycopg-pool>=3.2",
+    "fastmcp>=2",
+]
+
+[project.scripts]
+fd-erp-vertical-templates = "fd_erp_vertical_templates.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["fd_erp_vertical_templates*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

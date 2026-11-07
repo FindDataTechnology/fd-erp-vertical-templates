@@ -1,0 +1,165 @@
+{
+  "packType": "pageset/v1",
+  "id": "supply-chain-se-sales",
+  "name": "SE 业务员台页面集",
+  "surface": "业务员台（SE, 业务员/导购移动作业端）",
+  "surface_en": "Sales desk (SE, sales rep mobile)",
+  "name_en": "SE Sales Pageset",
+  "description_en": "Mobile sales-rep surface: proxy ordering on behalf of owned customers, customer 360 with ledger-sourced credit, alert disposal at the approval seat, statement assistance — proxy never widens the data domain.",
+  "i18n": {
+    "en": {
+      "name": "SE Sales Pageset",
+      "surface": "Sales desk (SE, sales rep mobile)",
+      "description": "Mobile sales-rep surface: proxy ordering on behalf of owned customers, customer 360 with ledger-sourced credit, alert disposal at the approval seat, statement assistance — proxy never widens the data domain."
+    }
+  },
+  "version": "0.1.0",
+  "specTrace": {
+    "change": "add-supply-chain-vertical",
+    "tasks": ["6.1", "6.3"],
+    "capability": "erp-miniapp-surfaces"
+  },
+  "base": {
+    "platform": "壹座 miniapp（paas 仓 paas/miniapp）",
+    "framework": "Taro 4.2.1 + React 18.3",
+    "designSystem": "Daylight（paas/miniapp/DESIGN.md，The Daylight Pocket）",
+    "minBaseContract": "pageset-base/v1",
+    "reusedBasePages": [
+      "pages/chat/index",
+      "pages/login/index",
+      "pages/bind-guide/index"
+    ],
+    "reusedBaseLibs": [
+      "src/lib/bind-scan.ts（扫码绑定）",
+      "src/lib/runtime.ts（token/WS/REST 运行时）",
+      "src/lib/taro-http.ts",
+      "src/lib/taro-socket.ts"
+    ],
+    "baseNote": "底座自身演进按 paas 仓 openspec 根治理；页面集声明最低兼容面，不锁死底座 patch 版本"
+  },
+  "authorization": {
+    "pagesetKey": "supply-chain.se",
+    "grantModel": "按租户授权组合启用；未授权页面集对租户不可见",
+    "identity": "租户内部业务员账号，经底座扫码绑定登录；角色映射由租户管理面维护",
+    "dataScope": "本租户 + 本人名下客户/线索档案；代客操作留痕业务员身份",
+    "requiredGrants": [
+      "catalog.read",
+      "order.write.proxy",
+      "crm.read",
+      "crm.visit.write",
+      "alert.handle",
+      "statement.confirm.proxy",
+      "ai.chat"
+    ]
+  },
+  "blueprint": {
+    "source": "锚点客户蓝图 SE 业务员台 17 功能点（change tasks 6.3 枚举：代客下单 / CRM 线索拜访 / 预警处置，拍板席位移动呈现）",
+    "granularityNote": "本 pack 按 tasks 6.3 功能域映射到页面；锚点 310 点逐条映射待其清单资产化后核对（挂账见 pack 备注）",
+    "coverage": { "coveredAreas": 3, "pendingTrimAreas": 0 },
+    "trimNote": "功能域全数有页面承载；一期是否含 SE 端属客户侧范围决策，不在此裁剪"
+  },
+  "confirmGatePattern": "提交→服务器确认→拒绝回显→超时兜底（底座既有交互模式）；预警处置与对账协助的拍板结果与 owner 席位同源生效（账本内核 confirm/reject proposal 同一面）",
+  "pages": [
+    {
+      "id": "se-home",
+      "title": "业务员工作台",
+      "covers": ["工作台聚合（名下客户/待办/预警数）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/workspace"
+      ]
+    },
+    {
+      "id": "se-customer-list",
+      "title": "客户与线索",
+      "covers": ["CRM 线索拜访"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/customers",
+        "GET /erp/supply-chain/v1/se/leads"
+      ]
+    },
+    {
+      "id": "se-customer-detail",
+      "title": "客户 360",
+      "covers": ["CRM 线索拜访", "代客下单（入口）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/customers/{customerId}",
+        "GET /erp/supply-chain/v1/se/customers/{customerId}/orders"
+      ],
+      "notes": "档案/订单/对账/信用占用一屏聚合；代客下单从此进入"
+    },
+    {
+      "id": "se-lead-visit",
+      "title": "线索/拜访登记",
+      "covers": ["CRM 线索拜访"],
+      "apis": [
+        "POST /erp/supply-chain/v1/se/visits",
+        "GET /erp/supply-chain/v1/se/visits",
+        "POST /erp/supply-chain/v1/se/leads"
+      ],
+      "notes": "拜访登记（定位签到为可选字段，采集范围沿底座隐私纪律）"
+    },
+    {
+      "id": "se-order-proxy",
+      "title": "代客下单",
+      "covers": ["代客下单"],
+      "apis": [
+        "POST /erp/supply-chain/v1/se/orders/proxy"
+      ],
+      "confirmGate": true,
+      "notes": "选客户→复用 UE 下单契约（同取价/信用校验链路），代理身份留痕"
+    },
+    {
+      "id": "se-order-track",
+      "title": "名下订单跟进",
+      "covers": ["代客下单（售后跟进）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/orders",
+        "GET /erp/supply-chain/v1/se/orders/{orderId}"
+      ]
+    },
+    {
+      "id": "se-alert-inbox",
+      "title": "预警收件箱",
+      "covers": ["预警处置"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/alerts"
+      ],
+      "notes": "阈值预警（tasks 7.2）投递到席位"
+    },
+    {
+      "id": "se-alert-handle",
+      "title": "预警处置（拍板）",
+      "covers": ["预警处置（拍板席位移动呈现）"],
+      "apis": [
+        "POST /erp/supply-chain/v1/se/alerts/{alertId}/handle"
+      ],
+      "confirmGate": true,
+      "notes": "处置动作经确认门；拍板结果与 owner 席位同源生效，拒绝留痕"
+    },
+    {
+      "id": "se-statement-assist",
+      "title": "对账协助",
+      "covers": ["对账单确认（协助推送）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/statements",
+        "POST /erp/supply-chain/v1/se/statements/{statementId}/push"
+      ],
+      "notes": "向客户推送对账单并跟踪确认状态；SE 端不代替客户拍板"
+    },
+    {
+      "id": "se-ai-assistant",
+      "title": "AI 助手",
+      "covers": ["AI 助手入口（spec：AI 助手入口）"],
+      "apis": [
+        "WS 底座 chat 通道（复用 pages/chat/index 与 wsSend 契约）"
+      ],
+      "aiEntry": true,
+      "notes": "客户档案/经营口径问答与页面同源；建议标注为建议，动作经确认门"
+    }
+  ],
+  "sharedNotes": [
+    "本 pack 全部页面消费的后端数据与 MCP 工具面同源（同一内核与编排层），无平行取数路径",
+    "代客下单与 UE 下单共用同一后端订单链路（仅多代理身份维度），禁止另建第二下单路径",
+    "锚点 310 点逐条映射挂账：清单资产化后在本 manifest 的 blueprint 段回填逐点核对结果"
+  ]
+}

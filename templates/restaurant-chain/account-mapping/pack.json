@@ -1,0 +1,63 @@
+{
+ "schema": "erp-vertical-connector-pack/v1",
+ "name": "餐饮连锁科目映射包",
+ "version": "1.0.0",
+ "description": "餐饮连锁对账模板·科目映射 pack：行业科目（门店营业收入/平台佣金等）对齐内核通用科目最小集，呈现层口径。映射只影响报表与查询呈现，已落账分录零改动；替换映射不改账；MUST NOT 向内核注入行业科目行。",
+ "tags": ["ERP", "餐饮连锁", "科目映射", "呈现层"],
+ "visibility": "public",
+ "category": "facet",
+ "account_mapping": {
+  "schema": "erp-account-mapping/v1",
+  "vertical": "restaurant-chain",
+  "version": "1.0.0",
+  "universal_preset_version": "v1",
+  "industry_accounts": [
+   {"code": "R-0001", "name_zh": "门店营业收入", "name_en": "Store dining revenue", "maps_to": "4000", "kind": "revenue"},
+   {"code": "R-0002", "name_zh": "门店营业成本", "name_en": "Store cost of sales", "maps_to": "5000", "kind": "expense"},
+   {"code": "R-0003", "name_zh": "平台佣金", "name_en": "Platform commissions", "maps_to": "5100", "kind": "expense"},
+   {"code": "R-0004", "name_zh": "其他经营费用", "name_en": "Other operating expenses", "maps_to": "5200", "kind": "expense"},
+   {"code": "R-0005", "name_zh": "渠道在途结算款", "name_en": "Channel settlements in transit", "maps_to": "1300", "kind": "asset"},
+   {"code": "R-0006", "name_zh": "应收账款", "name_en": "Accounts receivable", "maps_to": "1100", "kind": "asset"},
+   {"code": "R-0007", "name_zh": "应付账款", "name_en": "Accounts payable", "maps_to": "2000", "kind": "liability"}
+  ],
+  "report_rows": [
+   {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue", "includes": ["R-0001"]},
+   {"key": "cost", "label_zh": "成本费用", "label_en": "Costs and expenses", "includes": ["R-0002", "R-0003", "R-0004"]},
+   {"key": "working-capital", "label_zh": "往来与在途", "label_en": "Working capital", "includes": ["R-0005", "R-0006", "R-0007"]}
+  ]
+ },
+ "skills": [
+  {
+   "name": "erp-restaurant-mapping-discipline",
+   "description": "科目映射纪律卡（餐饮）：门店营业收入/平台佣金等行业科目对齐内核科目，呈现层重算，替换不改账。",
+   "content": "---\nname: erp-restaurant-mapping-discipline\ndescription: 科目映射纪律卡（餐饮）：映射只影响报表与查询呈现，账本事实零改动；替换映射不改账；内核科目保持最小行业无关。\n---\n\n# 科目映射纪律卡（餐饮连锁）\n\n## 一、呈现层口径\n- 行业科目是内核通用科目的呈现别名（一一对齐）：门店营业收入→4000、平台佣金→5100、渠道在途结算款→1300。\n- 门店日结/月度报表按行业科目名呈现；账本分录（journal_entries）零改动。\n- 未被映射覆盖的内核科目余额如实列 unmapped。\n\n## 二、替换不改账\n- 替换映射包版本：已落账分录不变，仅报表与余额呈现口径按新映射重算；映射 diff（added/removed/retargeted）如实随报。\n\n## 三、不注入内核\n- 行业科目 MUST NOT 注入内核（无任何写内核路径）；一个内核科目至多被一个行业科目对齐。",
+   "en": "Account mapping discipline (restaurant): presentation-layer only, replacing mapping never touches posted entries, no injection into the kernel.",
+   "ja": "勘定マッピング規律（飲食）：提示層のみ、差し替えでも仕訳不変、kernel 注入禁止。",
+   "es": "Disciplina de mapeo (restaurantes): solo presentación, reemplazar nunca toca asientos, sin inyección al kernel.",
+   "fr": "Discipline de mappage (restaurants) : présentation uniquement, remplacer ne touche jamais les écritures, aucune injection dans le noyau."
+  }
+ ],
+ "mcpServers": [
+  {
+   "registryName": "fd-erp-ledger-mcp",
+   "allowTools": ["query_balance", "query_entries"]
+  }
+ ],
+ "fleet": {
+  "name": "餐饮连锁科目映射包（供给包）",
+  "members": [
+   {
+    "ref": "rest-mapping-operator",
+    "title": "映射产出位",
+    "parentRef": null,
+    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
+    "kpiSlots": [{"key": "mapping_versions", "label": "映射版本"}]
+   }
+  ],
+  "orchestration": {"mode": "supervisor", "edges": []}
+ },
+ "_casting": {
+  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "note": "映射包内嵌 account_mapping 载荷（erp-account-mapping/v1）。mcpServers 仅内核只读两工具。publish-ready：上架挂账。"
+ }
+}

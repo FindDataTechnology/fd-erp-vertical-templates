@@ -1,0 +1,149 @@
+{
+  "schema": "erp-report-preset/v1",
+  "name": "仓配分销报表 preset",
+  "vertical": "supply-chain",
+  "version": "1.0.0",
+  "metric_calibers": [
+    {
+      "key": "sales_amount",
+      "label_zh": "销售额",
+      "label_en": "Sales amount",
+      "definition": "报告期内已确认订单的商品行金额合计（订单确认时刻口径，含活动价与券后成交价；不含代收运费）",
+      "definition_source": "erp-supply-orchestration/v1 order.confirmed lines.amount_total（模板事件记录，单一出处）",
+      "grain": "customer × product × day"
+    },
+    {
+      "key": "gross_margin",
+      "label_zh": "毛利率",
+      "label_en": "Gross margin",
+      "definition": "（销售额 − 商品销售成本）÷ 销售额；成本取同期出库商品的销售成本（移动加权口径随账本分录）",
+      "definition_source": "erp-account-mapping/v1 supply-chain pack report_rows（revenue/cost 行，内核科目 4000/5000 余额，单一出处）",
+      "grain": "product × day"
+    },
+    {
+      "key": "inventory_turnover",
+      "label_zh": "库存周转",
+      "label_en": "Inventory turnover",
+      "definition": "报告期商品销售成本 ÷ 期末库存商品余额（次/期）；库存余额取账本存货科目按 inv:键聚合口径",
+      "definition_source": "erp-vertical-templates wms_sync.book_positions_from_entries（内核科目 1200 分录聚合，单一出处）",
+      "grain": "warehouse × product × day"
+    },
+    {
+      "key": "ar_aging",
+      "label_zh": "应收账龄",
+      "label_en": "AR aging",
+      "definition": "应收账款按账龄段（0-30/31-60/61-90/90+ 天）分布；账龄起算 = 签收回流记录日期（无回单按发货日）",
+      "definition_source": "erp-supply-fulfillment/v1 pod 回流记录 + 内核科目 1100 余额（单一出处）",
+      "grain": "customer × aging_bucket"
+    },
+    {
+      "key": "inventory_stagnation",
+      "label_zh": "库存积压天数",
+      "label_en": "Inventory stagnation days",
+      "definition": "SKU 无出库事件持续天数（仓内维度，取最近一次出库指令/入库任务后的自然日差）",
+      "definition_source": "erp-supply-orchestration/v1 inbound_task/outbound_instruction 事件记录（单一出处）",
+      "grain": "warehouse × product"
+    },
+    {
+      "key": "overdue_receivable",
+      "label_zh": "逾期应收金额",
+      "label_en": "Overdue receivable amount",
+      "definition": "超出信用账期未回款的应收金额（账龄段 90+ 或合同逾期口径，取签收起算+账期）",
+      "definition_source": "erp-supply-fulfillment/v1 pod 回流记录 + 内核科目 1100 余额（单一出处）",
+      "grain": "customer"
+    }
+  ],
+  "reports": [
+    {
+      "key": "sc-procurement-inventory",
+      "title_zh": "采购与库存",
+      "title_en": "Procurement and inventory",
+      "kind": "report",
+      "source": "kernel query_entries（存货/应付科目）+ 模板编排事件记录（demand/purchase_order/arrival/inbound_task）",
+      "sections": [
+        {"key": "procurement", "label_zh": "采购执行", "label_en": "Procurement", "metrics": ["demand_open", "po_pending_confirm", "po_pushed", "arrival_open", "inbound_open"],
+         "row_caliber": "逐状态取模板编排事件记录计数（orchestration-{tenant}.jsonl 单一出处）；不取账本"},
+        {"key": "inventory", "label_zh": "库存头寸", "label_en": "Inventory position", "metrics": ["inventory_on_hand", "inventory_frozen", "book_vs_wms_diffs"],
+         "row_caliber": "库存量取账本存货科目分录 inv:键聚合（wms_sync 口径）；账实差异取日终账实对账驱动差异清单（四类）；WMS 快照只读"},
+        {"key": "payables", "label_zh": "采购应付", "label_en": "Procurement payables", "metrics": ["supplier_payables"],
+         "row_caliber": "应付取内核应付科目余额（呈现层经科目映射 pack 行业口径）"}
+      ],
+      "caliber": "采购执行=模板事件记录；库存=账本分录聚合+只读 WMS 快照对账；账本为账务真源，模板记录为业务单据真源，两源分开列示不混算"
+    },
+    {
+      "key": "sc-sales-product",
+      "title_zh": "销售与商品",
+      "title_en": "Sales and product",
+      "kind": "report",
+      "source": "kernel query_balance/query_entries（应收/收入科目）+ 模板事件记录（order/pricing 取价链）",
+      "sections": [
+        {"key": "sales", "label_zh": "销售达成", "label_en": "Sales", "metrics": ["sales_amount", "order_count", "avg_order_value"],
+         "row_caliber": "销售额按指标口径 metric_calibers.sales_amount（订单确认口径，模板事件记录单一出处）；与账本收入科目呈现层对账"},
+        {"key": "product", "label_zh": "商品维度", "label_en": "Product dimension", "metrics": ["top_products", "pool_visible_skus", "stop_selling_skus"],
+         "row_caliber": "可见可售 SKU 取主数据商品池授权（visible_product_codes）；停售 SKU 取主数据生命周期态；逐客户/渠道授权口径"},
+        {"key": "credit", "label_zh": "信用与拒单", "label_en": "Credit and rejections", "metrics": ["credit_available", "credit_reserved", "credit_rejected_orders"],
+         "row_caliber": "额度取内核 query_credit（账本记账单一出处）；拒单解释取订单受理留痕（fail-closed 拒单明细）"}
+      ],
+      "caliber": "销售=订单确认口径（模板记录）；信用=内核额度记账；两者同单勾稽（order.credit_reservation.stable_id 关联）"
+    },
+    {
+      "key": "sc-revenue-cost-margin",
+      "title_zh": "收入成本毛利",
+      "title_en": "Revenue, cost and margin",
+      "kind": "report",
+      "source": "kernel query_balance（收入/成本/费用科目）+ 科目映射 pack 呈现层重算",
+      "sections": [
+        {"key": "revenue", "label_zh": "收入", "label_en": "Revenue", "metrics": ["merchandise_revenue"],
+         "row_caliber": "内核营业收入科目余额，经映射 pack 行业口径呈现（SC-0001→4000）"},
+        {"key": "cost", "label_zh": "成本与费用", "label_en": "Costs and expenses", "metrics": ["cogs", "warehousing_distribution_cost"],
+         "row_caliber": "内核成本/费用科目余额，经映射 pack 呈现（SC-0002→5000、SC-0003→5200）；仓储配送费独立维度"},
+        {"key": "margin", "label_zh": "毛利", "label_en": "Margin", "metrics": ["gross_profit", "gross_margin"],
+         "row_caliber": "按指标口径 metric_calibers.gross_margin（单一出处）；毛利异常走阈值预警派处置任务"}
+      ],
+      "caliber": "呈现层口径：科目映射只重排报表与查询呈现，已落账分录零改动（kernel-of-truth 不变）"
+    },
+    {
+      "key": "sc-settlement-funds",
+      "title_zh": "结算与资金",
+      "title_en": "Settlement and funds",
+      "kind": "dashboard",
+      "source": "kernel query_balance/query_entries（应收/应付/预收科目）+ 模板事件记录（pod 回流/push 留痕）",
+      "sections": [
+        {"key": "receivables", "label_zh": "应收与账龄", "label_en": "Receivables and aging", "metrics": ["ar_balance", "ar_aging_buckets", "overdue_ar"],
+         "row_caliber": "应收余额取内核应收科目；账龄分布按指标口径 metric_calibers.ar_aging（签收回流起算）；逾期走阈值预警派处置任务"},
+        {"key": "settlement", "label_zh": "在途结算", "label_en": "Settlements in transit", "metrics": ["settlements_in_transit", "supplier_statement_diffs"],
+         "row_caliber": "在途取内核在途结算科目；供应商对账差异取对账驱动差异清单（双侧引用）"},
+        {"key": "funds", "label_zh": "资金头寸", "label_en": "Funds position", "metrics": ["cash_and_bank"],
+         "row_caliber": "取内核资金科目余额只读呈现；模板层零资金执行面（二清红线：不输出分账/代收代付/资金池）"}
+      ],
+      "caliber": "资金与结算全部取账本余额只读呈现；模板层不落任何资金科目分录（writeback 白名单禁写 1000/2100/3000/3100）"
+    }
+  ],
+  "threshold_alerts": [
+    {
+      "metric": "gross_margin",
+      "threshold": "5%",
+      "op": "lt",
+      "severity": "high",
+      "disposal_task": "毛利异常复核：核对取价规则链与出库成本，异常定价走取价规则修正提案",
+      "assignee_hint": "reconciler"
+    },
+    {
+      "metric": "inventory_stagnation",
+      "threshold": "90",
+      "op": "gt",
+      "severity": "medium",
+      "disposal_task": "库存积压处置：滞销 SKU 出促销/调拨/退供建议，经确认车道拍板",
+      "assignee_hint": "operator"
+    },
+    {
+      "metric": "overdue_receivable",
+      "threshold": "0",
+      "op": "gt",
+      "severity": "high",
+      "disposal_task": "逾期应收催收：按账龄段生成催收任务与信用管控建议（冻结经确认车道）",
+      "assignee_hint": "reconciler"
+    }
+  ],
+  "notes": "报表 preset 消费内核工具面数据（query_balance/query_entries/query_credit）与模板事件记录（编排/履约/主数据）；指标口径单一出处（metric_calibers.definition_source）；阈值预警 → 处置任务经确认车道派单（reports.ThresholdEvaluator）；无任何直连库表面。"
+}

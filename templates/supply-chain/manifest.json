@@ -1,0 +1,37 @@
+{
+  "schema": "erp-vertical-template/v1",
+  "vertical": "supply-chain",
+  "name_zh": "仓配分销模板",
+  "name_en": "Warehousing & Distribution Supply-Chain Template",
+  "version": "1.0.0",
+  "description_zh": "行业模板四件套 + 扩展 pack：连接器 pack（金蝶/WMS/支付/门户只读与留痕面）+ 仓配分销舰队蓝图（巡检/核对/拍板错峰，账实一致差异清单驱动）+ 科目映射 pack（呈现层对齐内核通用科目）+ 报表 preset（四组报表 + 指标口径单一出处 + 阈值预警派处置任务）；扩展件：取价规则 pack（三层规则带生效期与出处）+ 四端页面集 pack（壹座底座契约）。编排层零写 WMS/门户，作业执行在外部系统；账务全部经内核工具面确认车道。",
+  "description_en": "Four-piece vertical template + extension packs: connector pack (read-only and trace surfaces for ERP/WMS/payments/portals) + warehousing distribution fleet blueprint (staggered watch/reconcile/approve posts, book-vs-physical diff driven) + account mapping pack (presentation layer over kernel universal accounts) + report preset (four reports + single-source metric calibers + threshold alerts dispatching disposal tasks); extensions: pricing rules pack (three-layer rules with validity and source) + four-end pagesets pack (miniapp base contracts). Orchestration layer writes nothing to WMS/portals — execution lives in external systems; all accounting goes through kernel tool confirmation lanes.",
+  "assets": {
+    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.0.0"},
+    "fleet_blueprint": {"kind": "fleet-blueprint", "path": "warehousing-fleet/template.json", "version": "1.0.0"},
+    "account_mapping_pack": {"kind": "pack", "path": "account-mapping/pack.json", "version": "1.0.0"},
+    "report_preset": {"kind": "report-preset", "path": "report-preset/preset.json", "version": "1.0.0"},
+    "pricing_rules_pack": {"kind": "rules-pack", "path": "pricing-rules/pack.json", "version": "1.0.0"},
+    "pagesets_pack": {"kind": "pageset-pack", "path": "pagesets/pack.json", "version": "1.0.0"}
+  },
+  "constraints": {
+    "ledger_access": "kernel-tools-only",
+    "bypass_ledger_forbidden": true,
+    "writeback_lane": "kernel-proposal-whitelist",
+    "external_write": "none"
+  },
+  "pack_v2": {
+    "compatible": true,
+    "note": "四件套与扩展 pack 均为 pack v2 形状（skills/mcpServers/fleet/_casting 齐备）；市场安装模板 = 全件一并到位、各件独立升级。连接器 provider（金蝶云星空/WMS/支付渠道/供应商门户/承运商门户）归萬星连接器（open-connector-mt 独立 openspec 根）；页面集实施归壹座底座（paas 独立 openspec 根）——本模板只声明契约与留痕编排面。"
+  },
+  "i18n": {"en": {"name": "Warehousing & Distribution Supply-Chain Template", "description": "Four-piece vertical template + pricing rules and pagesets packs: connectors + fleet blueprint + account mapping + report preset."}},
+  "boundaries_zh": {
+    "kernel": "账务唯一真源 = 内核工具面（proposal 确认车道）；模板编排层零落账直写",
+    "wms": "编排层零写 WMS：只读快照适配器 + 日终账实对账差异清单驱动处理",
+    "supplier_portal": "直发/采购推送只留推送指令记录，实际推送经连接器",
+    "carrier": "运单轨迹/电子回单/签收只读回流（页面集/连接器载体）",
+    "funds": "资金执行面零输出（分账/代收代付/资金池红线延续）；writeback 白名单禁写资金类科目 1000/2100/3000/3100",
+    "credit": "信用额度占用/释放/回冲由账本记账（reserve_credit/release_credit）；额度不足 fail-closed 拒单可解释",
+    "pricing": "无出处取价规则拒绝参与取价；同维度重叠冲突拒绝配置"
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "packType": "pageset/v1",
+  "id": "supply-chain-sp-supplier",
+  "name": "SP 供应商页面集",
+  "surface": "供应商门户移动端（SP, 供应商）",
+  "surface_en": "Supplier portal mobile (SP, supplier)",
+  "name_en": "SP Supplier Pageset",
+  "description_en": "Mobile supplier surface: purchase-order acceptance, delivery feedback driving arrival notices and inbound tasks, statements and invoices (honest 501 until the source is wired). Zero payment operations — settlement is read-only by design.",
+  "i18n": {
+    "en": {
+      "name": "SP Supplier Pageset",
+      "surface": "Supplier portal mobile (SP, supplier)",
+      "description": "Mobile supplier surface: purchase-order acceptance, delivery feedback driving arrival notices and inbound tasks, statements and invoices (honest 501 until the source is wired). Zero payment operations — settlement is read-only by design."
+    }
+  },
+  "version": "0.1.0",
+  "specTrace": {
+    "change": "add-supply-chain-vertical",
+    "tasks": ["6.1", "6.4"],
+    "capability": "erp-miniapp-surfaces"
+  },
+  "base": {
+    "platform": "壹座 miniapp（paas 仓 paas/miniapp）",
+    "framework": "Taro 4.2.1 + React 18.3",
+    "designSystem": "Daylight（paas/miniapp/DESIGN.md，The Daylight Pocket）",
+    "minBaseContract": "pageset-base/v1",
+    "reusedBasePages": [
+      "pages/chat/index",
+      "pages/login/index",
+      "pages/bind-guide/index"
+    ],
+    "reusedBaseLibs": [
+      "src/lib/bind-scan.ts（扫码绑定）",
+      "src/lib/runtime.ts（token/WS/REST 运行时）",
+      "src/lib/taro-http.ts",
+      "src/lib/taro-socket.ts"
+    ],
+    "baseNote": "底座自身演进按 paas 仓 openspec 根治理；页面集声明最低兼容面，不锁死底座 patch 版本"
+  },
+  "authorization": {
+    "pagesetKey": "supply-chain.sp",
+    "grantModel": "按租户授权组合启用；未授权页面集对租户不可见",
+    "identity": "供应商联系人账号，经底座扫码绑定登录；映射到供应商档案（三主档确认车道产物）",
+    "dataScope": "仅本租户推送给本供应商档案的订单/对账/结算数据",
+    "requiredGrants": [
+      "po.read",
+      "po.accept",
+      "delivery.feedback",
+      "statement.read",
+      "invoice.upload",
+      "ai.chat"
+    ]
+  },
+  "blueprint": {
+    "source": "锚点客户蓝图 SP 供应商 14 功能点（change tasks 6.4 枚举：接单 / 发货反馈 / 对账 / 发票上传）",
+    "granularityNote": "本 pack 按 tasks 6.4 功能域映射到页面；锚点 310 点逐条映射待其清单资产化后核对（挂账见 pack 备注）",
+    "coverage": { "coveredAreas": 4, "pendingTrimAreas": 0 },
+    "trimNote": "功能域全数有页面承载；一期是否含 SP 端属客户侧范围决策，不在此裁剪"
+  },
+  "confirmGatePattern": "提交→服务器确认→拒绝回显→超时兜底（底座既有交互模式）；接单/发货反馈为外部执行方回流动作，回执以编排面同源状态机为准",
+  "pages": [
+    {
+      "id": "sp-home",
+      "title": "供应商工作台",
+      "covers": ["工作台聚合（待接单/待发货/待对账）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/sp/workspace"
+      ]
+    },
+    {
+      "id": "sp-order-accept",
+      "title": "接单",
+      "covers": ["接单"],
+      "apis": [
+        "GET /erp/supply-chain/v1/sp/purchase-orders",
+        "GET /erp/supply-chain/v1/sp/purchase-orders/{poId}",
+        "POST /erp/supply-chain/v1/sp/purchase-orders/{poId}/accept"
+      ],
+      "confirmGate": true,
+      "notes": "采购订单（确认车道审批后）推送供应商；接单回执驱动到货预告编排"
+    },
+    {
+      "id": "sp-delivery-feedback",
+      "title": "发货反馈",
+      "covers": ["发货反馈"],
+      "apis": [
+        "POST /erp/supply-chain/v1/sp/purchase-orders/{poId}/delivery-feedback"
+      ],
+      "notes": "发货明细/物流单号回流，与入库任务联动（spec：采购→订单→履约编排）"
+    },
+    {
+      "id": "sp-arrival-notice",
+      "title": "到货预告",
+      "covers": ["发货反馈（到货预告）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/sp/arrival-notices",
+        "POST /erp/supply-chain/v1/sp/arrival-notices"
+      ],
+      "notes": "可由发货反馈自动生成，本页承载补录与查询"
+    },
+    {
+      "id": "sp-reconciliation",
+      "title": "对账单",
+      "covers": ["对账"],
+      "apis": [
+        "GET /erp/supply-chain/v1/sp/statements",
+        "GET /erp/supply-chain/v1/sp/statements/{statementId}",
+        "POST /erp/supply-chain/v1/sp/statements/{statementId}/confirm"
+      ],
+      "confirmGate": true,
+      "notes": "应付对账单确认；数据与金蝶往来面同源（金蝶 provider 拉取、账本内核计算）"
+    },
+    {
+      "id": "sp-invoice-upload",
+      "title": "发票上传",
+      "covers": ["发票上传"],
+      "apis": [
+        "POST /erp/supply-chain/v1/sp/invoices",
+        "GET /erp/supply-chain/v1/sp/invoices"
+      ],
+      "notes": "发票影像/结构化要素上传并关联对账单；发票回写金蝶经连接器（contract-only）"
+    },
+    {
+      "id": "sp-payment-view",
+      "title": "结算查询",
+      "covers": ["对账（应付/结算进度）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/sp/settlements"
+      ],
+      "notes": "只读；对外付款走金蝶/持牌通道（资金红线 D4），SP 端零支付操作面"
+    },
+    {
+      "id": "sp-ai-assistant",
+      "title": "AI 助手",
+      "covers": ["AI 助手入口（spec：AI 助手入口）"],
+      "apis": [
+        "WS 底座 chat 通道（复用 pages/chat/index 与 wsSend 契约）"
+      ],
+      "aiEntry": true,
+      "notes": "对账/单据问答与页面同源；动作类输出经确认门"
+    }
+  ],
+  "sharedNotes": [
+    "本 pack 全部页面消费的后端数据与 MCP 工具面同源（同一内核与编排层），无平行取数路径",
+    "SP 端是采购编排的外部执行方回流面：接单/发货反馈状态与中台采购单状态机同源，不建第二状态机",
+    "锚点 310 点逐条映射挂账：清单资产化后在本 manifest 的 blueprint 段回填逐点核对结果"
+  ]
+}

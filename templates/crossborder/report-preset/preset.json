@@ -1,0 +1,48 @@
+{
+  "schema": "erp-report-preset/v1",
+  "name": "跨境电商对账报表 preset",
+  "vertical": "crossborder",
+  "version": "1.0.0",
+  "reports": [
+    {
+      "key": "xb-store-recon",
+      "title_zh": "店铺对账日报",
+      "title_en": "Store reconciliation daily",
+      "kind": "report",
+      "source": "recon driver + kernel get_recon_report",
+      "sections": [
+        {"key": "orders", "label_zh": "订单流", "label_en": "Orders", "metrics": ["order_count", "order_amount_original", "order_amount_base"]},
+        {"key": "payments", "label_zh": "收款流（payouts）", "label_en": "Payments (payouts)", "metrics": ["payout_count", "payout_amount", "commission", "payment_fee"]},
+        {"key": "inventory", "label_zh": "库存状态腿", "label_en": "Inventory leg", "metrics": ["matched_count", "in_transit_count"]},
+        {"key": "diffs", "label_zh": "差异（四类）", "label_en": "Diffs (four kinds)", "metrics": ["missing_in_right", "extra_in_right", "amount_mismatch", "status_mismatch"]}
+      ],
+      "caliber": "逐店出账；原币对账为准，本位币折算带汇率出处（ecb-exr）；无出处汇率标注 fx_unsourced 不折算"
+    },
+    {
+      "key": "xb-fee-report",
+      "title_zh": "平台费用对账",
+      "title_en": "Platform fee report",
+      "kind": "report",
+      "source": "recon driver fee_report",
+      "sections": [
+        {"key": "fees", "label_zh": "费用维度", "label_en": "Fee dimensions", "metrics": ["payouts", "commission", "payment_fee"]},
+        {"key": "explanations", "label_zh": "费率解释", "label_en": "Rate explanations", "metrics": ["explained", "unexplained"]}
+      ],
+      "caliber": "payouts/佣金/手续费独立维度；费率解释带出处，无出处如实 unexplained"
+    },
+    {
+      "key": "xb-balance-board",
+      "title_zh": "经营余额看板（映射口径）",
+      "title_en": "Business balance board (mapping caliber)",
+      "kind": "dashboard",
+      "source": "kernel query_balance + account mapping pack",
+      "sections": [
+        {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue"},
+        {"key": "cost", "label_zh": "成本与费用", "label_en": "Costs and expenses"},
+        {"key": "working-capital", "label_zh": "营运资本", "label_en": "Working capital"}
+      ],
+      "caliber": "呈现层口径：行业科目经科目映射对齐内核通用科目；账本分录零改动"
+    }
+  ],
+  "notes": "报表 preset 消费内核工具面数据（query_balance/query_entries/get_recon_report）与对账驱动报告；无任何直连库表面。"
+}

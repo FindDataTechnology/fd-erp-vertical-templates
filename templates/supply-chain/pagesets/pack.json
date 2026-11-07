@@ -1,0 +1,72 @@
+{
+ "schema": "erp-vertical-connector-pack/v1",
+ "name": "仓配分销页面集包",
+ "version": "1.0.0",
+ "description": "仓配分销模板·页面集 pack：四端页面集清单（UE 订货台/SE 业务员台/SP 供应商台/CP 承运商台）。页面全部建在壹座 miniapp 底座（跨仓 paas 立项，本包只声明页面契约与确认门交互模式）；后端 REST/WS 与 MCP 同源，无平行数据路径。确认门交互：提交→服务器确认→拒绝回显→超时兜底。",
+ "tags": ["ERP", "仓配分销", "页面集", "壹座底座"],
+ "visibility": "public",
+ "category": "facet",
+ "pagesets": [
+  {
+   "key": "sc-ue-ordering",
+   "target_end": "ue",
+   "title_zh": "UE 订货台",
+   "title_en": "UE ordering console",
+   "pages": ["product-search", "product-detail", "place-order", "order-status", "statement-confirm", "invoice-request", "after-sale-request"],
+   "notes": "客户/渠道按商品池授权可见可售（masterdata.visible_product_codes）；下单走订单受理编排（信用校验 fail-closed 解释回显）"
+  },
+  {
+   "key": "sc-se-salesrep",
+   "target_end": "se",
+   "title_zh": "SE 业务员台",
+   "title_en": "SE sales-rep console",
+   "pages": ["order-on-behalf", "crm-leads-visits", "alert-disposal", "statement-confirm"],
+   "notes": "代客下单与预警处置（拍板席位移动呈现）；处置任务经确认车道派单"
+  },
+  {
+   "key": "sc-sp-supplier",
+   "target_end": "sp",
+   "title_zh": "SP 供应商台",
+   "title_en": "SP supplier console",
+   "pages": ["po-accept", "ship-feedback", "arrival-notice", "statement-reconcile", "invoice-upload"],
+   "notes": "采购编排回流：接单/发货反馈/到货预告（直发指令在 SP 台确认执行）；对账与发票上传"
+  },
+  {
+   "key": "sc-cp-carrier",
+   "target_end": "cp",
+   "title_zh": "CP 承运商台",
+   "title_en": "CP carrier console",
+   "pages": ["waybill-accept", "dock-appointment", "pickup-checkin", "pod-report"],
+   "notes": "运单接收/月台预约/提货打卡/签收上报——签收回流为应收账龄起算口径之一"
+  }
+ ],
+ "skills": [
+  {
+   "name": "erp-supply-pagesets-discipline",
+   "description": "页面集纪律卡（仓配分销）：壹座底座唯一载体；与 MCP 同源取数无平行路径；确认门交互模式；客户中性命名。",
+   "content": "---\nname: erp-supply-pagesets-discipline\ndescription: 页面集纪律卡（仓配分销）：载体唯一（壹座 miniapp 底座）、数据同源（REST/WS 与 MCP 同源）、确认门交互（提交→服务器确认→拒绝回显→超时兜底）。\n---\n\n# 页面集纪律卡（仓配分销）\n\n## 一、载体唯一\n- 四端页面集（UE/SE/SP/CP）全部建在壹座 miniapp 底座（Taro4 + React + Daylight 设计系统）；本包只声明页面契约，不另起前端框架。\n- 底座抽取与页面集实施归 paas 仓独立 openspec 根；ERP 线只消费契约。\n\n## 二、数据同源\n- 页面取数走配套后端 REST/WS 面，与 MCP 工具面同源同库同权限；禁止页面直连库表或另建平行数据路径。\n- 报表与 AI 助手（底座 chat 面）同源取指标口径（report preset metric_calibers 单一出处）。\n\n## 三、确认门交互\n- 关键动作（下单/对账单确认/派单拍板）走「提交→服务器确认→拒绝回显→超时兜底」模式；拒绝必回显理由。\n- 页面集资产客户中性命名；锚点实例信息不进资产。",
+   "en": "Pagesets discipline (warehousing & distribution): single carrier (miniapp base), data same-source as MCP, confirmation-gate interaction pattern, customer-neutral naming.",
+   "ja": "ページセット規律（倉配流通）：キャリア唯一（miniapp ベース）、MCP と同源のデータ、確認ゲート操作パターン、顧客中立命名。",
+   "es": "Disciplina de conjuntos de páginas (almacenaje y distribución): transportista único (base miniapp), datos de la misma fuente que MCP, patrón de interacción con puerta de confirmación, denominación neutral al cliente.",
+   "fr": "Discipline des ensembles de pages (entreposage et distribution) : transporteur unique (base miniapp), données de même source que MCP, schéma d'interaction à porte de confirmation, nommage neutre vis-à-vis du client."
+  }
+ ],
+ "mcpServers": [],
+ "fleet": {
+  "name": "仓配分销页面集包（供给包）",
+  "members": [
+   {
+    "ref": "sc-pagesets-operator",
+    "title": "页面集产出位",
+    "parentRef": null,
+    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
+    "kpiSlots": [{"key": "pagesets_delivered", "label": "页面集交付"}]
+   }
+  ],
+  "orchestration": {"mode": "supervisor", "edges": []}
+ },
+ "_casting": {
+  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "note": "页面集包只声明四端页面契约（pagesets 载荷）；实施载体与底座归 paas 仓（跨仓立项），连接器归 open-connector-mt（跨仓立项）。publish-ready：上架挂账。"
+ }
+}

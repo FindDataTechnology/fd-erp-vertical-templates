@@ -1,0 +1,185 @@
+{
+  "packType": "pageset/v1",
+  "id": "supply-chain-ue-commerce",
+  "name": "UE 订货台页面集",
+  "surface": "订货台（UE, 用户端/订货台）",
+  "surface_en": "Ordering desk (UE, end customer)",
+  "name_en": "UE Ordering Pageset",
+  "description_en": "Mobile ordering surface for the tenant's customers: catalog search, product detail, cart, order placement, statement confirmation, invoice request, after-sales and the AI assistant entry.",
+  "i18n": {
+    "en": {
+      "name": "UE Ordering Pageset",
+      "surface": "Ordering desk (UE, end customer)",
+      "description": "Mobile ordering surface for the tenant's customers: catalog search, product detail, cart, order placement, statement confirmation, invoice request, after-sales and the AI assistant entry."
+    }
+  },
+  "version": "0.1.0",
+  "specTrace": {
+    "change": "add-supply-chain-vertical",
+    "tasks": ["6.1", "6.2"],
+    "capability": "erp-miniapp-surfaces"
+  },
+  "base": {
+    "platform": "壹座 miniapp（paas 仓 paas/miniapp）",
+    "framework": "Taro 4.2.1 + React 18.3",
+    "designSystem": "Daylight（paas/miniapp/DESIGN.md，The Daylight Pocket）",
+    "minBaseContract": "pageset-base/v1",
+    "reusedBasePages": [
+      "pages/chat/index",
+      "pages/login/index",
+      "pages/bind-guide/index"
+    ],
+    "reusedBaseLibs": [
+      "src/lib/bind-scan.ts（扫码绑定）",
+      "src/lib/runtime.ts（token/WS/REST 运行时）",
+      "src/lib/taro-http.ts",
+      "src/lib/taro-socket.ts"
+    ],
+    "baseNote": "底座自身演进按 paas 仓 openspec 根治理；页面集声明最低兼容面，不锁死底座 patch 版本"
+  },
+  "authorization": {
+    "pagesetKey": "supply-chain.ue",
+    "grantModel": "按租户授权组合启用；未授权页面集对租户不可见（spec：页面集 pack 化与授权组合）",
+    "identity": "客户联系人账号，经底座扫码绑定登录（openid/unionid 侧数据，隐私合规沿底座）",
+    "dataScope": "仅本租户、本人所属客户档案的数据",
+    "requiredGrants": [
+      "catalog.read",
+      "order.write",
+      "statement.confirm",
+      "invoice.write",
+      "aftersale.write",
+      "ai.chat"
+    ]
+  },
+  "blueprint": {
+    "source": "锚点客户蓝图 UE 订货台 25 功能点（change tasks 6.2 枚举：商品检索/详情/下单/查单/对账单确认/开票申请/售后申请）",
+    "granularityNote": "本 pack 按 tasks 6.2 功能域映射到页面；锚点 310 点逐条映射待其清单资产化后核对（挂账见 pack 备注）",
+    "coverage": { "coveredAreas": 7, "pendingTrimAreas": 0 },
+    "trimNote": "功能域全数有页面承载；四端是否一期全上属客户侧范围决策（design D8/Open Questions），不在此裁剪"
+  },
+  "confirmGatePattern": "提交→服务器确认→拒绝回显→超时兜底（底座既有交互模式，paas/miniapp/src/components/QuestionCard.tsx 同构；落账类拍板经账本内核 confirm/reject proposal 同源）",
+  "pages": [
+    {
+      "id": "ue-home",
+      "title": "订货首页",
+      "covers": ["商品检索"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/products",
+        "GET /erp/supply-chain/v1/ue/product-categories"
+      ],
+      "notes": "关键词/分类/常购清单入口"
+    },
+    {
+      "id": "ue-product-search",
+      "title": "商品检索",
+      "covers": ["商品检索"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/products"
+      ],
+      "notes": "与 ue-home 共用检索面，独立路由承载深链搜索"
+    },
+    {
+      "id": "ue-product-detail",
+      "title": "商品详情",
+      "covers": ["商品详情"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/products/{productId}"
+      ],
+      "notes": "规格/价格（取价引擎结果）/库存可见性/图片"
+    },
+    {
+      "id": "ue-cart",
+      "title": "进货单",
+      "covers": ["下单"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/cart",
+        "POST /erp/supply-chain/v1/ue/cart/lines",
+        "DELETE /erp/supply-chain/v1/ue/cart/lines/{lineId}",
+        "POST /erp/supply-chain/v1/ue/cart/price-preview"
+      ],
+      "notes": "下单前取价试算（客户价/活动价/券），纯读预览不占用信用额度"
+    },
+    {
+      "id": "ue-order-create",
+      "title": "订单确认",
+      "covers": ["下单"],
+      "apis": [
+        "POST /erp/supply-chain/v1/ue/orders"
+      ],
+      "confirmGate": true,
+      "notes": "提交经信用校验（账本额度占用，额度不足可解释拒绝）；订单确认走确认车道"
+    },
+    {
+      "id": "ue-order-list",
+      "title": "我的订单",
+      "covers": ["查单"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/orders"
+      ]
+    },
+    {
+      "id": "ue-order-detail",
+      "title": "订单详情与物流轨迹",
+      "covers": ["查单"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/orders/{orderId}",
+        "GET /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment"
+      ],
+      "notes": "履约路径（直发/仓内）状态与运单轨迹，同源交付编排面"
+    },
+    {
+      "id": "ue-statement-confirm",
+      "title": "对账单确认",
+      "covers": ["对账单确认"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/statements",
+        "GET /erp/supply-chain/v1/ue/statements/{statementId}",
+        "POST /erp/supply-chain/v1/ue/statements/{statementId}/confirm"
+      ],
+      "confirmGate": true,
+      "notes": "确认/异议提交为确认门动作；对账单数据与金蝶往来面同源（连接器拉取，中台计算）"
+    },
+    {
+      "id": "ue-invoice-apply",
+      "title": "开票申请",
+      "covers": ["开票申请"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/invoice-requests",
+        "POST /erp/supply-chain/v1/ue/invoice-requests"
+      ],
+      "notes": "申请进后台审核车道；开票执行在金蝶/开票通道，本页只登记与查进度"
+    },
+    {
+      "id": "ue-aftersale-apply",
+      "title": "售后申请",
+      "covers": ["售后"],
+      "apis": [
+        "POST /erp/supply-chain/v1/ue/aftersale-requests"
+      ]
+    },
+    {
+      "id": "ue-aftersale-detail",
+      "title": "售后进度",
+      "covers": ["售后"],
+      "apis": [
+        "GET /erp/supply-chain/v1/ue/aftersale-requests",
+        "GET /erp/supply-chain/v1/ue/aftersale-requests/{requestId}"
+      ]
+    },
+    {
+      "id": "ue-ai-assistant",
+      "title": "AI 助手",
+      "covers": ["AI 助手入口（spec：AI 助手入口）"],
+      "apis": [
+        "WS 底座 chat 通道（复用 pages/chat/index 与 wsSend 契约）"
+      ],
+      "aiEntry": true,
+      "notes": "经营问答/推荐答复与页面同源指标口径；建议类输出标注为建议，动作类必须经确认门"
+    }
+  ],
+  "sharedNotes": [
+    "本 pack 全部页面消费的后端数据与 MCP 工具面同源（同一内核与编排层），无平行取数路径",
+    "页面标题与文案在实施时按 Daylight 语气规范（paas/miniapp/DESIGN.md）定稿",
+    "锚点 310 点逐条映射挂账：清单资产化后在本 manifest 的 blueprint 段回填逐点核对结果"
+  ]
+}

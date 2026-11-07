@@ -1,0 +1,121 @@
+{
+  "name": "跨境电商对账舰队（模板）",
+  "version": "1.0.0",
+  "description": "跨境电商对账舰队：巡检岗按店铺触发订单-收款-库存三方对账（内核 run_reconciliation + 模板对账驱动报告）、核对岗四类差异逐条定性并引用三舰观测证据解释（在途/签收引物流舰、供给纠偏引合规舰）、拍板岗 owner 席位对 escalate 差异拍板（确认门唯一落账）。复用跨境线既有三舰观测面（监测/物流/合规）作差异解释依据，不另建平行数据路径。平台侧零写入；核对结论回写经内核 proposal 白名单车道（确认门只在拍板席位）。",
+  "agents": [
+    {
+      "id": "xb-recon-watcher",
+      "name": "巡检岗",
+      "description": "逐店触发三方对账并核对驱动报告完成度",
+      "persona": "你是跨境电商对账舰队的巡检岗。每回合逐店触发对账：①经内核 run_reconciliation 对可通用化的两源（订单流↔收款流）出 task_id，get_recon_report 取四类差异；②消费对账驱动（fd-erp-vertical-templates sidecar）产出的三方对账报告（含库存状态腿与费用维度）；③核对报告完成度：每店逐笔对齐结果与差异清单齐备、双侧引用齐全，缺店/缺流如实标注（驱动不可达=NOT_WIRED 如实报，不伪造完成）；④多店铺逐店出账，绝不混店汇总。\n\n【职责边界】你是触发与核数者：不定性差异、不拍板、不解释物流因果（归核对岗引证据）。\n\n【工作纪律】①每店报告带店铺标识与日窗口；②差异计数与驱动报告逐字一致；③内核任务 failed/interrupted 如实上报；④平台侧零写入是你与全舰的铁律，任何写平台工具面都拒绝调用。\n\n【输出契约】收尾必 report_status（槽位 stores_reconciled/diffs_found），报数说明含逐店任务 id、差异四类计数、不可得清单（NOT_WIRED 归因）。"
+    },
+    {
+      "id": "xb-recon-reconciler",
+      "name": "核对岗",
+      "description": "四类差异逐条定性；引用三舰观测证据解释；结论经 proposal 回写",
+      "persona": "你是跨境电商对账舰队的核对岗。每回合对巡检岗报来的差异逐条定性：①缺失/多余/金额不符/状态不符，每条引用双侧原始引用复核；②在途/签收类差异引用物流舰 series 观测证据解释（对账层不猜测物流因果）；供给纠偏/通报类引用合规舰证据；③可定性的差异出核对建议分录（限白名单科目：应收/在途/收入/费用；资金类分录禁入）；④核对结论经内核 submit_proposal 回写（pending 待确认，lane 携带舰队语义字段）——你无确认门，绝不调用 confirm_proposal；⑤无法定性的差异 escalate 拍板单到 owner 席位。\n\n【职责边界】你是定性者不是落账者：proposal 只创建不落账；不写平台侧任何数据；无出处汇率不参与折算核对（如实标 fx_unsourced）。\n\n【工作纪律】①每条差异定性必带证据引用（三舰观测或双侧原始引用）；②重推/幂等：同差异回写同 stable_id 返回首次结果；③payouts/佣金/手续费按独立维度核对，费率出处缺失如实 unexplained。\n\n【输出契约】收尾必 report_status（槽位 diffs_classified/proposals_written/escalated），报数说明含逐差异定性结论、证据引用清单、回写 proposal id、升级拍板单 id。"
+    },
+    {
+      "id": "xb-recon-decider",
+      "name": "拍板岗",
+      "description": "owner 拍板席：裁决升级差异，确认门落账",
+      "persona": "你是跨境电商对舰队的拍板岗（owner 席位）。每回合值守升级拍板单：①对核对岗 escalate 的差异逐条裁决（确认更正/拒绝/挂起待证）；②裁决后经内核 confirm_proposal（确认门）落账或 reject_proposal 留痕——确认门是唯一落账路径，你是全舰唯一持门者；③拍板记录带差异双侧引用与裁决理由；④资金执行类请求（分账执行/代收代付/资金池）一律拒绝——二清红线，资金走客户自选持牌通道。\n\n【职责边界】你是唯一落账关口：不代替核对岗定性、不跳过确认门直接写任何数据；冲正走 reversal 关联原分录。\n\n【工作纪律】①每笔确认前核对建议分录借贷必平与科目白名单；②拒绝必留理由；③挂起项带复核期限。\n\n【输出契约】收尾必 report_status（槽位 decided/confirmed/rejected），报数说明含逐拍板单结论、落账 txn_id 清单、拒绝理由。"
+    }
+  ],
+  "fleet": {
+    "name": "跨境电商对账集群（模板）",
+    "members": [
+      {
+        "ref": "watcher",
+        "title": "巡检岗",
+        "parentRef": "reconciler",
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:crossborder-connector-pack}}", "presetId": "erp-crossborder-recon-discipline"},
+        "kpiSlots": [
+          {"key": "stores_reconciled", "label": "已对店铺", "unit": "店"},
+          {"key": "diffs_found", "label": "差异条目", "unit": "条"}
+        ],
+        "cadence": {"cron": "20 6 * * *", "tz": "Asia/Shanghai", "promptTemplate": "逐店触发订单-收款-库存三方对账，核对驱动报告完成度；多店铺逐店出账不混账；缺流如实 NOT_WIRED。收尾必 report_status。{{fleetContext}}"}
+      },
+      {
+        "ref": "reconciler",
+        "title": "核对岗",
+        "parentRef": "decider",
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:crossborder-connector-pack}}", "presetId": "erp-crossborder-recon-discipline"},
+        "kpiSlots": [
+          {"key": "diffs_classified", "label": "已定性差异", "unit": "条"},
+          {"key": "proposals_written", "label": "回写提案", "unit": "条"},
+          {"key": "escalated", "label": "升级拍板", "unit": "单"}
+        ],
+        "cadence": {"cron": "50 6 * * *", "tz": "Asia/Shanghai", "promptTemplate": "逐条定性四类差异，在途引物流舰证据、供给引合规舰证据；结论 submit_proposal 回写（pending）；无法定性 escalate 拍板单。收尾必 report_status。{{fleetContext}}"}
+      },
+      {
+        "ref": "decider",
+        "title": "拍板岗",
+        "parentRef": null,
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:crossborder-connector-pack}}", "presetId": "erp-crossborder-recon-discipline"},
+        "kpiSlots": [
+          {"key": "decided", "label": "已拍板", "unit": "单"},
+          {"key": "confirmed", "label": "确认落账", "unit": "笔"}
+        ],
+        "cadence": {"cron": "30 7 * * *", "tz": "Asia/Shanghai", "promptTemplate": "值守升级拍板单：裁决后经确认门落账（confirm_proposal）或拒绝留痕；资金执行类请求一律拒绝（二清红线）。收尾必 report_status。{{fleetContext}}"}
+      }
+    ],
+    "orchestration": {
+      "mode": "schedule",
+      "edges": [
+        {"kind": "trigger", "from": "cron(20 6 * * *)", "to": "watcher"},
+        {"kind": "trigger", "from": "cron(50 6 * * *)", "to": "reconciler"},
+        {"kind": "trigger", "from": "cron(30 7 * * *)", "to": "decider"},
+        {"kind": "handoff", "from": "watcher", "to": "reconciler"},
+        {"kind": "handoff", "from": "reconciler", "to": "decider"}
+      ]
+    },
+    "i18n": {
+      "en": {
+        "name": "Cross-border Recon Cluster (Template)",
+        "members": {
+          "watcher": {"title": "Recon Watcher", "kpiSlots": {"stores_reconciled": {"label": "Stores reconciled"}, "diffs_found": {"label": "Diffs found"}}},
+          "reconciler": {"title": "Reconciler", "kpiSlots": {"diffs_classified": {"label": "Diffs classified"}, "proposals_written": {"label": "Proposals written"}, "escalated": {"label": "Escalations"}}},
+          "decider": {"title": "Approver (Owner)", "kpiSlots": {"decided": {"label": "Decided"}, "confirmed": {"label": "Confirmed postings"}}}
+        }
+      }
+    }
+  },
+  "monitoring": {
+    "anomaly_criteria": [
+      "差异清单出现 missing_in_right / extra_in_right / amount_mismatch / status_mismatch 任一",
+      "对账驱动或内核任务 failed/interrupted",
+      "费率出处缺失（费用差异 unexplained）",
+      "无出处汇率（fx_unsourced）"
+    ],
+    "escalate": {"threshold": "核对岗无法定性或 severity=high 的差异", "severity_default": "high"},
+    "notify": "proposal-channel"
+  },
+  "acceptance": [
+    {"id": "a1", "kind": "post-materialized", "target": "巡检岗"},
+    {"id": "a2", "kind": "post-materialized", "target": "核对岗"},
+    {"id": "a3", "kind": "first-round-fired", "target": "巡检岗"},
+    {"id": "a4", "kind": "report-landed", "target": "核对岗"},
+    {"id": "a5", "kind": "escalate-bounded", "expect": 3},
+    {"id": "a6", "kind": "llm-judged", "target": "拍板岗", "rubric": "差异拍板单逐条带双侧引用与结论；核对结论回写为 proposal 待确认（无直写落账）；资金执行类请求被拒绝"}
+  ],
+  "mcpServers": [
+    {
+      "registryName": "fd-erp-ledger-mcp",
+      "allowTools": ["run_reconciliation", "get_recon_report", "query_balance", "query_entries", "list_proposals", "submit_proposal", "confirm_proposal", "reject_proposal"]
+    },
+    {
+      "registryName": "fd-info",
+      "allowTools": ["list_since", "search_info", "get_item", "stream_health"]
+    }
+  ],
+  "_casting": {
+    "packDependencies": {
+      "crossborder-connector-pack": "{{PACK_ID:crossborder-connector-pack}}",
+      "crossborder-account-mapping-pack": "{{PACK_ID:crossborder-account-mapping-pack}}",
+      "fleet-data-qa": "{{PACK_ID:fleet-data-qa}}",
+      "fleet-brief-report": "{{PACK_ID:fleet-brief-report}}"
+    },
+    "note": "对账舰队复用跨境三舰观测面（监测/物流/合规舰在产）作差异解释依据——观测数据路径不平行新建。巡检/核对/拍板错峰 30min（06:20/06:50/07:30）。确认门（confirm/reject）只在拍板岗（owner 席位）岗位纪律；核对岗 persona 明示只 submit_proposal。多店铺逐店出账：驱动按店隔离，舰报按店列示。"
+  }
+}

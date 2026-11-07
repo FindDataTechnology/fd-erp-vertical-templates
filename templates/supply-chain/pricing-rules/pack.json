@@ -1,0 +1,112 @@
+{
+ "schema": "erp-vertical-connector-pack/v1",
+ "name": "仓配分销取价规则包",
+ "version": "1.0.0",
+ "description": "仓配分销模板·取价规则 pack：客户专属价/活动价/优惠券三层规则（规则带生效期与出处 rate_source，无出处规则拒绝上架）。运行时规则经 PricingRuleBook 确认车道配置；本包是市场分发的种子规则集（演示口径，客户实施时按其价格政策替换）。取价可溯源：逐规则链带出处（pricing.resolve_price provenance）。",
+ "tags": [
+  "ERP",
+  "仓配分销",
+  "取价引擎",
+  "定价规则"
+ ],
+ "notes": "publish-ready 源清单（未上架，packId 未铸造）：种子规则为演示口径，不是客户实际价格政策；同维度重叠在配置期拒绝，无出处规则拒绝上架；取价逐规则链带出处。",
+ "visibility": "public",
+ "category": "facet",
+ "pricing_rules": {
+  "schema": "erp-pricing-rules/v1",
+  "vertical": "supply-chain",
+  "version": "1.0.0",
+  "layers": [
+   "customer_price",
+   "promo",
+   "coupon"
+  ],
+  "rules": [
+   {
+    "layer": "customer_price",
+    "scope": {
+     "product_code": "*",
+     "customer_id": "*"
+    },
+    "price": "98.00",
+    "valid_from": "2026-01-01",
+    "valid_to": "2027-12-31",
+    "rate_source": "template-seed:supply-chain-price-list/v1",
+    "note": "种子示例：通用协议价（实施时按客户价格政策替换）"
+   },
+   {
+    "layer": "promo",
+    "scope": {
+     "product_code": "*",
+     "customer_id": "*"
+    },
+    "price": "95.00",
+    "valid_from": "2026-01-01",
+    "valid_to": "2026-12-31",
+    "rate_source": "template-seed:supply-chain-promo-calendar/v1",
+    "note": "种子示例：年度促销价（演示生效期语义）"
+   }
+  ]
+ },
+ "skills": [
+  {
+   "name": "erp-supply-pricing-discipline",
+   "description": "取价纪律卡（仓配分销）：无出处规则拒绝参与取价；规则冲突（同维度重叠）拒绝配置；下单取价可溯源；规则配置走确认车道。",
+   "content": "---\nname: erp-supply-pricing-discipline\ndescription: 取价纪律卡（仓配分销）：三层规则（客户价/活动价/券）、生效期与出处、冲突检测、确认车道。\n---\n\n# 取价纪律卡（仓配分销）\n\n## 一、出处纪律\n- 每条规则 MUST 带 rate_source（价格政策/促销日历/券模板的出处）；无出处规则拒绝配置、拒绝参与取价（取价面跳过并留痕 unsourced_skipped）。\n- 规则带生效期（valid_from/valid_to）；过效期规则不参与取价。\n\n## 二、冲突纪律\n- 同层 + 同维度作用域（商品×客户全等）+ 生效期重叠 = 冲突：拒绝配置（宁可漏配人工补，不可重叠乱价）。\n- 层内择一：更具体作用域优先 > 生效期更晚；层间语义：客户价覆盖基础价 → 活动价覆盖 → 券在现价上打折。\n\n## 三、可溯源\n- 下单自动取价返回命中规则链（provenance，逐规则带 rate_source）；报价解释以规则链为准。\n- 规则配置经确认车道（pending→confirm），拒绝留痕；种子规则集是演示口径，客户实施时替换。",
+   "en": "Pricing discipline (warehousing & distribution): unsourced rules rejected from pricing; same-dimension overlap rejected at configuration; order-time pricing fully sourced via rule chain provenance; rule configuration via confirmation lane.",
+   "ja": "価格決定規律（倉配流通）：出所のないルールは価格決定から拒否、同一ディメンション重複は設定時拒否、受注時の価格決定はルールチェーンで完全トレース可能、ルール設定は確認レーン経由。",
+   "es": "Disciplina de precios (almacenaje y distribución): las reglas sin fuente se rechazan en la fijación de precios; el solapamiento de la misma dimensión se rechaza en la configuración; la fijación de precios en el pedido es totalmente trazable mediante la cadena de reglas; la configuración de reglas pasa por el carril de confirmación.",
+   "fr": "Discipline de tarification (entreposage et distribution) : les règles sans source sont rejetées à la tarification ; le chevauchement de même dimension est rejeté à la configuration ; la tarification à la commande est entièrement traçable via la chaîne de règles ; la configuration des règles passe par le couloir de confirmation."
+  }
+ ],
+ "mcpServers": [],
+ "fleet": {
+  "name": "仓配分销取价规则包（供给包）",
+  "members": [
+   {
+    "ref": "sc-pricing-operator",
+    "title": "规则产出位",
+    "parentRef": null,
+    "target": {
+     "kind": "pack-preset",
+     "packId": "Mo3_aWe7tF2eFVzkqFT9mA",
+     "presetId": "erp-ledger-board-post"
+    },
+    "kpiSlots": [
+     {
+      "key": "rule_versions",
+      "label": "规则版本"
+     }
+    ]
+   }
+  ],
+  "orchestration": {
+   "mode": "supervisor",
+   "edges": []
+  }
+ },
+ "_casting": {
+  "packDependencies": {
+   "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
+  },
+  "note": "取价规则包内嵌 pricing_rules 载荷（erp-pricing-rules/v1）。无 MCP 工具面（规则运行时经模板 PricingRuleBook 确认车道与订单编排消费）。publish-ready：上架挂账。"
+ },
+ "i18n": {
+  "en": {
+   "name": "Warehousing & distribution pricing rules pack",
+   "description": "Pricing rules pack for the warehousing & distribution template: three rule layers — customer-specific price, campaign price, coupon — each carrying an effective window and a rate source; rules without a source are rejected. Runtime rules are configured through the confirmation lane of the pricing rule book. This pack is a seed rule set distributed through the market (demonstration caliber; customers replace it with their own price policy). Pricing stays traceable: every resolution carries its rule chain provenance.",
+   "notes": "Publish-ready source (not yet published; packId not minted). Seed rules are demonstration caliber, not a customer's actual price policy; same-dimension overlaps are rejected at configuration and unsourced rules are refused.",
+   "tags": [
+    "ERP",
+    "warehousing & distribution",
+    "pricing",
+    "rule set"
+   ],
+   "skills": {
+    "erp-supply-pricing-discipline": {
+     "description": "Pricing discipline (warehousing & distribution): unsourced rules rejected from pricing; same-dimension overlap rejected at configuration; order-time pricing fully sourced via rule chain provenance; rule configuration via confirmation lane."
+    }
+   }
+  }
+ }
+}

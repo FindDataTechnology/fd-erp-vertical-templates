@@ -1,0 +1,117 @@
+{
+  "name": "餐饮门店日结舰队（模板）",
+  "version": "1.0.0",
+  "description": "餐饮连锁门店日结舰队：日结巡检岗按门店错峰触发每日对账（POS-收款-外卖三方，驱动逐店出账）、核对岗四类差异定性（佣金差异按平台费率出处解释，无法定性 escalate）、拍板岗 owner 席位经确认门落账。日报三段（流水/收款/差异）；多门店错峰调度（逐店 cadence 间隔 ≥30min）；资金执行面不存在（二清红线：分成只出核对对账单与核对指令）。",
+  "agents": [
+    {
+      "id": "rest-close-watcher",
+      "name": "日结巡检岗",
+      "description": "逐店错峰触发日结并核对日报完成度",
+      "persona": "你是餐饮门店日结舰队的日结巡检岗。每回合逐店触发日结：①按门店主数据（开营业态）逐店调用对账驱动（fd-erp-vertical-templates sidecar）出日结日报（三段：流水/收款/差异）；②多门店错峰：逐店间隔 ≥30 分钟，绝不并发轰同一渠道；③核对日报完成度：三段齐备、双侧引用齐全；驱动不可达/渠道未适配如实 NOT_WIRED（POS 未适配厂商走导出文件通道，不以人工补录冒充自动接入）；④停业门店（closed）不参与日结。\n\n【职责边界】你是触发与核数者：不定性差异、不拍板、不落账。\n\n【工作纪律】①每店日报带门店标识与营业日；②渠道凭据未注入（BYOK）如实报 NOT_WIRED，不伪造收款段；③差异计数与驱动报告逐字一致。\n\n【输出契约】收尾必 report_status（槽位 stores_closed/diffs_found），报数说明含逐店日报摘要、未得清单（NOT_WIRED 归因）。"
+    },
+    {
+      "id": "rest-close-reconciler",
+      "name": "核对岗",
+      "description": "差异定性；佣金差异按费率出处解释；结论 proposal 回写",
+      "persona": "你是餐饮门店日结舰队的核对岗。每回合对日结差异逐条定性：①四类差异逐条复核双侧引用；②佣金差异按平台费率出处解释（费率无出处如实 unexplained，不臆测）；③可定性的差异出核对建议分录（限白名单科目：应收/在途/收入/费用；资金类分录禁入）；④核对结论经内核 submit_proposal 回写（pending 待确认）——你无确认门，绝不调用 confirm_proposal；⑤无法定性的差异 escalate 拍板单到 owner 席位；⑥加盟店日结数据进入分成核对口径（对账单核对岗出数，划转归持牌通道）。\n\n【职责边界】你是定性者不是落账者：proposal 只创建不落账；不写渠道/平台侧任何数据；分账执行类请求一律拒绝（二清红线）。\n\n【输出契约】收尾必 report_status（槽位 diffs_classified/proposals_written/escalated），报数说明含逐差异结论、证据引用、回写 proposal id、拍板单 id。"
+    },
+    {
+      "id": "rest-close-decider",
+      "name": "拍板岗",
+      "description": "owner 拍板席：裁决升级差异，确认门落账；分成只出核对指令",
+      "persona": "你是餐饮门店日结舰队的拍板岗（owner 席位）。每回合值守：①对 escalate 差异逐条裁决，经内核 confirm_proposal（确认门）落账或 reject_proposal 留痕——你是全舰唯一持门者；②分成口径：只输出双方可核对的分成对账单与核对指令数据（对接持牌分账通道的数据面），资金划转由品牌方经持牌通道执行——平台不经手资金，任何资金执行工具面都不存在；③冲正走 reversal 关联原分录。\n\n【职责边界】你是唯一落账关口：不跳过确认门写任何数据；不提供资金归集/代收代付/分账执行。\n\n【输出契约】收尾必 report_status（槽位 decided/confirmed/rejected），报数说明含拍板结论、落账 txn_id、拒绝理由、分成核对单期号。"
+    }
+  ],
+  "fleet": {
+    "name": "餐饮门店日结集群（模板）",
+    "members": [
+      {
+        "ref": "close-watcher",
+        "title": "日结巡检岗",
+        "parentRef": "reconciler",
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:restaurant-connector-pack}}", "presetId": "erp-restaurant-recon-discipline"},
+        "kpiSlots": [
+          {"key": "stores_closed", "label": "已日结门店", "unit": "店"},
+          {"key": "diffs_found", "label": "差异条目", "unit": "条"}
+        ],
+        "cadence": {"cron": "30 23 * * *", "tz": "Asia/Shanghai", "promptTemplate": "逐店错峰触发日结（营业日窗口），核对日报三段完成度；未适配厂商走导出文件通道如实报；停业门店不参与。收尾必 report_status。{{fleetContext}}"}
+      },
+      {
+        "ref": "reconciler",
+        "title": "核对岗",
+        "parentRef": "decider",
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:restaurant-connector-pack}}", "presetId": "erp-restaurant-recon-discipline"},
+        "kpiSlots": [
+          {"key": "diffs_classified", "label": "已定性差异", "unit": "条"},
+          {"key": "proposals_written", "label": "回写提案", "unit": "条"},
+          {"key": "escalated", "label": "升级拍板", "unit": "单"}
+        ],
+        "cadence": {"cron": "0 0 * * *", "tz": "Asia/Shanghai", "promptTemplate": "逐条定性日结差异；佣金差异按费率出处解释；结论 submit_proposal 回写（pending）；无法定性 escalate；加盟店数据进分成核对口径。收尾必 report_status。{{fleetContext}}"}
+      },
+      {
+        "ref": "decider",
+        "title": "拍板岗",
+        "parentRef": null,
+        "target": {"kind": "pack-preset", "packId": "{{PACK_ID:restaurant-connector-pack}}", "presetId": "erp-restaurant-recon-discipline"},
+        "kpiSlots": [
+          {"key": "decided", "label": "已拍板", "unit": "单"},
+          {"key": "confirmed", "label": "确认落账", "unit": "笔"}
+        ],
+        "cadence": {"cron": "30 0 * * *", "tz": "Asia/Shanghai", "promptTemplate": "值守拍板单：确认门落账或拒绝留痕；分成只出核对对账单与核对指令（持牌通道执行划转，平台不经手资金）。收尾必 report_status。{{fleetContext}}"}
+      }
+    ],
+    "orchestration": {
+      "mode": "schedule",
+      "edges": [
+        {"kind": "trigger", "from": "cron(30 23 * * *)", "to": "close-watcher"},
+        {"kind": "trigger", "from": "cron(0 0 * * *)", "to": "reconciler"},
+        {"kind": "trigger", "from": "cron(30 0 * * *)", "to": "decider"},
+        {"kind": "handoff", "from": "close-watcher", "to": "reconciler"},
+        {"kind": "handoff", "from": "reconciler", "to": "decider"}
+      ]
+    },
+    "i18n": {
+      "en": {
+        "name": "Restaurant Daily-Close Cluster (Template)",
+        "members": {
+          "close-watcher": {"title": "Daily-Close Watcher", "kpiSlots": {"stores_closed": {"label": "Stores closed"}, "diffs_found": {"label": "Diffs found"}}},
+          "reconciler": {"title": "Reconciler", "kpiSlots": {"diffs_classified": {"label": "Diffs classified"}, "proposals_written": {"label": "Proposals written"}, "escalated": {"label": "Escalations"}}},
+          "decider": {"title": "Approver (Owner)", "kpiSlots": {"decided": {"label": "Decided"}, "confirmed": {"label": "Confirmed postings"}}}
+        }
+      }
+    }
+  },
+  "monitoring": {
+    "anomaly_criteria": [
+      "日结差异四类任一出现",
+      "渠道凭据未注入 / 渠道读面不可达（NOT_WIRED）",
+      "POS 厂商未适配（须提示导出文件替代通道）",
+      "佣金差异费率出处缺失（unexplained）",
+      "分成请求含资金执行语义"
+    ],
+    "escalate": {"threshold": "核对岗无法定性或 severity=high 的差异", "severity_default": "high"},
+    "notify": "proposal-channel"
+  },
+  "acceptance": [
+    {"id": "a1", "kind": "post-materialized", "target": "日结巡检岗"},
+    {"id": "a2", "kind": "first-round-fired", "target": "日结巡检岗"},
+    {"id": "a3", "kind": "report-landed", "target": "核对岗"},
+    {"id": "a4", "kind": "escalate-bounded", "expect": 3},
+    {"id": "a5", "kind": "llm-judged", "target": "拍板岗", "rubric": "日报三段齐备（流水/收款/差异）；核对结论回写为 proposal 待确认；分成输出为核对对账单与核对指令，无任何资金执行面"}
+  ],
+  "mcpServers": [
+    {
+      "registryName": "fd-erp-ledger-mcp",
+      "allowTools": ["run_reconciliation", "get_recon_report", "query_balance", "query_entries", "list_proposals", "submit_proposal", "confirm_proposal", "reject_proposal"]
+    }
+  ],
+  "_casting": {
+    "packDependencies": {
+      "restaurant-connector-pack": "{{PACK_ID:restaurant-connector-pack}}",
+      "restaurant-account-mapping-pack": "{{PACK_ID:restaurant-account-mapping-pack}}",
+      "fleet-data-qa": "{{PACK_ID:fleet-data-qa}}",
+      "fleet-brief-report": "{{PACK_ID:fleet-brief-report}}"
+    },
+    "note": "日结巡检 23:30 起逐店错峰（驱动内部门店间隔 ≥30min）；核对 00:00、拍板 00:30 错峰。确认门只在拍板岗（owner 席位）。首个 POS 厂商适配器随首单客户上线（挂账）；未适配厂商走导出文件通道。"
+  }
+}

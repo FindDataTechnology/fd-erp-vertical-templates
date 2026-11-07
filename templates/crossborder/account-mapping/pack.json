@@ -1,0 +1,64 @@
+{
+ "schema": "erp-vertical-connector-pack/v1",
+ "name": "跨境电商科目映射包",
+ "version": "1.0.0",
+ "description": "跨境电商对账模板·科目映射 pack：行业科目对齐内核通用科目最小集（呈现层口径）。映射只影响报表与查询呈现，已落账分录零改动；替换映射不改账。映射 MUST NOT 向内核注入行业科目行（本包无任何写内核路径）。",
+ "tags": ["ERP", "跨境电商", "科目映射", "呈现层"],
+ "visibility": "public",
+ "category": "facet",
+ "account_mapping": {
+  "schema": "erp-account-mapping/v1",
+  "vertical": "crossborder",
+  "version": "1.0.0",
+  "universal_preset_version": "v1",
+  "industry_accounts": [
+   {"code": "X-0001", "name_zh": "平台销售收入", "name_en": "Platform sales revenue", "maps_to": "4000", "kind": "revenue"},
+   {"code": "X-0002", "name_zh": "销货成本", "name_en": "Cost of goods sold", "maps_to": "5000", "kind": "expense"},
+   {"code": "X-0003", "name_zh": "平台佣金与收款手续费", "name_en": "Platform commission and payment fees", "maps_to": "5100", "kind": "expense"},
+   {"code": "X-0004", "name_zh": "跨境物流费用", "name_en": "Cross-border logistics costs", "maps_to": "5200", "kind": "expense"},
+   {"code": "X-0005", "name_zh": "应收平台款", "name_en": "Platform receivables", "maps_to": "1100", "kind": "asset"},
+   {"code": "X-0006", "name_zh": "平台在途回款", "name_en": "Platform settlements in transit", "maps_to": "1300", "kind": "asset"},
+   {"code": "X-0007", "name_zh": "商品库存", "name_en": "Merchandise inventory", "maps_to": "1200", "kind": "asset"},
+   {"code": "X-0008", "name_zh": "供应商应付", "name_en": "Supplier payables", "maps_to": "2000", "kind": "liability"}
+  ],
+  "report_rows": [
+   {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue", "includes": ["X-0001"]},
+   {"key": "cost", "label_zh": "成本与费用", "label_en": "Costs and expenses", "includes": ["X-0002", "X-0003", "X-0004"]},
+   {"key": "working-capital", "label_zh": "营运资本", "label_en": "Working capital", "includes": ["X-0005", "X-0006", "X-0007", "X-0008"]}
+  ]
+ },
+ "skills": [
+  {
+   "name": "erp-crossborder-mapping-discipline",
+   "description": "科目映射纪律卡：映射只在呈现层、替换不改账、不向内核注入行业科目、无出处汇率不折算。",
+   "content": "---\nname: erp-crossborder-mapping-discipline\ndescription: 科目映射纪律卡：映射只影响报表与查询呈现，账本事实零改动；替换映射不改账；内核科目保持最小行业无关。\n---\n\n# 科目映射纪律卡（跨境电商）\n\n## 一、呈现层口径\n- 行业科目是内核通用科目的呈现别名（一一对齐）：平台销售收入→4000、平台佣金与收款手续费→5100、平台在途回款→1300 等。\n- 报表与查询按映射呈现行业科目名；账本分录（journal_entries）零改动。\n- 未被映射覆盖的内核科目余额如实列 unmapped，不静默吞掉。\n\n## 二、替换不改账\n- 同一租户替换映射包版本：已落账分录不变，仅报表与余额呈现口径按新映射重算。\n- 验证口径：替换前后 query_entries 逐字一致；映射 diff（added/removed/retargeted）如实随报。\n\n## 三、不注入内核\n- 行业科目 MUST NOT 注入内核（无任何写内核路径）；内核科目集保持行业无关最小集（12 科目 v1）。\n- 一个内核科目至多被一个行业科目对齐（呈现重算不重复计数）。",
+   "en": "Account mapping discipline: presentation-layer only, replacing mapping never touches posted entries, industry accounts are presentation aliases of kernel universal accounts, no injection into the kernel.",
+   "ja": "勘定マッピング規律：提示層のみ、マッピング差し替えでも仕訳不変、業界勘定は kernel 普遍勘定の別名、kernel への注入禁止。",
+   "es": "Disciplina de mapeo de cuentas: solo capa de presentación, reemplazar el mapeo nunca toca asientos registrados, las cuentas del sector son alias de presentación de las cuentas universales del kernel, sin inyección al kernel.",
+   "fr": "Discipline de mappage de comptes : couche de présentation uniquement, remplacer le mappage ne touche jamais les écritures comptabilisées, les comptes sectoriels sont des alias de présentation des comptes universels du noyau, aucune injection dans le noyau."
+  }
+ ],
+ "mcpServers": [
+  {
+   "registryName": "fd-erp-ledger-mcp",
+   "allowTools": ["query_balance", "query_entries"]
+  }
+ ],
+ "fleet": {
+  "name": "跨境电商科目映射包（供给包）",
+  "members": [
+   {
+    "ref": "xb-mapping-operator",
+    "title": "映射产出位",
+    "parentRef": null,
+    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
+    "kpiSlots": [{"key": "mapping_versions", "label": "映射版本"}]
+   }
+  ],
+  "orchestration": {"mode": "supervisor", "edges": []}
+ },
+ "_casting": {
+  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "note": "映射包内嵌 account_mapping 载荷（erp-account-mapping/v1）。mcpServers 仅内核只读两工具（映射无写面）。publish-ready：上架挂账。"
+ }
+}

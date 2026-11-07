@@ -1,0 +1,58 @@
+{
+  "schema": "erp-report-preset/v1",
+  "name": "餐饮门店日报与分成核对 preset",
+  "vertical": "restaurant-chain",
+  "version": "1.0.0",
+  "reports": [
+    {
+      "key": "rest-daily-close",
+      "title_zh": "门店营业日报（三段）",
+      "title_en": "Store daily close (three sections)",
+      "kind": "report",
+      "source": "recon driver daily_close",
+      "sections": [
+        {"key": "flows", "label_zh": "流水", "label_en": "Flows", "metrics": ["pos_flow_count", "pos_total", "by_channel"]},
+        {"key": "receipts", "label_zh": "收款", "label_en": "Receipts", "metrics": ["settlement_total", "fee_total", "record_count"]},
+        {"key": "diffs", "label_zh": "差异（四类）", "label_en": "Diffs (four kinds)", "metrics": ["missing_in_right", "extra_in_right", "amount_mismatch", "status_mismatch"]}
+      ],
+      "caliber": "逐店出账；POS 流水 vs 收款渠道结算 vs 外卖结算三方对齐；渠道侧零写入"
+    },
+    {
+      "key": "rest-commission-check",
+      "title_zh": "外卖佣金核对",
+      "title_en": "Delivery commission check",
+      "kind": "report",
+      "source": "recon driver commission_diffs",
+      "sections": [
+        {"key": "commission", "label_zh": "佣金差异", "label_en": "Commission diffs", "metrics": ["fee", "order_amount", "explained"]}
+      ],
+      "caliber": "佣金差异按平台费率出处解释；无出处如实 unexplained"
+    },
+    {
+      "key": "rest-share-statement",
+      "title_zh": "分成对账单（核对口径）",
+      "title_en": "Profit-share verification statement",
+      "kind": "report",
+      "source": "recon shares build_share_statement",
+      "sections": [
+        {"key": "rows", "label_zh": "逐店逐日分成", "label_en": "Per-store daily shares", "metrics": ["revenue", "fees", "net", "brand_share", "franchisee_share"]},
+        {"key": "instructions", "label_zh": "核对指令数据", "label_en": "Verification instructions", "metrics": ["instruction_id", "amount", "references"]}
+      ],
+      "caliber": "双方可核对；核对指令为持牌分账通道的输入数据；模板无资金执行面（二清红线），划转由品牌方经持牌通道执行"
+    },
+    {
+      "key": "rest-balance-board",
+      "title_zh": "经营余额看板（映射口径）",
+      "title_en": "Business balance board (mapping caliber)",
+      "kind": "dashboard",
+      "source": "kernel query_balance + account mapping pack",
+      "sections": [
+        {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue"},
+        {"key": "cost", "label_zh": "成本费用", "label_en": "Costs and expenses"},
+        {"key": "working-capital", "label_zh": "往来与在途", "label_en": "Working capital"}
+      ],
+      "caliber": "呈现层口径：行业科目经科目映射对齐内核通用科目；账本分录零改动"
+    }
+  ],
+  "notes": "重域（中央厨房/采购/BOM/排班/会员）不在模板范围：问及如实回答当前不提供（spec 重域如实挂账）。"
+}
