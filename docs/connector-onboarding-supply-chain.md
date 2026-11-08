@@ -358,3 +358,20 @@ restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三
 "上游 schema 缺失不提供"这类守界话必须原样带过去，否则英文面比中文面承诺更多。
 
 三包上架后都过 `fleet-packs/scripts/check_drift.py`（源=市场逐字段一致）。
+
+## 六、角色名是公共词汇，已有受控词表
+
+角色名跨包共享（`connector_role_mappings` 以 `(email, role)` 为键）：同一个角色在餐饮包里叫
+`pos`、在下一个行业包里也必须叫 `pos`，否则客户要为同一件事回答两次。词表与命名规则见
+[`connector-role-vocabulary.md`](connector-role-vocabulary.md)，由两道 pytest 门守着：
+
+- 角色名必须全小写 kebab-case；
+- 角色名不得等于目录里真实存在的 service id（以后目录新增同名 provider 时当场变红，逼我们
+  在「改角色名」与「改真 id」之间做决定，而不是让同一个字符串有两种含义）；
+- 文档词表与 `ROLE_PROVIDERS` 登记表必须逐项一致——**新增角色两处都改**，这是刻意的摩擦，
+  防止顺手起个近义词就把词汇散掉。
+
+命名上有一条自查过的结论：现有五个角色名（`wms`/`supplier-portal`/`carrier-portal`/`pos`/
+`cn-commerce`）**正好等于连接器车道名**（`pos.py`、`cn_commerce.py` 等），所以不要为了
+"更好听"改成 `marketplace-cn` 之类——那会制造名实不符，排障时要在两个词之间翻译。
+

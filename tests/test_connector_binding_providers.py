@@ -27,6 +27,7 @@ optional，安装门永远显示未解决）。
 from __future__ import annotations
 
 import importlib.util
+import re
 import json
 from pathlib import Path
 
@@ -185,4 +186,48 @@ def test_snapshot_matches_the_live_catalog_when_the_checkout_is_present():
     rendered = refresh.render(refresh.read_service_ids())
     assert rendered == SNAPSHOT.read_text(encoding="utf-8"), (
         "目录已变化，快照过期 —— 跑 python3 scripts/refresh_connector_catalog_ids.py"
+    )
+
+
+# ── 受控词表（docs/connector-role-vocabulary.md） ─────────────────────────────
+#
+# 角色名是跨包的公共词汇：同一个角色在餐饮包里叫 pos、在下一个行业包里也必须叫 pos。
+# 但代码里没有任何东西阻止下一个包自创 `pos-system` / `cn-ecom` 这类近义词——词表会慢慢
+# 散掉，而散掉的代价由客户承担（同一件事回答两次）。所以词表做成两处联动的门：
+# 登记表（ROLE_PROVIDERS）+ 文档表（本文档的 `| `role` | …` 行），漏一处就红。
+
+VOCAB_DOC = REPO / "docs" / "connector-role-vocabulary.md"
+ROLE_NAME_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
+
+
+def _documented_roles() -> set[str]:
+    """文档表里登记的角色名（`| `pos` | …` 形式的第一列）。"""
+    text = VOCAB_DOC.read_text(encoding="utf-8")
+    return set(re.findall(r"^\|\s*`([a-z][a-z0-9-]*)`\s*\|", text, flags=re.MULTILINE))
+
+
+def test_role_names_are_kebab_case():
+    bad = [name for name in ROLE_PROVIDERS if not ROLE_NAME_RE.match(name)]
+    assert not bad, f"角色名必须是全小写 kebab-case（{ROLE_NAME_RE.pattern}）：{bad}"
+
+
+def test_role_names_do_not_collide_with_catalog_ids():
+    """角色名不得等于目录里真实存在的 service id。
+
+    现在不冲突不代表以后不冲突：目录新增同名 provider 时，这条会红，逼我们在
+    「改角色名」与「改真 id」之间做决定，而不是让同一个字符串有两种含义。
+    """
+    collided = sorted(set(ROLE_PROVIDERS) & _service_ids())
+    assert not collided, f"角色名与目录 service id 撞名，必须二选一改名：{collided}"
+
+
+def test_role_vocabulary_document_matches_the_registry():
+    """文档表与登记表必须逐项一致——新增角色两处都改，删除同理。"""
+    documented = _documented_roles()
+    registered = set(ROLE_PROVIDERS)
+    assert documented - registered == set(), (
+        f"词表文档里有登记表没有的角色（要么补登记，要么删行）：{sorted(documented - registered)}"
+    )
+    assert registered - documented == set(), (
+        f"登记表里有词表文档没有的角色（新词必须写进 {VOCAB_DOC.name}）：{sorted(registered - documented)}"
     )
