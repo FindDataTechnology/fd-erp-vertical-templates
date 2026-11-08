@@ -368,3 +368,30 @@ def test_delivery_feedback_accepts_miniapp_line_shape(tmp_path, md):
                                         carrier="CARRIER-1", waybill_no="WB-1")
     assert out["lines"][0]["product_code"] == "P001"
     assert out["arrival_ref"]  # 发货反馈自动生成到货预告
+
+
+def test_inbound_task_accepts_frontend_line_shape(tmp_path, md):
+    """入库任务必须吃前端原样存的 {product, qty}，且缺编码如实拒绝。
+
+    2026-11-08：到货预告原样保存客户端载荷（SP 页面集发 {product, qty}），
+    而 create_inbound_task 旧实现只读 product_code → **静默存空串**（不报错），
+    脏数据要到下游 WMS 对账才暴露。三键兼容 + 缺键 INVALID_ARGUMENT。
+    """
+    m, ids = md
+    from fd_erp_vertical_templates.orchestration import ProcurementOrchestrator
+    proc = ProcurementOrchestrator("tpl-supply", tmp_path / "data", m)
+    demand = proc.submit_demand("manual", [{"product_code": "P001", "qty": "5",
+                                            "unit": "件"}])
+    agg = proc.aggregate_demand([demand["ref"]])
+    po = proc.propose_purchase_order(agg["ref"], ids["supplier"])
+    proc.confirm_purchase_order(po["request_id"])
+    proc.record_push(po["ref"], channel="supplier-portal")
+
+    an = proc.record_arrival_notice(po["ref"], [{"product": "P001", "qty": 5}])
+    task = proc.create_inbound_task(an["ref"], warehouse="WH-EAST")
+    assert task["lines"][0]["product_code"] == "P001"
+
+    bad = proc.record_arrival_notice(po["ref"], [{"qty": 5}])
+    with pytest.raises(TemplateError) as ei:
+        proc.create_inbound_task(bad["ref"], warehouse="WH-EAST")
+    assert ei.value.code == "INVALID_ARGUMENT"

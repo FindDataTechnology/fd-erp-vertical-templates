@@ -379,9 +379,19 @@ class ProcurementOrchestrator:
         if an.get("record") != "arrival_notice":
             raise TemplateError("INVALID_ARGUMENT", f"非到货预告：{arrival_ref}")
         ref = _ref("IB", f"{self._tenant}|{arrival_ref}|{warehouse}")
-        lines = [{"product_code": str(ln.get("product_code") or ""),
-                  "qty": str(ln.get("qty")), "unit": str(ln.get("unit") or "")}
-                 for ln in an["payload"]["lines"]]
+        # 行键名兼容 + 缺键如实拒绝（2026-11-08）：到货预告把前端载荷原样存
+        # （SP 页面集提交的是 {product, qty}），这里旧实现只读 product_code，
+        # 会把商品编码**静默存成空串**——不是 400 而是脏数据，下游 WMS 对账才炸。
+        lines = []
+        for ln in an["payload"]["lines"]:
+            code = str(ln.get("product_code") or ln.get("product")
+                       or ln.get("productId") or "").strip()
+            if not code:
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"到货预告行缺商品编码（product_code/product/productId）：{ln!r}")
+            lines.append({"product_code": code, "qty": str(ln.get("qty")),
+                          "unit": str(ln.get("unit") or "")})
         self._append({"record": "inbound_task", "ref": ref,
                       "event": "created", "status": "open",
                       "payload": {"arrival_ref": arrival_ref,
