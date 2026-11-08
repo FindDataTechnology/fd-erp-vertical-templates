@@ -13,7 +13,10 @@
 > `tests/test_connector_binding_providers.py` 核对：表里的动作必须真的存在于该 provider
 > 的目录清单。角色绑定（`providerRole: true`）不在此表——它的面由客户选的系统决定。
 >
-> 本机有 `open-connector-mt` checkout 时逐动作核对；CI 无 checkout 时跳过（但**出片前必跑**）。
+> 核对数据来自两处：本机有 `open-connector-mt` checkout 时直接读目录（最新），没有就读入库快照
+> `tests/fixtures/connector-binding-actions.json`（由 `scripts/refresh_connector_catalog_ids.py` 生成）。
+> 所以 **CI 里这道门不会跳过**——`.github/workflows/gates.yml` 每次 push/PR 都跑全套 pytest。
+> 目录侧动作变化时，刷新快照并随包一起提交。
 
 ## 对位表
 

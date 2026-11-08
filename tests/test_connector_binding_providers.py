@@ -247,15 +247,26 @@ def test_role_vocabulary_document_matches_the_registry():
 
 SURFACES_DOC = REPO / "docs" / "connector-binding-surfaces.md"
 CATALOG_APPS = REPO.parent / "open-connector-mt" / "catalog" / "apps"
+ACTIONS_SNAPSHOT = REPO / "tests" / "fixtures" / "connector-binding-actions.json"
 
 
 def _catalog_actions(service: str) -> set[str] | None:
-    """目录里该 provider 的动作名集合；本机没有目录 checkout 时返回 None（跳过）。"""
+    """该 provider 的动作名集合。
+
+    优先读本机 `open-connector-mt` checkout（最新），没有就读快照
+    `tests/fixtures/connector-binding-actions.json`——CI 没有那个 checkout，而这道门
+    正是最该在 CI 里跑的一道（"类级绿灯、面不对"的错就是它抓的）。两者都没有才返回 None。
+    """
     path = CATALOG_APPS / f"{service}.json"
-    if not path.exists():
-        return None
-    body = json.loads(path.read_text(encoding="utf-8"))
-    return {str(action.get("name")) for action in body.get("actions") or [] if action.get("name")}
+    if path.exists():
+        body = json.loads(path.read_text(encoding="utf-8"))
+        return {str(action.get("name")) for action in body.get("actions") or [] if action.get("name")}
+    if ACTIONS_SNAPSHOT.exists():
+        body = json.loads(ACTIONS_SNAPSHOT.read_text(encoding="utf-8"))
+        actions = (body.get("providers") or {}).get(service)
+        if actions is not None:
+            return {str(action.get("name")) for action in actions if action.get("name")}
+    return None
 
 
 def _surface_rows() -> dict[tuple[str, str], list[str]]:
@@ -303,8 +314,8 @@ def test_documented_actions_really_exist_in_the_catalog():
     这条是把"我以为 meituan 能做外卖结算"这类错误挡在发布之前：没有目录 checkout 时跳过
     （CI 无 checkout），本地/出片前必跑。
     """
-    if not CATALOG_APPS.is_dir():
-        pytest.skip("没有 open-connector-mt checkout（设目录后可跑）")
+    if not CATALOG_APPS.is_dir() and not ACTIONS_SNAPSHOT.exists():
+        pytest.skip("既无 open-connector-mt checkout 也无动作集快照——先跑 scripts/refresh_connector_catalog_ids.py")
     bad: list[str] = []
     for root in sorted((REPO / "templates").iterdir()):
         pack_path = root / "connector-pack" / "pack.json"
