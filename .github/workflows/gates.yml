@@ -30,6 +30,12 @@ jobs:
       # runner 上没有内核仓（fd-erp-ledger-mcp 是兄弟仓）也没有 Postgres：conftest 会把
       # 依赖内核的用例如实 skip，资产类门（绑定声明/角色词表/面级对位/appliance 副本/
       # 清单形状）照常执行——这正是本 workflow 要守的那几道。
+      #
+      # 那批被 skip 的账务回归**不是没人管**：内核仓自己有 CI 了
+      # （fd-erp-ledger-mcp/.github/workflows/gates.yml，真 postgres:16 service，69 例全绿）。
+      # 分工：本仓守"模板资产与声明是否自洽"，内核仓守"账务内核本身"。想让本仓也覆盖内核，
+      # 得在这里检出私有兄弟仓并起 Postgres service——那需要凭据，且会让本仓的 CI 依赖外部仓
+      # 的可用性，故不做。
       - name: Gates
         run: python -m pytest -q
 
