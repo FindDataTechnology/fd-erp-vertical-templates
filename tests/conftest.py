@@ -14,18 +14,31 @@ import psycopg
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-KERNEL_ROOT = REPO_ROOT.parent / "fd-erp-ledger-mcp"
+# 内核是**兄弟仓**，本仓单独检出时不存在（CI 就是这样）。资产类门（绑定声明、
+# 角色词表、面级对位、appliance 副本、清单形状）不需要内核也不需要 Postgres，
+# 所以内核导入做成可选的：缺了就让需要它的 fixture skip，而不是整个 conftest 炸掉——
+# 否则那几道门在 CI 里永远跑不起来（2026-11-08 首次上 CI 即撞）。
+KERNEL_ROOT = Path(os.environ.get("ERP_LEDGER_KERNEL_ROOT")
+                   or REPO_ROOT.parent / "fd-erp-ledger-mcp")
 
 import sys
 sys.path.insert(0, str(KERNEL_ROOT))
 
-from fd_erp_ledger_mcp.config import Settings  # noqa: E402
-from fd_erp_ledger_mcp.db import migrate  # noqa: E402
-from fd_erp_ledger_mcp.universal_accounts import seed_universal_accounts  # noqa: E402
-from fd_erp_ledger_mcp.fx import seed_fx_facts  # noqa: E402
-from fd_erp_ledger_mcp.db import connection  # noqa: E402
-from fd_erp_ledger_mcp import ledger as _ledger  # noqa: E402
-from fd_erp_ledger_mcp import proposals as _proposals  # noqa: E402
+try:
+    from fd_erp_ledger_mcp.config import Settings  # noqa: E402
+    from fd_erp_ledger_mcp.db import migrate  # noqa: E402
+    from fd_erp_ledger_mcp.universal_accounts import seed_universal_accounts  # noqa: E402
+    from fd_erp_ledger_mcp.fx import seed_fx_facts  # noqa: E402
+    from fd_erp_ledger_mcp.db import connection  # noqa: E402
+    from fd_erp_ledger_mcp import ledger as _ledger  # noqa: E402
+    from fd_erp_ledger_mcp import proposals as _proposals  # noqa: E402
+    KERNEL_AVAILABLE = True
+    KERNEL_IMPORT_ERROR: str | None = None
+except ModuleNotFoundError as exc:  # 只有"缺内核"走这条；内核内部的 ImportError 照旧炸
+    if not str(exc).startswith("No module named 'fd_erp_ledger_mcp"):
+        raise
+    KERNEL_AVAILABLE = False
+    KERNEL_IMPORT_ERROR = f"{exc}（KERNEL_ROOT={KERNEL_ROOT}）"
 
 from fd_erp_vertical_templates.errors import TemplateError  # noqa: E402
 
@@ -34,6 +47,8 @@ TENANT = "tpl-e2e"
 
 @pytest.fixture(scope="session")
 def db_settings():
+    if not KERNEL_AVAILABLE:
+        pytest.skip(f"内核仓不在位，跳过需要 Postgres 内核的用例：{KERNEL_IMPORT_ERROR}")
     dsn = os.environ.get("ERP_LEDGER_DATABASE_URL")
     if not dsn:
         pytest.skip("ERP_LEDGER_DATABASE_URL 未设置（需真实 Postgres）")
