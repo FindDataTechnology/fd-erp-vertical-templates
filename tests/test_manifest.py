@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -169,7 +170,9 @@ _PUBLISH_TO_LOCAL = {
 }
 
 #: 跨仓岗位包源（fleet-packs 是铸造源仓；模板的 target 可以指向那里的包）。
-FLEET_PACKS_ERP = REPO.parent / "fleet-packs" / "erp"
+#: 可用 ERP_LEDGER_FLEET_PACKS_ERP 覆盖——CI 不检出该仓，本地用它复现 CI 的 skip 面。
+FLEET_PACKS_ERP = Path(os.environ.get("ERP_LEDGER_FLEET_PACKS_ERP")
+                       or REPO.parent / "fleet-packs" / "erp")
 
 
 def _local_packs() -> dict[str, Path]:
@@ -241,7 +244,9 @@ def test_blueprint_pack_presets_resolve_to_local_agents():
 # （三成员指向不存在的岗）。副本必须是逐字段拷贝，否则打包发出去的是旧世界。
 # --------------------------------------------------------------------------
 
-APPLIANCE_TENANTS = REPO.parent / "fd-appliance" / "tenants"
+#: appliance 打包副本源；CI 不检出该仓，可用 ERP_LEDGER_APPLIANCE_TENANTS 覆盖以复现。
+APPLIANCE_TENANTS = Path(os.environ.get("ERP_LEDGER_APPLIANCE_TENANTS")
+                         or REPO.parent / "fd-appliance" / "tenants")
 APPLIANCE_TENANT = APPLIANCE_TENANTS / "supply-chain" / "content"
 
 # 三个行业租户各自的副本清单。只守 supply-chain 时，crossborder 与 restaurant-chain
