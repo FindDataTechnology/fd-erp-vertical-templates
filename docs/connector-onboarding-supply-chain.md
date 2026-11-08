@@ -396,6 +396,7 @@ checkout 逐个核对动作真的存在。角色绑定不在此列（面由客�
 
 顺带一条产品事实：`pos` 与 `cn-commerce` 两个角色**当前候选集为空**——目录里没有任何门店 POS，
 也没有淘宝/天猫/京东。这是诚实的现状（状态面会说"先去连接器连一个"），不是缺陷；要让它们可闭环，
-得在连接器侧（open-connector-mt）新增 provider，属于对侧立项。目录里现成的 `n8n` / `browser_use`
+得在连接器侧（open-connector-mt）新增 provider。**骨架已立**（2026-11-08）：
+`open-connector-mt/docs/pos-skeleton-contract.md` 与 `docs/cn-commerce-skeleton-contract.md` 把动作面、验收判据、形态分支都写定了，锚点客户确认品牌与接口形态后按契约实现即可；同一仓的 `docs/adr/0002-no-generic-http-provider.md` 记录了**为什么不做**"客户自己填 URL"的通用 provider（会把连接器变成任意出网代理、把策展目录降级成协议适配器）。目录里现成的 `n8n` / `browser_use`
 也帮不上：它们的 read 动作是自家 API 管理（`get_execution`、`list_sessions`），不是"代读任意系统"。
 

@@ -32,8 +32,8 @@
 | --- | --- | --- | --- |
 | 外卖结算单 / 佣金明细 | 餐饮连锁 | `meituan` 仅有 `query_travel`（酒旅），无商户结算动作 | 不声明该绑定；连接器侧新增动作后再加（沿用"拼多多不声明"的同一原则） |
 | Shopify payouts / 余额 | 跨境电商 | `shopify_admin` 无 payout/balance 动作 | 不承诺收款对账；连接器侧新增后可加回 |
-| 门店 POS 收银流水 | 餐饮连锁 | 目录无任何 POS 收银 provider | 用角色绑定 `pos`：客户选自己已连通的系统；候选为空时状态面如实说"先去连一个" |
-| 淘宝/天猫/京东订单 | 跨境电商 | 目录无这些平台 | 用角色绑定 `cn-commerce`；同上 |
+| 门店 POS 收银流水 | 餐饮连锁 | 目录无任何 POS 收银 provider | 用角色绑定 `pos`：客户选自己已连通的系统；候选为空时状态面如实说"先去连一个"。**接入骨架已立**：`open-connector-mt/docs/pos-skeleton-contract.md`（动作面/验收判据先行，实现待锚点客户） |
+| 淘宝/天猫/京东订单 | 跨境电商 | 目录无这些平台 | 用角色绑定 `cn-commerce`；同上。**接入骨架已立**：`open-connector-mt/docs/cn-commerce-skeleton-contract.md`；拼多多明确不留槽位 |
 
 ## 什么时候更新这张表
 
