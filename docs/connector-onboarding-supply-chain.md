@@ -400,3 +400,40 @@ checkout 逐个核对动作真的存在。角色绑定不在此列（面由客�
 `open-connector-mt/docs/pos-skeleton-contract.md` 与 `docs/cn-commerce-skeleton-contract.md` 把动作面、验收判据、形态分支都写定了，锚点客户确认品牌与接口形态后按契约实现即可；同一仓的 `docs/adr/0002-no-generic-http-provider.md` 记录了**为什么不做**"客户自己填 URL"的通用 provider（会把连接器变成任意出网代理、把策展目录降级成协议适配器）。目录里现成的 `n8n` / `browser_use`
 也帮不上：它们的 read 动作是自家 API 管理（`get_execution`、`list_sessions`），不是"代读任意系统"。
 
+
+## 八、三条接缝的实测对账（2026-11-08）
+
+客户在壹座装一个包，实际要接通三样东西。此前只有第一条有门，后两条从没对过账。本次逐个实测。
+
+### 8.1 连接器绑定（有门，绿）
+
+三个包都上了市场（supply-chain v3 / restaurant v2 / crossborder v2），
+`fleet-packs/scripts/check_drift.py` 逐字段一致；解析侧由 paas
+`test-connector-role-mapping` / `test-industry-connector-packs` 覆盖。
+
+### 8.2 工具面（本次实测：一致）
+
+- 注册处 `GET /api/servers` 的 `fd-erp-ledger-mcp` 条目：**19 个工具**，健康、启用；
+- 内核 `tool-surface.json` 的 `tool_groups` 声明：**19 个**，与注册处**逐项完全一致**；
+- 两个包白名单 6 个：`run_reconciliation`、`get_recon_report`、`query_balance`、
+  `query_entries`、`list_proposals`、`submit_proposal` —— **全部在**，没有一个是注册处没有的。
+
+两个刻意的不对称，写下来免得被当成缺陷：
+
+1. **13 个工具没有任何包暴露**（计费 8：submit/approve/list_billing_rules、bill_event、list/get/reverse_fee、
+   simulate_billing；信用 3：query/reserve/release_credit；提案确认门 2：confirm/reject_proposal）。
+   这不是遗漏：对账包的职责是"读流水、出差异、提 proposal"，确认门属于人的动作、
+   计费与信用属于另一层产品面（尚未产品化）。最小授权优先，等真有包需要再加白名单。
+2. **供应链连接器包没有 `mcpServers`**：它只卖连接契约与纪律卡，运行时账务面在
+   `fd-erp-ledger-mcp`、工具面由另一支岗位包（fleet-packs 的 supply-chain-recon-roles）承载。
+   另两个包各自带工具面。这个差异是有意的：连接器包不该顺手把账务工具塞给客户。
+
+### 8.3 技能（本次实测：不构成契约）
+
+内核 `tool-surface.json` 里的 `skills_eligible_for_packs: ["erp-ledger-discipline"]` 自己写明是
+**候选占位**——"本 apply 未创建这些技能，不宣称其已在别处存在"。三个包各自把纪律卡**内嵌**在
+`skills[]`（`erp-supply-connector-discipline` / `erp-restaurant-recon-discipline` /
+`erp-crossborder-recon-discipline`），与那个占位名**不需要**对齐。
+
+所以：这里没有漂移可修。哪天要让包"引用"内核侧技能（而不是内嵌），得先把占位换成真技能，
+那是另一次变更——别把今天的三个内嵌名去"对齐"到一个占位符上。
