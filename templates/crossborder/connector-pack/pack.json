@@ -147,7 +147,7 @@
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "连接器 pack 为 pack v2 形状且免自指（fleet target 指向在册 fleet-board-contribution 真实 packId）。对账舰队蓝图见 recon-fleet/template.json（本包随四件套清单分发）。publish-ready：谦面市场上架为独立部署步骤（挂账）。"
+  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。Shopify 写真 id，国内平台用角色绑定（客户自己选平台）。拼多多上游 schema 缺失故不声明。已上架：市场 v1（packId cv0kj9mRHGrz6nNMA7glVg），packs v2 形状、免自指。"
  },
  "i18n": {
   "en": {

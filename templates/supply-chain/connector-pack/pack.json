@@ -133,7 +133,7 @@
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。publish-ready：上架挂账。"
+  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id。已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA），无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {

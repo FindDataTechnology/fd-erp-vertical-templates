@@ -140,7 +140,7 @@
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "pack v2 形状免自指。首个 POS 厂商适配器待首单客户确定（挂账，客户驱动）；渠道 live 面实测后声明。publish-ready：上架挂账。"
+  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付/外卖写真 id。已上架：市场 v1（packId 3RZRBdc66rKdLV5I8tuKIg），无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {

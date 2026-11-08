@@ -310,7 +310,7 @@ paas 侧 `add-connector-role-mapping` 已归档，绑定可以用**角色形态*
 4. 市场：`fleet-packs/scripts/publish_pack.py <源 pack.json> --author <email> --pack-id y8gnMHFMze-Mylsd6JXpkA`
    （出 v3；限流 10 次/时），发完用 `fleet-packs/scripts/check_drift.py` 复核源=市场逐字段一致。
 
-## 五、另两条行业线的连接器包（2026-11-08 补齐机器字段）
+## 五、另两条行业线的连接器包（2026-11-08 补齐机器字段并上架）
 
 此前只有供应链包的连接需求是机器可读的（`connector_bindings`）；餐饮连锁与跨境电商两个
 对账连接器包把需求写在旧的 `connectors` 说明字段里，**壹座的绑定链完全看不见它们**——
@@ -342,3 +342,19 @@ paas 侧 `add-connector-role-mapping` 已归档，绑定可以用**角色形态*
 supply-chain 一个租户，另外两个租户的副本落后时门还是绿的（实测：crossborder 与
 restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三租户 × 全部副本，并做了
 负向实证（改坏 crossborder 副本 → 门红并指名）。
+
+### 5.1 上架结果（三包均已在市场）
+
+| 包 | packId | 首版 | 现状 |
+| --- | --- | --- | --- |
+| 供应链连接器包 | `y8gnMHFMze-Mylsd6JXpkA` | v1 → 现 v3 | 角色绑定 + 纠正声明 |
+| 餐饮连锁连接器包 | `3RZRBdc66rKdLV5I8tuKIg` | v1 | 角色 `pos` + 两条真 id |
+| 跨境电商连接器包 | `cv0kj9mRHGrz6nNMA7glVg` | v1 | 真 id `shopify` + 角色 `cn-commerce` |
+
+上架踩到的门（记下来省下一次）：**官方身份发新包时市场强制要求 en 展示面全覆盖**
+（`name` / `description` / `tags` / 每个 skill 的 `description`），缺一项即
+`422 official_en_coverage_incomplete`，报错里会逐项点名缺哪几个。两包原本只有中文，
+补了 `i18n.en` 才通过。补译原则：照中文原文逐句译，**不新增承诺**——"未实测不宣称 live"
+"上游 schema 缺失不提供"这类守界话必须原样带过去，否则英文面比中文面承诺更多。
+
+三包上架后都过 `fleet-packs/scripts/check_drift.py`（源=市场逐字段一致）。
