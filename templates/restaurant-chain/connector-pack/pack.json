@@ -1,8 +1,8 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "餐饮连锁对账连接器包",
- "version": "1.1.0",
- "description": "餐饮连锁对账模板·连接器 pack：POS BYOK 适配器框架（框架一个、厂商逐个插拔；首个适配厂商由首单客户的实际厂商决定，不预设名单；未适配厂商如实报出 + 导出文件替代通道）+ 收款渠道商户侧适配（微信支付/支付宝/美团商户侧 API 结算流水拉取，可用面以实测为准，未实测不宣称 live）+ 外卖结算读取（美团等，实测后写入适配器范围）。凭证逐店授权 BYOK 环境变量注入零落库。只读滩头：对渠道/平台侧零写入；无资金执行面（二清红线）。",
+ "version": "1.2.0",
+ "description": "餐饮连锁对账模板·连接器 pack：POS BYOK 适配器框架（框架一个、厂商逐个插拔；首个适配厂商由首单客户的实际厂商决定，不预设名单；未适配厂商如实报出 + 导出文件替代通道）+ 收款渠道商户侧适配（微信支付/支付宝/美团商户侧 API 结算流水拉取，可用面以实测为准，未实测不宣称 live）+ 外卖结算读取暂无目录覆盖（美团在目录里只有酒旅查询，故不声明）。凭证逐店授权 BYOK 环境变量注入零落库。只读滩头：对渠道/平台侧零写入；无资金执行面（二清红线）。",
  "tags": [
   "ERP",
   "餐饮连锁",
@@ -58,27 +58,13 @@
    "surface": "商户侧结算流水 + 手续费明细只读",
    "direction": "read-only",
    "credential": "BYOK：ERP_BYOK_PAY_<渠道>",
-   "note": "可用面以实测为准，未实测不宣称 live；平台零资金执行面（二清红线）。",
+   "note": "可用面以实测为准，未实测不宣称 live；目录里 wechatpay 有 download_bill/query_transaction、alipay 有 download_settlement_bill/query_trade，两家都能承担结算流水对账。**meituan 不在备选里**：目录 action 是 query_travel（酒旅），不是商户结算——放进来会因类级覆盖通过而授权错的面。外卖结算单目前无目录覆盖，故不声明。平台零资金执行面（二清红线）。",
    "provider": "wechatpay",
    "allowOperations": [
     "read"
    ],
    "alternativeProviders": [
-    "alipay",
-    "meituan"
-   ],
-   "optional": true
-  },
-  {
-   "key": "delivery-settlement",
-   "external_system": "外卖平台结算（美团等）",
-   "surface": "外卖订单结算单/佣金明细只读",
-   "direction": "read-only",
-   "credential": "BYOK：ERP_BYOK_PAY_<平台>",
-   "note": "与收款渠道是两个面（外卖结算单 ≠ 支付流水），分别对账；实测后写入适配器范围。",
-   "provider": "meituan",
-   "allowOperations": [
-    "read"
+    "alipay"
    ],
    "optional": true
   }
@@ -145,7 +131,7 @@
  "i18n": {
   "en": {
    "name": "Restaurant chain reconciliation connector pack",
-   "description": "Connector pack for the restaurant chain reconciliation template: a POS BYOK adapter framework (one framework, vendors plugged in one at a time — the first adapter is decided by the first customer's actual vendor, no vendor list is presumed; unadapted vendors are reported honestly and served by an export-file fallback channel) plus merchant-side settlement reads (WeChat Pay / Alipay / Meituan settlement statements, live surface only claimed once measured) and delivery-platform settlement reads (Meituan and others, scoped after measurement). Credentials are granted per store via injected BYOK environment variables, never stored and never logged. Read-only beachhead: zero writes to channels or platforms, and no fund-execution surface (the second-clearing red line).",
+   "description": "Connector pack for the restaurant chain reconciliation template: a POS BYOK adapter framework (one framework, vendors plugged in one at a time — the first adapter is decided by the first customer's actual vendor, no vendor list is presumed; unadapted vendors are reported honestly and served by an export-file fallback channel) plus merchant-side settlement reads (WeChat Pay / Alipay / Meituan settlement statements, live surface only claimed once measured) and delivery-platform settlement reads are not declared yet (Meituan's only catalog action is a travel query, not merchant settlement). Credentials are granted per store via injected BYOK environment variables, never stored and never logged. Read-only beachhead: zero writes to channels or platforms, and no fund-execution surface (the second-clearing red line).",
    "tags": [
     "ERP",
     "restaurant chain",

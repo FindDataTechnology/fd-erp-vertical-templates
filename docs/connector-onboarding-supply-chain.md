@@ -375,3 +375,27 @@ restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三
 `cn-commerce`）**正好等于连接器车道名**（`pos.py`、`cn_commerce.py` 等），所以不要为了
 "更好听"改成 `marketplace-cn` 之类——那会制造名实不符，排障时要在两个词之间翻译。
 
+## 七、面级对位：类级绿灯 ≠ 这个面能用（2026-11-08 抓到的两个真错）
+
+上架后发现两处**我自己写错的 provider**，都是"类级覆盖通过、面根本不对"：
+
+| 绑定 | 我原来写的 | 目录实际 | 现在的处置 |
+| --- | --- | --- | --- |
+| 餐饮 `delivery-settlement` | `meituan` | 唯一 read 是 `query_travel`（**酒旅/机票**） | **删除该绑定**：目录没有任何外卖结算面 |
+| 餐饮 `payments-merchant` 备选 | 含 `meituan` | 同上 | 备选只留 `alipay` |
+| 跨境 `shopify-store` | `shopify` | 13 个 read **全是博客/页面**；订单库存在 `shopify_admin`，payouts **一个动作都没有** | 换 `shopify_admin`，surface 与 note 去掉"收款 payouts"承诺 |
+
+危险点在于 paas 的覆盖检查是**类级**的：`meituan` 有一个 read 动作，所以"只读"声明会被判
+`satisfied` 并铸出令牌——客户会拿到一张只能查机票的凭证，而卡片说"外卖结算已接通"。
+这不是状态映射错，是**声明在撒谎**。
+
+于是加了一条面级门（`docs/connector-binding-surfaces.md` + 两条 pytest）：
+**每条固定 provider 的绑定都必须点名"哪个动作承担这个面"**，门会拿本机 `open-connector-mt`
+checkout 逐个核对动作真的存在。角色绑定不在此列（面由客户选的系统决定）。
+负向实证：把 `meituan` 那条塞回去 → 门红并指名 `restaurant-chain/delivery-settlement（provider=meituan）`。
+
+顺带一条产品事实：`pos` 与 `cn-commerce` 两个角色**当前候选集为空**——目录里没有任何门店 POS，
+也没有淘宝/天猫/京东。这是诚实的现状（状态面会说"先去连接器连一个"），不是缺陷；要让它们可闭环，
+得在连接器侧（open-connector-mt）新增 provider，属于对侧立项。目录里现成的 `n8n` / `browser_use`
+也帮不上：它们的 read 动作是自家 API 管理（`get_execution`、`list_sessions`），不是"代读任意系统"。
+

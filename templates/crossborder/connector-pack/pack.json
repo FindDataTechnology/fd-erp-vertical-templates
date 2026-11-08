@@ -1,8 +1,8 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商对账连接器包",
- "version": "1.1.0",
- "description": "跨境电商对账模板·连接器 pack：Shopify 店铺读取（复用已采纳 a1-x-tech/mcp-shopify-admin 的读面：订单/收款 payouts/库存流）+ 国内平台只读（mcp-cn-commerce，支持面以实测为准：淘宝/天猫/京东；拼多多上游 schema 缺失当前不提供）。凭证 BYOK 环境变量注入（ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN）零落库零日志。只读滩头：对外部系统零写入；真实店读写沿 crm-board 2026-10-30 裁决暂缓，待商家自带凭证逐店上线。运行时形态 = fd-erp-vertical-templates Python 包（对账驱动 sidecar），本包为市场分发与 pack v2 兼容清单。",
+ "version": "1.2.0",
+ "description": "跨境电商对账模板·连接器 pack：Shopify 店铺读取（复用已采纳 a1-x-tech/mcp-shopify-admin 的读面：订单 + 库存流（payouts 暂无目录覆盖，见绑定 note））+ 国内平台只读（mcp-cn-commerce，支持面以实测为准：淘宝/天猫/京东；拼多多上游 schema 缺失当前不提供）。凭证 BYOK 环境变量注入（ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN）零落库零日志。只读滩头：对外部系统零写入；真实店读写沿 crm-board 2026-10-30 裁决暂缓，待商家自带凭证逐店上线。运行时形态 = fd-erp-vertical-templates Python 包（对账驱动 sidecar），本包为市场分发与 pack v2 兼容清单。",
  "tags": [
   "ERP",
   "跨境电商",
@@ -64,11 +64,11 @@
   {
    "key": "shopify-store",
    "external_system": "Shopify 店铺",
-   "surface": "订单 + 收款 payouts + 库存流只读",
+   "surface": "订单 + 库存只读（get_order/list_orders、list_inventory_items）",
    "direction": "read-only",
    "credential": "BYOK：ERP_BYOK_SHOPIFY_TOKEN（凭证不出库）",
-   "note": "复用已采纳的 mcp-shopify-admin 读面；真实店读写沿 crm-board 2026-10-30 裁决暂缓，商家自带凭证逐店上线。",
-   "provider": "shopify",
+   "note": "复用已采纳的 mcp-shopify-admin 读面；真实店读写沿 crm-board 2026-10-30 裁决暂缓，商家自带凭证逐店上线。**payouts/余额对账目前不在连接器目录覆盖内**（shopify_admin 无该动作），故不承诺——要做得先在连接器侧新增该动作。",
+   "provider": "shopify_admin",
    "allowOperations": [
     "read"
    ],
@@ -152,7 +152,7 @@
  "i18n": {
   "en": {
    "name": "Cross-border e-commerce reconciliation connector pack",
-   "description": "Connector pack for the cross-border e-commerce reconciliation template: Shopify store reads (reusing the already-adopted a1-x-tech/mcp-shopify-admin read surface: orders / payouts / inventory flow) plus read-only access to Chinese platforms (mcp-cn-commerce; supported surface measured, not presumed: Taobao / Tmall / JD; Pinduoduo is not offered because its upstream schema is missing). Credentials are injected as BYOK environment variables (ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN), never stored and never logged. Read-only beachhead: zero writes to external systems; real-store writes stay deferred per the crm-board ruling of 2026-10-30 until merchants bring their own credentials per store.",
+   "description": "Connector pack for the cross-border e-commerce reconciliation template: Shopify store reads (reusing the already-adopted a1-x-tech/mcp-shopify-admin read surface: orders + inventory flow (payouts are not covered by the connector catalog yet, see the binding note)) plus read-only access to Chinese platforms (mcp-cn-commerce; supported surface measured, not presumed: Taobao / Tmall / JD; Pinduoduo is not offered because its upstream schema is missing). Credentials are injected as BYOK environment variables (ERP_BYOK_SHOPIFY_TOKEN / ERP_BYOK_CN_COMMERCE_TOKEN), never stored and never logged. Read-only beachhead: zero writes to external systems; real-store writes stay deferred per the crm-board ruling of 2026-10-30 until merchants bring their own credentials per store.",
    "tags": [
     "ERP",
     "cross-border e-commerce",

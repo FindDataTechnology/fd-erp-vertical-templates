@@ -231,3 +231,103 @@ def test_role_vocabulary_document_matches_the_registry():
     assert registered - documented == set(), (
         f"登记表里有词表文档没有的角色（新词必须写进 {VOCAB_DOC.name}）：{sorted(registered - documented)}"
     )
+
+
+# ── 表面级对位（docs/connector-binding-surfaces.md） ──────────────────────────
+#
+# 为什么光有 provider 存在性门不够：paas 的覆盖检查是**类级**的（read/write），
+# 所以 provider 只要有任意一个 read 动作，声明"只读"的绑定就会被判 satisfied 并授权。
+# 2026-11-08 实测抓到两例，都是我们自己的包：
+#   · `provider: meituan` 的"外卖结算" —— 目录里 meituan 唯一的 read 是 query_travel（酒旅）；
+#   · `provider: shopify` 的"订单/收款/库存" —— 目录里 shopify 的 13 个 read 全是博客/页面，
+#     订单库存在 shopify_admin 里，而 payouts 一个动作都没有。
+# 两例都会"绿灯授权一个错的面"。所以固定 provider 的绑定必须在
+# docs/connector-binding-surfaces.md 里写清"哪个动作承担这个面"，并被这条门逐一核对：
+# 文档里点名的动作必须真的存在于该 provider 的目录清单里（角色绑定不需要，客户自己选）。
+
+SURFACES_DOC = REPO / "docs" / "connector-binding-surfaces.md"
+CATALOG_APPS = REPO.parent / "open-connector-mt" / "catalog" / "apps"
+
+
+def _catalog_actions(service: str) -> set[str] | None:
+    """目录里该 provider 的动作名集合；本机没有目录 checkout 时返回 None（跳过）。"""
+    path = CATALOG_APPS / f"{service}.json"
+    if not path.exists():
+        return None
+    body = json.loads(path.read_text(encoding="utf-8"))
+    return {str(action.get("name")) for action in body.get("actions") or [] if action.get("name")}
+
+
+def _surface_rows() -> dict[tuple[str, str], list[str]]:
+    """把对位表读成 {(包目录, 绑定 key): [动作名…]}。"""
+    text = SURFACES_DOC.read_text(encoding="utf-8")
+    rows: dict[tuple[str, str], list[str]] = {}
+    for line in text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 4 or not cells[0].startswith("`"):
+            continue
+        pack_dir = cells[0].strip("`")
+        key = cells[1].strip("`")
+        actions = [a.strip().strip("`") for a in cells[3].split(",") if a.strip() and a.strip() != "—"]
+        rows[(pack_dir, key)] = actions
+    return rows
+
+
+def test_fixed_provider_bindings_have_a_documented_surface_mapping():
+    """每条固定 provider 的绑定都必须在对位表里点名承担它的目录动作。"""
+    documented = _surface_rows()
+    missing: list[str] = []
+    for root in sorted((REPO / "templates").iterdir()):
+        if not root.is_dir():
+            continue
+        pack_path = root / "connector-pack" / "pack.json"
+        if not pack_path.exists():
+            continue
+        body = json.loads(pack_path.read_text(encoding="utf-8"))
+        for binding in body.get("connector_bindings") or []:
+            if binding.get("providerRole") is True:
+                continue  # 角色绑定的面由客户选的系统决定
+            entry = (root.name, str(binding.get("key")))
+            actions = documented.get(entry)
+            if not actions:
+                missing.append(f"{root.name}/{binding.get('key')}（provider={binding.get('provider')}）")
+    assert not missing, (
+        "固定 provider 的绑定缺少面级对位（类级覆盖绿灯不代表面能用，"
+        f"在 {SURFACES_DOC.name} 里写清承担它的动作）：\n  " + "\n  ".join(missing)
+    )
+
+
+def test_documented_actions_really_exist_in_the_catalog():
+    """对位表里点名的动作必须真的存在于该 provider 的目录清单里。
+
+    这条是把"我以为 meituan 能做外卖结算"这类错误挡在发布之前：没有目录 checkout 时跳过
+    （CI 无 checkout），本地/出片前必跑。
+    """
+    if not CATALOG_APPS.is_dir():
+        pytest.skip("没有 open-connector-mt checkout（设目录后可跑）")
+    bad: list[str] = []
+    for root in sorted((REPO / "templates").iterdir()):
+        pack_path = root / "connector-pack" / "pack.json"
+        if not pack_path.exists():
+            continue
+        body = json.loads(pack_path.read_text(encoding="utf-8"))
+        by_key = {str(b.get("key")): b for b in body.get("connector_bindings") or []}
+        for (pack_dir, key), actions in _surface_rows().items():
+            if pack_dir != root.name or key not in by_key:
+                continue
+            binding = by_key[key]
+            if binding.get("providerRole") is True:
+                continue
+            if not actions:
+                bad.append(f"{pack_dir}/{key}: 对位表里没有动作（面无法被验证）")
+                continue
+            known = _catalog_actions(str(binding.get("provider")))
+            if known is None:
+                continue  # 本机缺该 provider 的目录文件：不是本门的判据
+            unknown = sorted(set(actions) - known)
+            if unknown:
+                bad.append(
+                    f"{pack_dir}/{key}: 对位表点了 {unknown}，但目录里 {binding.get('provider')} 没有这些动作"
+                    f"（现有: {sorted(known)[:6]}…）"
+                )
+    assert not bad, "面级对位与目录不一致：\n  " + "\n  ".join(bad)
