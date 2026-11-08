@@ -221,6 +221,10 @@ def test_blueprint_pack_presets_resolve_to_local_agents():
             if not pack_id.startswith(_PACK_PLACEHOLDER):
                 continue
             name = pack_id[len(_PACK_PLACEHOLDER):].rstrip("}")
+            if name not in packs and not FLEET_PACKS_ERP.exists():
+                # 跨仓铸造源（fleet-packs）不在位：这条我们**看不到**，不是它错了。
+                # 如实跳过，而不是让 CI 因为少检出一个兄弟仓而红（2026-11-08 首次上 CI 即撞）。
+                pytest.skip(f"跨仓铸造源不在位（{FLEET_PACKS_ERP}），无法核对 {{PACK_ID:{name}}}")
             assert name in packs, f"{bp_path.name}: {member.get('ref')} 引用了本仓无源的包 {name}"
             ids = _agent_ids(packs[name])
             assert target.get("presetId") in ids, (

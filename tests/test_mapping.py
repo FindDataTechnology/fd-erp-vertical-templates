@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import json
 from pathlib import Path
 
@@ -21,8 +22,14 @@ TEMPLATES = REPO / "templates"
 
 def test_universal_codes_match_kernel_migration():
     """模板层通用科目集与内核迁移 0002 预设逐字对齐（不得漂移）。"""
-    sql = (REPO.parent / "fd-erp-ledger-mcp" / "fd_erp_ledger_mcp" / "migrations"
-           / "0002_universal_accounts.sql").read_text(encoding="utf-8")
+    # 与 tests/conftest.py 同一开关：CI 上没有内核兄弟仓，本机可用 env 复现。
+    kernel_root = Path(os.environ.get("ERP_LEDGER_KERNEL_ROOT")
+                       or REPO.parent / "fd-erp-ledger-mcp")
+    migration = kernel_root / "fd_erp_ledger_mcp" / "migrations" / "0002_universal_accounts.sql"
+    if not migration.exists():
+        # 内核是兄弟仓，CI 不检出它；这条对齐门在没有内核时无从核对，如实跳过。
+        pytest.skip(f"内核仓不在位，无法核对科目集对齐（{migration}）")
+    sql = migration.read_text(encoding="utf-8")
     seeded = set()
     for line in sql.splitlines():
         s = line.strip()
