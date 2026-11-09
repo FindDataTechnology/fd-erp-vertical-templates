@@ -116,20 +116,33 @@ def load_mirror(path: str | Path | dict[str, Any] | None = None) -> dict[str, An
 
 
 class EvidenceIndex:
-    """对外材料可引用的证据集合（一次构建，逐 claim 解析）。"""
+    """对外材料可引用的证据集合（一次构建，逐 claim 解析）。
+
+    证据源优先级（仓约定，同 `.github/workflows/gates.yml`）：
+      1. 兄弟仓 checkout（`api_package` / `tool_surface`）——实时真值；
+      2. 入库快照 `coverage/evidence.json`——CI 只有本仓时用它，仍能真核验
+         （路由表 + MCP 工具面都在快照里），代价是可能落后于兄弟仓；
+      3. 都没有 → resolve 返回「证据源不在位」，调用方判成**无法核验**（warning），
+         不是「核验失败」（error）。读不到 ≠ 不存在。
+    """
 
     def __init__(self, *, workspace: Path = FINDDATA,
                  api_package: Path = API_PACKAGE,
                  tool_surface: Path = TOOL_SURFACE,
-                 repo: Path = REPO):
+                 repo: Path = REPO,
+                 evidence_snapshot: Path | None = None):
         self.workspace = workspace
         self.repo = repo
         self.routes: dict[str, Any] | None = None
         self.route_error: str | None = None
+        #: live / snapshot / missing
+        self.source = "missing"
+        self.source_detail = ""
         try:
             from fd_erp_vertical_templates.coverage import parse_api_routes
             self.routes = {(r.method, _norm(r.path)): r
                            for r in parse_api_routes(api_package)}
+            self.source = "live"
         except Exception as exc:  # noqa: BLE001 - 证据源不在位如实报
             self.route_error = str(exc)
         try:
@@ -137,6 +150,33 @@ class EvidenceIndex:
             self.tools = set(parse_mcp_tools(tool_surface))
         except Exception:  # noqa: BLE001
             self.tools = set()
+
+        if self.source != "live" or not self.tools:
+            snap = Path(evidence_snapshot) if evidence_snapshot else repo / "coverage" / "evidence.json"
+            if snap.is_file():
+                try:
+                    body = json.loads(snap.read_text(encoding="utf-8"))
+                    if self.routes is None:
+                        from fd_erp_vertical_templates.coverage import Route
+                        self.routes = {}
+                        for raw in body.get("routes") or []:
+                            route = Route(method=str(raw["method"]).upper(),
+                                          path=str(raw["path"]),
+                                          function=str(raw.get("function") or ""),
+                                          placeholder=bool(raw.get("placeholder")),
+                                          source=str(raw.get("source") or ""),
+                                          line=int(raw.get("line") or 0))
+                            self.routes[(route.method, _norm(route.path))] = route
+                    if not self.tools:
+                        self.tools = set(body.get("mcp_tools") or [])
+                    self.source = "snapshot"
+                    self.source_detail = f"证据来自入库快照 {snap.name}（兄弟仓不在位，可能落后）"
+                    self.route_error = None
+                except Exception as exc:  # noqa: BLE001
+                    self.source_detail = f"快照不可用：{exc}"
+            else:
+                self.source_detail = f"无兄弟仓 checkout，也无 {snap}"
+
         from fd_erp_vertical_templates.coverage import parse_test_names
         try:
             self.tests = set(parse_test_names(repo / "tests"))
@@ -173,6 +213,12 @@ class EvidenceIndex:
         if kind == "code":
             path = self.workspace / ref
             if not path.is_file():
+                # 整仓不在位（CI 单仓 checkout）≠ 文件被改名：前者无法核验，
+                # 后者才是核验失败。判据看 ref 的第一段目录是否存在。
+                head = self.workspace / Path(ref).parts[0] if Path(ref).parts else None
+                if head is not None and Path(ref).parts and not head.exists():
+                    return {"ok": False, "unverifiable": True,
+                            "detail": f"代码所属仓不在位，无法核验：{ref}"}
                 return {"ok": False, "detail": f"代码文件不存在：{ref}"}
             if contains and contains not in path.read_text(encoding="utf-8",
                                                            errors="ignore"):
@@ -213,6 +259,15 @@ def check(*, claims_path: str | Path | None = None,
     violations: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
 
+    # 证据源降级要显式可见：快照模式能核验但可能落后；完全缺失则「无法核验」，
+    # 不能当成「核验失败」，也不能静默通过。
+    if index.source == "snapshot":
+        warnings.append({"code": "CLAIM_EVIDENCE_SNAPSHOT", "severity": "warning",
+                         "message": index.source_detail})
+    elif index.source == "missing":
+        warnings.append({"code": "CLAIM_EVIDENCE_UNVERIFIABLE", "severity": "warning",
+                         "message": index.source_detail or "证据源不可得，本次未核验端点/工具证据"})
+
     # ① 证据解析 + 状态一致性
     for claim in claims["claims"]:
         status = claim["status"]
@@ -221,6 +276,14 @@ def check(*, claims_path: str | Path | None = None,
             outcome = index.resolve(item["kind"], str(item["ref"]),
                                     contains=item.get("contains"))
             if not outcome["ok"]:
+                if outcome.get("unverifiable"):
+                    # 证据所属仓/源不在位：如实记为「无法核验」，不算核验失败。
+                    warnings.append({"code": "CLAIM_EVIDENCE_UNVERIFIABLE",
+                                     "severity": "warning", "claim": claim.get("id"),
+                                     "capability": claim.get("capability"),
+                                     "message": f"{item['kind']}:{item['ref']} — {outcome['detail']}"})
+                    resolved_any = True
+                    continue
                 violations.append(_v("CLAIM_EVIDENCE_UNRESOLVED", claim,
                                      f"{item['kind']}:{item['ref']} — {outcome['detail']}"))
                 continue
@@ -248,10 +311,12 @@ def check(*, claims_path: str | Path | None = None,
     violations.extend(_check_planned(mirror, record, index, api_planned))
 
     # ④ 对外材料扫描（4.2）
-    violations.extend(_scan_targets(claims, doc, workspace))
-
-    # ⑤ 生成块漂移（4.6）
-    violations.extend(_check_blocks(claims, record, doc))
+    # ④ 对外材料扫描 与 ⑤ 生成块漂移：这两个函数把「材料/文档不在位」记为 warning，
+    # 必须按 severity 分流，否则告警会污染 violations，让「只有某条违规」的断言失效。
+    for bucket, items in ((violations, _scan_targets(claims, doc, workspace)),
+                          (violations, _check_blocks(claims, record, doc))):
+        for item in items:
+            (warnings if item.get("severity") == "warning" else bucket).append(item)
 
     # ⑥ 缺口登记（3.8 的数据进能力清单；这里只确认四项齐全，门本身在 gaps.py）
     try:

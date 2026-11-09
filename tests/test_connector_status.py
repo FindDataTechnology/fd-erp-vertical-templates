@@ -119,13 +119,26 @@ def test_live_claim_with_real_evidence_marks_connected(mod, tmp_path, monkeypatc
 
 
 def test_planned_surface_counts_match_api_repo(derived):
-    """3.7 跨产物对拍：连接器状态面的 501 挂账计数必须等于 API 仓的派生清单。"""
-    api_planned = json.loads(
-        (REPO.parent / "fd-erp-vertical-api" / "planned-surfaces.json").read_text(encoding="utf-8")
-    )
-    items = api_planned.get("surfaces") or api_planned.get("endpoints") or []
+    """3.7 跨产物对拍：501 挂账计数必须等于「同一真源的入库镜像」。
+
+    CI 只有本仓 checkout，读不到纵向 API 仓；镜像 `claims/planned-surfaces.json`
+    由 `claim_gate --update-planned` 从 API 仓真源回填，所以拿它做同一断言。
+    兄弟仓在位时额外核验镜像与真源一致（这条在 CI 会 skip，属跨仓核验）。
+    """
+    api_planned = REPO.parent / "fd-erp-vertical-api" / "planned-surfaces.json"
+    mirror = REPO / "claims" / "planned-surfaces.json"
+    assert mirror.is_file(), "缺少挂账镜像 claims/planned-surfaces.json"
+
+    mirror_items = json.loads(mirror.read_text(encoding="utf-8")).get("endpoints") or []
     assert derived["planned_surfaces"]["available"] is True
-    assert derived["planned_surfaces"]["count"] == len(items)
+    assert derived["planned_surfaces"]["count"] == len(mirror_items)
+
+    if not api_planned.is_file():
+        pytest.skip("纵向 API 仓不在位：镜像与真源的跨仓一致性本机核验，CI 跳过")
+
+    source_items = json.loads(api_planned.read_text(encoding="utf-8"))
+    source_items = source_items.get("surfaces") or source_items.get("endpoints") or []
+    assert len(source_items) == len(mirror_items), "镜像与 API 仓真源条数不一致，重跑 claim_gate --update-planned"
 
 
 def test_committed_status_is_in_sync_with_derivation(mod, tmp_path, monkeypatch):

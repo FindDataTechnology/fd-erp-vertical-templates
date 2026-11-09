@@ -50,6 +50,52 @@ def executor_test_count(provider: str) -> int:
     return len(list(d.glob("*.test.ts")))
 
 
+FACTS_FIXTURE = REPO / "tests" / "fixtures" / "connector-provider-facts.json"
+
+
+def provider_facts() -> tuple[dict[str, dict], str]:
+    """(provider → {catalog, executor_tests}, 来源)。
+
+    有连接器仓 checkout 就读实时；CI 只有本仓，读入库快照（仓约定：优先 checkout，
+    没有就读 fixtures 快照，同 `.github/workflows/gates.yml` 对面级对位门的说明）。
+    两条路径必须导出同一份事实，否则 `--check` 会在其中一侧假红。
+    """
+    if (CONNECTOR_REPO / "catalog" / "apps").is_dir():
+        catalog = catalog_providers()
+        return (
+            {p: {"catalog": True, "executor_tests": executor_test_count(p)} for p in catalog},
+            "live:open-connector-mt",
+        )
+    if FACTS_FIXTURE.is_file():
+        data = _load(FACTS_FIXTURE)
+        return dict(data.get("providers") or {}), f"snapshot:{FACTS_FIXTURE.relative_to(REPO)}"
+    return {}, "missing"
+
+
+def refresh_facts_fixture() -> int:
+    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。"""
+    providers = sorted(p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json"))
+    facts = {
+        p: {"catalog": True, "executor_tests": executor_test_count(p)} for p in providers
+    }
+    # 绑定里提到的、但目录没有的角色名也要留一行，否则快照会"看起来都齐"
+    for b in bindings():
+        facts.setdefault(str(b["provider"]), {"catalog": False, "executor_tests": 0})
+    body = {
+        "_comment": (
+            "open-connector-mt 的 provider 事实快照。CI 只有本仓 checkout，读不到连接器仓；"
+            "三态必须能离线推导。刷新：scripts/build_connector_status.py --refresh-fixture。"
+        ),
+        "source": "open-connector-mt",
+        "count": len(facts),
+        "providers": facts,
+    }
+    FACTS_FIXTURE.write_text(
+        json.dumps(body, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return len(facts)
+
+
 def bindings() -> list[dict]:
     out: list[dict] = []
     for manifest in sorted(TEMPLATES.glob("*/connector-pack/pack.json")):
@@ -88,7 +134,10 @@ def _evidence_exists(rel: str) -> bool:
 
 
 def planned_surfaces() -> dict:
+    """501 挂账计数：优先读纵向 API 仓，CI 读 claims/ 下的入库镜像（同源派生）。"""
     src = API_REPO / "planned-surfaces.json"
+    if not src.is_file():
+        src = REPO / "claims" / "planned-surfaces.json"
     if not src.is_file():
         return {"available": False, "count": None, "by_capability": {}}
     data = _load(src)
@@ -101,9 +150,15 @@ def planned_surfaces() -> dict:
 
 
 def derive() -> dict:
-    catalog = catalog_providers()
+    facts, facts_source = provider_facts()
+    catalog = {p for p, f in facts.items() if f.get("catalog")}
     live = live_records()
     problems: list[str] = []
+    if facts_source == "missing":
+        problems.append(
+            "连接器 provider 事实不可得：既没有 open-connector-mt checkout，也没有 "
+            "tests/fixtures/connector-provider-facts.json（三态无法判定，不得当成全部缺失）"
+        )
 
     integrations: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -121,7 +176,7 @@ def derive() -> dict:
         seen.add((b["template"], provider))
 
         cat_ok = provider in catalog and not b["provider_role"]
-        tests_n = executor_test_count(provider)
+        tests_n = int((facts.get(provider) or {}).get("executor_tests") or 0)
         rec = live.get(provider)
         live_ok = False
         live_evidence = None
@@ -220,7 +275,18 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="派生 / 校验连接器三态状态面")
     ap.add_argument("--check", action="store_true", help="只校验，不写盘")
     ap.add_argument("--print", dest="do_print", action="store_true", help="打到 stdout")
+    ap.add_argument("--refresh-fixture", action="store_true",
+                    help="从连接器仓 checkout 重写 tests/fixtures/connector-provider-facts.json")
     args = ap.parse_args(argv)
+
+    if args.refresh_fixture:
+        if not (CONNECTOR_REPO / "catalog" / "apps").is_dir():
+            print(f"FAIL: 没有连接器仓 checkout（{CONNECTOR_REPO}），无法刷新事实快照",
+                  file=sys.stderr)
+            return 1
+        n = refresh_facts_fixture()
+        print(f"wrote {FACTS_FIXTURE.relative_to(FINDDATA)}（{n} 个 provider）")
+        return 0
 
     derived = derive()
     if args.do_print:

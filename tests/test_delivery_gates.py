@@ -18,6 +18,9 @@ from fd_erp_vertical_templates.gaps import load_gaps
 REPO = Path(__file__).resolve().parent.parent
 FINDDATA = REPO.parent
 BOARD_DOC = FINDDATA / "docs" / "erp" / "README.md"
+#: 机制用例用的板块文档快照：CI 只有本仓 checkout，读不到 finddata 根的 docs/。
+#: 漂移探测由「生产材料」那条用例负责（需要真文档，缺则 skip）。
+BOARD_DOC_FIXTURE = REPO / "tests" / "fixtures" / "board-doc-erp-README.md"
 API_PLANNED = FINDDATA / "fd-erp-vertical-api" / "planned-surfaces.json"
 API_PACKAGE = FINDDATA / "fd-erp-vertical-api" / "fd_erp_vertical_api"
 TOOL_SURFACE = FINDDATA / "fd-erp-ledger-mcp" / "tool-surface.json"
@@ -184,9 +187,13 @@ def test_open_gaps_appear_in_capability_list(claim_gate):
 
 
 def _prepare_doc(tmp_path, claim_gate) -> Path:
-    """复制板块文档并把生成块重写一遍（保证只有我要篡改的地方不同）。"""
+    """复制板块文档并把生成块重写一遍（保证只有我要篡改的地方不同）。
+
+    用入库夹具而不是 finddata 根的真文档：CI 只有本仓 checkout。这里验的是
+    「生成块与生成器输出对拍」这个机制，与生产材料是否最新无关。
+    """
     doc = tmp_path / "erp-README.md"
-    shutil.copyfile(BOARD_DOC, doc)
+    shutil.copyfile(BOARD_DOC_FIXTURE, doc)
     claims = claim_gate.load_claims()
     mirror = claim_gate.load_mirror()
     from fd_erp_vertical_templates.publish import load_record
@@ -196,8 +203,12 @@ def _prepare_doc(tmp_path, claim_gate) -> Path:
 
 
 def test_claim_gate_passes_on_current_materials(claim_gate):
-    """4.2 正例：现有三处对外材料（文档 + 官网两页）零无证据声明。"""
-    _require(API_PACKAGE, TOOL_SURFACE)
+    """4.2 正例：现有三处对外材料（文档 + 官网两页）零无证据声明。
+
+    验的是**生产材料**，所以必须读真文档与兄弟仓；CI 单仓 checkout 下如实 skip
+    （机制面由夹具用例覆盖，不因此放弃覆盖）。
+    """
+    _require(BOARD_DOC, API_PACKAGE, TOOL_SURFACE, FINDDATA / "fd-official-web")
     result = claim_gate.check()
     assert result["ok"] is True, result["violations"]
     assert result["counts"]["planned"] == 20
@@ -409,9 +420,13 @@ def test_doc_table_drift_is_red(tmp_path):
 
 
 def test_not_claimable_block_equals_generator(claim_gate):
-    """4.6 文档第 4 节的不可宣称清单 == 生成器输出（手写清单已删除）。"""
+    """4.6 生成块的不可宣称清单 == 生成器输出（手写清单已删除）。
+
+    读入库夹具：验的是「块内容由生成器决定」这条机制，CI 单仓也能跑。
+    生产文档是否已刷新由 test_claim_gate_passes_on_current_materials 负责。
+    """
     claims = claim_gate.load_claims()
-    text = BOARD_DOC.read_text(encoding="utf-8")
+    text = BOARD_DOC_FIXTURE.read_text(encoding="utf-8")
     pair = claims["scan"]["generated_block_markers"]["not-claimable"]
     assert pair[0] in text and pair[1] in text
     block = text.split(pair[0], 1)[1].split(pair[1], 1)[0].strip()
@@ -435,10 +450,10 @@ def test_hand_edited_block_is_red(tmp_path, claim_gate):
 
 
 def test_release_status_block_is_derived(claim_gate):
-    """4.6 第 6 节的发布状态块同样由记录派生（含「未上线（挂账）」三项）。"""
+    """4.6 发布状态块同样由记录派生（含「未上线（挂账）」三项）。读入库夹具。"""
     claims = claim_gate.load_claims()
     from fd_erp_vertical_templates.publish import load_record
-    text = BOARD_DOC.read_text(encoding="utf-8")
+    text = BOARD_DOC_FIXTURE.read_text(encoding="utf-8")
     pair = claims["scan"]["generated_block_markers"]["release-status"]
     block = text.split(pair[0], 1)[1].split(pair[1], 1)[0]
     record = load_record()
