@@ -128,7 +128,18 @@ def main(argv: list[str] | None = None) -> int:
         print(text)
         return 1
     if args.check:
-        print(f"OK：{len(data['rows'])} 件资产四语齐全、tags 同长")
+        # 除了四语/tags，还要确认**已导出的文件与资产同版本**——否则交上去的是旧版
+        # 文案（本会话就出现过：资产已 1.5.1，md 还写 1.5.0，而 --check 照样绿）。
+        if OUT.is_file():
+            md = OUT.read_text(encoding="utf-8")
+            stale = [f"{row['asset_id']} v{row['version']}"
+                     for row in data["rows"] if f"v{row['version']}" not in md]
+            if stale:
+                print(f"FAIL：提交材料落后于资产 {stale}；重跑 "
+                      "`python3 scripts/market_submission.py`（不带 --check）")
+                return 1
+        print(f"OK：{len(data['rows'])} 件资产四语齐全、tags 同长"
+              + ("，且已导出文件与资产同版本" if OUT.is_file() else ""))
         return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding="utf-8")

@@ -8,11 +8,11 @@
 
 | 资产 | 版本 | 路径 | tags 长度（逐语言） |
 |---|---|---|---|
-| connector-pack | v1.4.0 | `connector-pack/pack.json` | 5/5/5/5 |
+| connector-pack | v1.5.1 | `connector-pack/pack.json` | 5/5/5/5 |
 | account-mapping-pack | v1.1.0 | `account-mapping/pack.json` | 4/4/4/4 |
 | recon-fleet | v1.1.0 | `recon-fleet/template.json` | 4/4/4/4 |
 
-## connector-pack · v1.4.0
+## connector-pack · v1.5.1
 
 > 连接器 pack：能力面逐平台由 capability-matrix.json 生成
 
