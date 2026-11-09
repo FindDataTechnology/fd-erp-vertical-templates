@@ -114,3 +114,41 @@ def test_review_pending_lists_every_unmapped_cell():
     for row in pending:
         assert row["reason"]
         assert row["next_action"]
+
+
+# ── 生成器 CLI 的 --check 负例（脚本入口此前只有库级测试） ────────────────
+
+def test_generator_check_fails_when_matrix_changed_without_regeneration(tmp_path):
+    """矩阵改了、产物没重生成 → `--check` 必须非零退出。
+
+    覆盖的是**脚本入口**（`scripts/gen_capability_artifacts.py --check`），
+    而不是库函数；否则「跑了但仍是旧产物」这种情况没人拦。
+    """
+    import json as _json
+    import shutil
+    import subprocess
+    import sys as _sys
+
+    repo = Path(__file__).resolve().parent.parent
+    work = tmp_path / "repo"
+    # 只复制生成器需要的最小面：脚本 + 包 + 模板
+    shutil.copytree(repo / "scripts", work / "scripts")
+    shutil.copytree(repo / "fd_erp_vertical_templates", work / "fd_erp_vertical_templates",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(repo / "templates" / "crossborder", work / "templates" / "crossborder")
+
+    # 先确认干净副本是同步的
+    ok = subprocess.run([_sys.executable, "scripts/gen_capability_artifacts.py", "--check"],
+                        cwd=work, capture_output=True, text=True)
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+
+    # 改矩阵一句原因（指纹随之变），不重生成
+    matrix = work / "templates" / "crossborder" / "capability-matrix.json"
+    body = _json.loads(matrix.read_text(encoding="utf-8"))
+    body["platforms"][0]["flows"]["orders"]["reason"] += "（改一句）"
+    matrix.write_text(_json.dumps(body, ensure_ascii=False), encoding="utf-8")
+
+    bad = subprocess.run([_sys.executable, "scripts/gen_capability_artifacts.py", "--check"],
+                         cwd=work, capture_output=True, text=True)
+    assert bad.returncode != 0, "矩阵变了但 --check 仍绿：产物落后没有被拦"
+    assert "不同步" in (bad.stdout + bad.stderr)
