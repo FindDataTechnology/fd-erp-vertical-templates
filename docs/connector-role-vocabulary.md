@@ -23,7 +23,7 @@
 | `supplier-portal` | 供应商门户 / SRM | 无同名 provider | supply-chain `supplier-portal` | 自己的供应商门户系统 |
 | `carrier-portal` | 承运商门户 / TMS | 无同名 provider | supply-chain `carrier-portal` | 自己的承运商（目录有 sf_express / kuaidi100 可作其一） |
 | `pos` | 门店收银 / POS | `pos.py` | restaurant-chain `pos-sales` | 自己实际在用的 POS 厂商 |
-| `cn-commerce` | 国内电商平台（淘宝/天猫/京东） | `cn_commerce.py`（`mcp-cn-commerce`） | crossborder `cn-commerce-store` | 自己开店的平台与账号（拼多多不声明：上游 schema 缺失） |
+| `cn-commerce` | 国内电商平台（淘宝/天猫/京东） | `cn_commerce.py`（**状态翻译层，不出网**）+ 后续实名 provider（`taobao`/`jd`/`merchant_erp`） | crossborder `cn-commerce-store` | 自己开店的平台与账号（拼多多不声明：上游 schema 缺失）。措辞取能力矩阵：`unmapped`=需一次接入，`unavailable`=不提供 |
 
 ## 不是角色、别登记的东西
 

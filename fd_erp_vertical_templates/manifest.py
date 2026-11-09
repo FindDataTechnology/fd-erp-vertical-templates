@@ -27,8 +27,11 @@ ASSET_KINDS = ("connector_pack", "fleet_blueprint", "account_mapping_pack", "rep
 #: 扩展 pack 类型（add-supply-chain-vertical：取价规则 pack / 页面集 pack）。
 #: 可选件：既有模板不带仍合法；声明时须过各自面校验。
 OPTIONAL_ASSET_KINDS = ("pricing_rules_pack", "pagesets_pack")
+#: 能力矩阵（change ship-ecommerce-commercial / truth-ecommerce-capability-surface）：
+#: 随连接器 pack 分发的第五类资产。可选——只有采纳能力矩阵的行业线才声明。
+OPTIONAL_ASSET_KINDS = OPTIONAL_ASSET_KINDS + ("capability_matrix",)
 ASSET_KIND_VALUES = ("pack", "fleet-blueprint", "report-preset",
-                     "rules-pack", "pageset-pack")
+                     "rules-pack", "pageset-pack", "capability-matrix")
 _CONSTRAINT_LOCKS = {
     "ledger_access": "kernel-tools-only",
     "bypass_ledger_forbidden": True,
@@ -106,27 +109,117 @@ def _validate(body: dict[str, Any]) -> None:
 
 
 def _validate_assets(body: dict[str, Any], root: Path) -> None:
+    """逐资产校验，违规聚合后一次报出（机器可读结果见 `validation.py`）。
+
+    清单与资产版本对拍（optimize-erp-solution task 2.3 / design D3）：清单声明值
+    是唯一权威，资产文件内自身声明的 `version` MUST 与之相等；两者都必须是
+    semver。不等时同时给出两值与两个文件路径——只说「不一致」等于让人自己去找。
+    `capability_matrix` 是派生资产（由能力矩阵生成器产出），文件未声明 version 时
+    不判红（由 validation.py 记为告警 ASSET_VERSION_UNSTATED）；一旦声明则同样对拍。
+    """
     assets = body["assets"]
     checked_kinds = list(ASSET_KINDS) + [
         k for k in OPTIONAL_ASSET_KINDS if k in assets]
+    problems: list[dict[str, Any]] = []
     for kind in checked_kinds:
-        path = root / assets[kind]["path"]
+        asset = assets[kind]
+        rel = str(asset.get("path") or "")
+        path = root / rel
         if not path.is_file():
-            raise TemplateError("MANIFEST_INVALID",
-                                f"{kind} 资产不存在：{assets[kind]['path']}")
+            problems.append(_violation("ASSET_MISSING", kind, rel,
+                                       f"{kind} 资产不存在：{rel}"))
+            continue
         text = path.read_text(encoding="utf-8")
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError as exc:
-            raise TemplateError("MANIFEST_INVALID",
-                                f"{kind} 资产不是合法 JSON：{exc}") from exc
-        if kind == "fleet_blueprint":
-            _check_blueprint(parsed, path)
-        elif kind in ("connector_pack", "account_mapping_pack",
-                      "pricing_rules_pack", "pagesets_pack"):
-            _check_pack(parsed, path)
-        else:  # report_preset
-            _check_preset(parsed, path)
+            problems.append(_violation("ASSET_INVALID_JSON", kind, rel,
+                                       f"{kind} 资产不是合法 JSON：{exc}",
+                                       detail={"error": str(exc)}))
+            continue
+        declared = str(asset.get("version") or "")
+        if not _SEMVER.match(declared):
+            problems.append(_violation(
+                "ASSET_VERSION_INVALID", kind, rel,
+                f"{kind}.version 须为 semver：{declared!r}"))
+        seen = parsed.get("version") if isinstance(parsed, dict) else None
+        if not isinstance(seen, str) or not _SEMVER.match(seen):
+            if not (kind == "capability_matrix" and seen is None):
+                problems.append(_violation(
+                    "ASSET_VERSION_INVALID", kind, rel,
+                    f"{rel}: 资产文件内 version 缺失或非 semver：{seen!r}",
+                    detail={"file_version": seen}))
+        elif seen != declared:
+            problems.append(_violation(
+                "ASSET_VERSION_MISMATCH", kind, rel,
+                f"{kind} 版本漂移：清单声明 {declared} ≠ 资产文件 {seen}"
+                f"（清单 {root / 'manifest.json'} / 资产 {path}）",
+                detail={"declared": declared, "asset_version": seen,
+                        "manifest": str(root / "manifest.json"),
+                        "asset_path": str(path)}))
+        try:
+            if kind == "capability_matrix":
+                _check_capability_matrix(parsed, path)
+            elif kind == "fleet_blueprint":
+                _check_blueprint(parsed, path)
+            elif kind in ("connector_pack", "account_mapping_pack",
+                          "pricing_rules_pack", "pagesets_pack"):
+                _check_pack(parsed, path)
+            else:  # report_preset
+                _check_preset(parsed, path)
+        except TemplateError as exc:
+            problems.append(_violation("ASSET_SHAPE_INVALID", kind, rel,
+                                       exc.message, detail=exc.detail))
+    if problems:
+        raise TemplateError(
+            "MANIFEST_INVALID",
+            "；".join(p["message"] for p in problems),
+            detail={"violation": problems[0]["code"], "violations": problems,
+                    "asset": problems[0]["asset"], "path": problems[0]["path"]},
+        )
+    _check_coverage_declaration(body, root)
+
+
+def _violation(code: str, asset: str, path: str, message: str,
+               *, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    """一条资产级违规（code/asset/path/message/detail 四件套，供机器消费）。"""
+    out: dict[str, Any] = {"code": code, "asset": asset, "path": path,
+                           "message": message}
+    if detail:
+        out["detail"] = detail
+    return out
+
+
+def _check_coverage_declaration(body: dict[str, Any], root: Path) -> None:
+    """覆盖声明（页面集 blueprint 域级计数）必须等于覆盖矩阵派生值。
+
+    唯一校验钩子（optimize-erp-solution task 1.6）：只对声明了 pagesets_pack 的
+    模板生效，其余模板原样放行。派生与比对逻辑在 `coverage.py`，此处不复制。
+    """
+    if "pagesets_pack" not in (body.get("assets") or {}):
+        return
+    from .coverage import check_template_coverage_declaration
+
+    violations = check_template_coverage_declaration(root)
+    if violations:
+        raise TemplateError(
+            "MANIFEST_INVALID",
+            "覆盖声明与覆盖矩阵派生值不一致：" + "；".join(violations),
+            detail={"template": str(root), "violations": violations},
+        )
+
+
+def _check_capability_matrix(matrix: dict[str, Any], path: Path) -> None:
+    """能力矩阵面校验：交给 capability 模块（schema/三态/证据形状同一套判据）。"""
+    from .capability import MATRIX_SCHEMA
+
+    rel = str(path)
+    if not isinstance(matrix, dict) or matrix.get("schema") != MATRIX_SCHEMA:
+        raise TemplateError(
+            "MANIFEST_INVALID",
+            f"{rel}: 能力矩阵 schema 须为 {MATRIX_SCHEMA}")
+    if not isinstance(matrix.get("platforms"), list) or not matrix["platforms"]:
+        raise TemplateError("MANIFEST_INVALID", f"{rel}: 能力矩阵缺 platforms")
 
 
 def _check_blueprint(bp: dict[str, Any], path: Path) -> None:

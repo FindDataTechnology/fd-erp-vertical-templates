@@ -27,16 +27,21 @@
 | `supply-chain` | `kingdee-cloud` | `kingdee` | `query_records`, `get_record`, `submit_records`, `audit_records`, `push_records` | 凭证/往来读写；read 三个 + write 四个（allocate/audit/push/submit），金蝶的 destructive 动作不在授权面内 |
 | `supply-chain` | `payments-merchant` | `wechatpay` | `download_bill`, `query_transaction` | 商户侧结算流水/交易查询；备选 `alipay` 的 `download_settlement_bill`, `query_trade` 同面 |
 | `restaurant-chain` | `payments-merchant` | `wechatpay` | `download_bill`, `query_transaction` | 同上；备选只有 `alipay`（`meituan` 只有 query_travel，已剔除） |
-| `crossborder` | `shopify-store` | `shopify_admin` | `get_order`, `list_orders`, `list_inventory_items`, `get_inventory_item` | 订单 + 库存；**payouts 无动作，故不承诺** |
+| `crossborder` | `shopify-store` | `shopify_admin` | `get_order`, `list_orders`, `list_inventory_items`, `get_inventory_item`, `list_payouts` | 订单 + 库存 + 结算；`list_payouts` 为 change `wire-ecommerce-merchant-channels` 新增的只读动作（GraphQL `shopifyPaymentsAccount.payouts`，需 `read_shopify_payments_payouts`）；动作未上线前运行时报 `ACTION_NOT_FOUND`，矩阵把 settlements 记缺口 |
+| `crossborder` | `tiktok-store` | `tiktok_shop` | `list_orders`, `list_settlements`, `list_inventory` | TikTok Shop 三腿只读；待商家授权 + 平台应用审核，未过审前矩阵为 `unmapped` |
+| `crossborder` | `merchant-erp-store` | `merchant_erp`（按厂商落地为实名 provider，如 `wangdiantong`） | `list_orders`, `list_settlements`, `list_inventory` | 国内三腿；**库存腿唯一来源**，国内三方对账缺此腿不成立 |
+
+> 2026-11-10 起本表的承担动作必须与能力矩阵同步：`list_payouts` 未在目录落地前，
+> 矩阵 `shopify.settlements` 保持 `unmapped`（可接未接），不得对外说「已支持收款对账」。
 
 ## 已知缺口（如实记录，不写进声明）
 
 | 面 | 谁需要 | 目录现状 | 处置 |
 | --- | --- | --- | --- |
 | 外卖结算单 / 佣金明细 | 餐饮连锁 | `meituan` 仅有 `query_travel`（酒旅），无商户结算动作 | 不声明该绑定；连接器侧新增动作后再加（沿用"拼多多不声明"的同一原则） |
-| Shopify payouts / 余额 | 跨境电商 | `shopify_admin` 无 payout/balance 动作 | 不承诺收款对账；连接器侧新增后可加回 |
+| Shopify payouts / 余额 | 跨境电商 | `shopify_admin` **已有** `list_payouts`（GraphQL `shopifyPaymentsAccount.payouts`，需 `read_shopify_payments_payouts`；2026-11-10 落地） | 动作在，但**无真实店读取记录**，矩阵 `shopify.settlements` 仍为 `unmapped`；商户未启用 Shopify Payments 时该店结算面不适用（与「没有收款」区分）。升格要一次真实读取并留痕 |
 | 门店 POS 收银流水 | 餐饮连锁 | 目录无任何 POS 收银 provider | 用角色绑定 `pos`：客户选自己已连通的系统；候选为空时状态面如实说"先去连一个"。**接入骨架已立**：`open-connector-mt/docs/pos-skeleton-contract.md`（动作面/验收判据先行，实现待锚点客户） |
-| 淘宝/天猫/京东订单 | 跨境电商 | 目录无这些平台 | 用角色绑定 `cn-commerce`；同上。**接入骨架已立**：`open-connector-mt/docs/cn-commerce-skeleton-contract.md`；拼多多明确不留槽位 |
+| 淘宝/天猫/京东订单 | 跨境电商 | 目录无这些平台 | 用角色绑定 `cn-commerce`；**接入骨架已立**：`open-connector-mt/docs/cn-commerce-skeleton-contract.md`；拼多多明确不留槽位。国内首选电商 ERP 通道（`merchant_erp`，三腿齐），平台直连按锚点客户逐个上 |
 
 ## 什么时候更新这张表
 

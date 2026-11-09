@@ -95,26 +95,73 @@ def _convert(amount: str, currency: str, as_of: str, base_currency: str,
 
 
 class CrossborderRecon:
-    """逐店三方对账。store 级实例（互不混账靠单店实例 + store 字段落款）。"""
+    """逐店三方对账。store 级实例（互不混账靠单店实例 + store 字段落款）。
+
+    `matrix` + `platform` 可选：给了就按矩阵的可对齐腿数降级（三方 → 两方 → 单方），
+    并把不可得腿写进差异清单的 `capability_missing`；不给则维持旧行为（三方全跑），
+    用于既有测试与未注入矩阵的调用面。
+    """
 
     def __init__(self, store: str, *, base_currency: str = "CNY",
                  fx: FxProvider | None = None,
-                 platform_fee_schedule: dict[str, str] | None = None):
+                 platform_fee_schedule: dict[str, str] | None = None,
+                 matrix: Any | None = None, platform: str | None = None):
         self._store = store
         self._base = base_currency
         self._fx = fx
         self._fees = platform_fee_schedule or {}
+        self._matrix = matrix
+        self._platform = platform
 
     @property
     def store(self) -> str:
         return self._store
+
+    # ---- 矩阵面 ----
+
+    def _missing(self, flow: str) -> dict[str, Any] | None:
+        """该腿的不可得归因（无矩阵时恒 None = 不做降级判定）。"""
+        if self._matrix is None or not self._platform:
+            return None
+        return self._matrix.capability_missing(self._platform, flow)
+
+    def capability_missing(self) -> list[dict[str, Any]]:
+        if self._matrix is None or not self._platform:
+            return []
+        return self._matrix.missing_legs(self._platform)
+
+    def recon_shape(self) -> int | None:
+        if self._matrix is None or not self._platform:
+            return None
+        return self._matrix.recon_shape(self._platform)
+
+    def _unavailable(self, flow: str, pair: str) -> dict[str, Any] | None:
+        missing = self._missing(flow)
+        if missing is None:
+            return None
+        return {
+            "store": self._store,
+            "pair": pair,
+            "diffs": [],
+            "matched": 0,
+            "capability_missing": missing,
+            "note": (f"该腿不可得（{missing['status']}）：{missing['reason']}；"
+                     "不产出零差异结论"),
+        }
 
     # ---- 订单 ↔ 收款 ----
 
     def reconcile_orders_payments(self, orders: list[dict[str, Any]],
                                   payments: list[dict[str, Any]],
                                   *, amount_tolerance: str = "0") -> dict[str, Any]:
-        """订单流 ↔ 收款流逐笔对齐（关联键 = raw.order_id / raw.link）。"""
+        """订单流 ↔ 收款流逐笔对齐（关联键 = raw.order_id / raw.link）。
+
+        结算腿不可得时**不产出任何对齐结果**：拿到空的 payments 就报「零差异」
+        是把「没核对」说成「核对无误」。
+        """
+        blocked = self._unavailable("settlements", "orders-payments")
+        if blocked is not None:
+            return blocked
         result = align_pair(orders, payments, left_side="orders",
                             right_side="payments",
                             amount_tolerance=amount_tolerance)
@@ -136,7 +183,14 @@ class CrossborderRecon:
     def reconcile_orders_inventory(self, orders: list[dict[str, Any]],
                                    inventory_moves: list[dict[str, Any]]
                                    ) -> dict[str, Any]:
-        """订单 ↔ 库存状态对齐：在途/未扣减 → needs_explanation=logistics。"""
+        """订单 ↔ 库存状态对齐：在途/未扣减 → needs_explanation=logistics。
+
+        库存腿不可得时不产出对齐结果，只报 `capability_missing`——「库存零差异」
+        在没读过库存的情况下是假绿。
+        """
+        blocked = self._unavailable("inventory", "orders-inventory")
+        if blocked is not None:
+            return blocked
         result = align_status(orders, inventory_moves, left_side="orders",
                               right_side="inventory")
         result["store"] = self._store
@@ -150,7 +204,17 @@ class CrossborderRecon:
 
         平台费率配置（platform_fee_schedule）= {dimension: "rate"}，
         带出处（rate_source）方可参与解释；无费率出处 → 如实 unexplained。
+
+        结算腿不可得时：不产出行、不产出 totals、不给 explained——费用对账
+        无从谈起，只能报 `capability_missing`。
         """
+        blocked = self._missing("settlements")
+        if blocked is not None:
+            return {"store": self._store, "rows": [], "totals": None,
+                    "fee_explanations": [],
+                    "capability_missing": blocked,
+                    "note": (f"结算面不可得（{blocked['status']}）：{blocked['reason']}；"
+                             "不产出结算额与费用差异")}
         rows: list[dict[str, Any]] = []
         totals: dict[str, Decimal] = {"payouts": Decimal(0), "commission": Decimal(0),
                                       "payment_fee": Decimal(0)}
@@ -186,6 +250,54 @@ class CrossborderRecon:
         return {"store": self._store, "rows": rows,
                 "totals": {k: str(v) for k, v in totals.items()},
                 "fee_explanations": explanations}
+
+    # ---- 一次对账（按矩阵腿数编排）----
+
+    def reconcile(self, *, orders: list[dict[str, Any]],
+                  payments: list[dict[str, Any]] | None = None,
+                  inventory: list[dict[str, Any]] | None = None,
+                  amount_tolerance: str = "0") -> dict[str, Any]:
+        """按可得腿数跑对账并汇总。
+
+        返回 `shape`（3/2/1）与 `capability_missing`（逐腿归因）；不可得腿对应的
+        pair 不产出差异清单，只产出归因——差异数为 0 与「没核对」必须可区分。
+        """
+        shape = self.recon_shape()
+        results: dict[str, dict[str, Any]] = {}
+
+        settlements_missing = self._missing("settlements")
+        if settlements_missing is None and payments is not None:
+            results["orders-payments"] = self.reconcile_orders_payments(
+                orders, payments, amount_tolerance=amount_tolerance)
+        else:
+            blocked = self._unavailable("settlements", "orders-payments")
+            results["orders-payments"] = blocked if blocked is not None else {
+                "store": self._store, "pair": "orders-payments",
+                "skipped": True, "note": "调用方未提供收款流数据"}
+
+        inventory_missing = self._missing("inventory")
+        if inventory_missing is None and inventory is not None:
+            results["orders-inventory"] = self.reconcile_orders_inventory(
+                orders, inventory)
+        else:
+            blocked = self._unavailable("inventory", "orders-inventory")
+            results["orders-inventory"] = blocked if blocked is not None else {
+                "store": self._store, "pair": "orders-inventory",
+                "skipped": True, "note": "调用方未提供库存流数据"}
+
+        diffs = [d for r in results.values() for d in (r.get("diffs") or [])]
+        return {
+            "store": self._store,
+            "platform": self._platform,
+            "shape": shape,
+            "legs": {k: ("available" if not r.get("capability_missing") else
+                         r["capability_missing"]["status"])
+                     for k, r in results.items()},
+            "capability_missing": self.capability_missing(),
+            "pairs": results,
+            "diff_count": len(diffs),
+            "diffs": diffs,
+        }
 
     # ---- 回写差异核对结论（白名单车道在 writeback.py；此处只出建议分录面）--
 

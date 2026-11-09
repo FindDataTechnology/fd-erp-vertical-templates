@@ -15,6 +15,12 @@ class TemplateError(Exception):
         "NOT_WIRED",             # 未接线/未适配（如实报出，不伪造能力）
         "MAPPING_INVALID",       # 科目映射 pack 非法（目标不在内核通用科目集等）
         "MANIFEST_INVALID",      # 模板四件套清单非法
+        "MATRIX_INVALID",        # 能力矩阵非法（schema/状态/证据形状/缺格）
+        "RUNTIME_UNREACHABLE",   # 连接器运行时不可达（不得回退直连）
+        "ACTION_NOT_FOUND",      # 动作不在目录（目录缺口，不得自建通道）
+        "AUTH_FAILED",           # 凭据无效或权限不足（去连接器重授权）
+        "RATE_LIMITED",          # 上游配额（可退避重试，归因「配额」非「无数据」）
+        "BAD_RESPONSE",          # 动作返回结构不符契约（契约漂移）
         "BOUNDARY_VIOLATION",    # 模板边界审计发现违规
         "MASTER_DATA_STATE",     # 主数据状态非法（如已停业门店再出日结）
         "CREDIT_NOT_REGISTERED",  # 客户未登记信用额度（下单前置运维动作缺失）

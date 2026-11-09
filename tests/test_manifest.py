@@ -17,11 +17,17 @@ CROSSBORDER = REPO / "templates" / "crossborder"
 RESTAURANT = REPO / "templates" / "restaurant-chain"
 
 
+MANDATORY_ASSETS = {"connector_pack", "fleet_blueprint",
+                    "account_mapping_pack", "report_preset"}
+OPTIONAL_ASSETS = {"pricing_rules_pack", "pagesets_pack", "capability_matrix"}
+
+
 def test_both_manifests_load_with_assets():
+    """必备四件必须在；扩展件只能是已知种类（不允许悄悄塞第六类资产）。"""
     for root in (CROSSBORDER, RESTAURANT):
         m = load_template_manifest(root / "manifest.json")
-        assert set(m["assets"]) == {"connector_pack", "fleet_blueprint",
-                                    "account_mapping_pack", "report_preset"}
+        assert MANDATORY_ASSETS <= set(m["assets"])
+        assert set(m["assets"]) - MANDATORY_ASSETS <= OPTIONAL_ASSETS
         assert m["constraints"]["bypass_ledger_forbidden"] is True
 
 
@@ -74,7 +80,12 @@ def test_pack_v2_fields_enforced(tmp_path):
 def test_mapping_payloads_load_from_packs():
     xb = load_mapping_pack(CROSSBORDER / "account-mapping" / "pack.json")
     rest = load_mapping_pack(RESTAURANT / "account-mapping" / "pack.json")
-    assert xb["version"] == "1.0.0" and rest["version"] == "1.0.0"
+    # 版本随内容走：跨境映射 pack 因补四语 i18n 升到 1.1.0；餐饮仍未变。
+    # 断言只钉「两边都能加载且是 semver」，不钉死具体版本号（钉死会在每次
+    # 正常 bump 时变成假红，反而鼓励改断言而不是改内容）。
+    import re as _re
+    assert _re.match(r"^\d+\.\d+\.\d+$", xb["version"])
+    assert _re.match(r"^\d+\.\d+\.\d+$", rest["version"])
     names = {a["name_zh"] for a in rest["industry_accounts"]}
     assert "门店营业收入" in names and "平台佣金" in names
 
@@ -264,6 +275,8 @@ _APPLIANCE_COPIES = {
         "erp-templates/crossborder-connector-pack.json": "connector-pack/pack.json",
         "erp-templates/crossborder-account-mapping-pack.json": "account-mapping/pack.json",
         "erp-templates/crossborder-report-preset.json": "report-preset/preset.json",
+        # 能力矩阵随包分发：出包后客户能自己看到「哪条腿拿不到、为什么」
+        "erp-templates/crossborder-capability-matrix.json": "capability-matrix.json",
     },
     "restaurant-chain": {
         "erp-templates/restaurant-connector-pack.json": "connector-pack/pack.json",
@@ -299,3 +312,58 @@ def test_appliance_copies_match_template_sources():
                     f"{tenant}/{rel}: 与 {src_rel} 不一致（appliance 独有键 {extra_a} / 模板独有键 {extra_b}）"
                 )
     assert drifted == [], f"appliance 副本落后于模板：{drifted}"
+
+
+# --------------------------------------------------------------------------
+# 覆盖声明由矩阵派生（optimize-erp-solution task 1.6）
+# 清单里的 blueprint 域级计数不是手写数字：它由 api-contract.md 的功能点对账表
+# 展开成覆盖矩阵、按证据归类后计数。声明与派生值不一致即校验失败，并指出模板、
+# 域与两处计数——不给人留手改空间。
+# --------------------------------------------------------------------------
+
+
+def test_supply_chain_coverage_declaration_matches_matrix():
+    """真实 supply-chain 模板：声明 7/3/4/4 与矩阵派生值一致，校验全绿。"""
+    manifest = load_template_manifest(SUPPLY_CHAIN / "manifest.json")
+    assert manifest["vertical"] == "supply-chain"
+
+
+def test_blueprint_count_drift_rejected_and_both_counts_named(tmp_path):
+    """人为把 ue 的 blueprint 域级计数改错 → 校验红并点名模板、域与两处计数。"""
+    import shutil
+
+    from fd_erp_vertical_templates import coverage as cov
+
+    template = tmp_path / "supply-chain"
+    shutil.copytree(SUPPLY_CHAIN, template)
+    pageset_manifest = template / "pagesets" / "ue-commerce" / "manifest.json"
+    body = json.loads(pageset_manifest.read_text(encoding="utf-8"))
+    original = body["blueprint"]["coverage"]["coveredAreas"]
+    body["blueprint"]["coverage"]["coveredAreas"] = original - 1  # 少回填一个域
+    pageset_manifest.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(TemplateError) as ei:
+        load_template_manifest(template / "manifest.json")
+    message = ei.value.message
+    assert "覆盖声明与覆盖矩阵派生值不一致" in message
+    assert "supply-chain/ue" in message           # 模板 + 域
+    assert f"声明 {original - 1}" in message      # 两处计数：清单声明值
+    assert f"派生 {original}" in message          # 两处计数：矩阵派生值
+    assert "coveredAreas" in message
+    assert ei.value.detail["violations"]
+
+    # 只改一处也必须红：另一端的 pendingTrimAreas 同样受校验
+    body["blueprint"]["coverage"]["coveredAreas"] = original
+    body["blueprint"]["coverage"]["pendingTrimAreas"] = 2
+    pageset_manifest.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(TemplateError) as ei:
+        load_template_manifest(template / "manifest.json")
+    assert "pendingTrimAreas" in ei.value.message
+    assert "声明 2" in ei.value.message and "派生 0" in ei.value.message
+
+
+def test_manifest_without_pagesets_pack_skips_coverage_gate():
+    """未声明页面集的模板（crossborder / restaurant-chain）不受覆盖钩子影响。"""
+    for root in (CROSSBORDER, RESTAURANT):
+        body = load_template_manifest(root / "manifest.json")
+        assert "pagesets_pack" not in body["assets"]

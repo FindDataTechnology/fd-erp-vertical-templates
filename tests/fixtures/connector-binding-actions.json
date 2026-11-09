@@ -207,6 +207,10 @@
         "operationType": "read"
       },
       {
+        "name": "list_payouts",
+        "operationType": "read"
+      },
+      {
         "name": "list_product_variants",
         "operationType": "read"
       },
