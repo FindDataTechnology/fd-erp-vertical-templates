@@ -4,10 +4,22 @@
  "updated_at": "2026-11-10",
  "surfaces": {
   "note": "发布面（非 pack 类）：官网 deploy / 网关 rollout / registry 写入的 live 状态只能写在这里，且必须带证据。claims 里 assert_live 指向本段——宣称已 live 而这里为空或 live=false 即判红（task 4.5）。",
-  "official-web.deploy": {"live": false, "evidence": "本地内容完整性 gate 通过（0 hits）；site deploy 需真实凭据，未执行"},
-  "gateway.rollout": {"live": false, "evidence": "无集群变更记录"},
-  "registry.snapshot": {"live": false, "evidence": "未写入 registry"},
-  "market.connector-packs": {"live": true, "evidence": "packs 段逐包记录 + 兄弟仓 fleet-packs/README.md 机器台账"}
+  "official-web.deploy": {
+   "live": false,
+   "evidence": "本地内容完整性 gate 通过（0 hits）；site deploy 需真实凭据，未执行"
+  },
+  "gateway.rollout": {
+   "live": false,
+   "evidence": "无集群变更记录"
+  },
+  "registry.snapshot": {
+   "live": false,
+   "evidence": "未写入 registry"
+  },
+  "market.connector-packs": {
+   "live": true,
+   "evidence": "packs 段逐包记录 + 兄弟仓 fleet-packs/README.md 机器台账"
+  }
  },
  "packs": {
   "supply-chain/connector-pack": {
@@ -57,16 +69,17 @@
    "published_at": "2026-11-08",
    "channel": "facet-market",
    "evidence": [
-    "fleet-packs/README.md#机器台账: crossborder-connector-pack v2（面级纠错：shopify-store provider → shopify_admin）",
-    "docs/connector-onboarding-supply-chain.md#5.1",
-    "docs/connector-onboarding-supply-chain.md#8.1"
+    "fleet-packs/README.md#机器台账: crossborder-connector-pack v2（市场仍为 v2，源已到 pack 1.5.1 / manifest 1.4.1，待上架）",
+    "fd-erp-vertical-templates/releases/ledger.jsonl#connector-pack v1.5.1",
+    "fd-erp-vertical-templates/templates/crossborder/capability-matrix.json",
+    "docs/connector-onboarding-supply-chain.md#5.1"
    ],
-   "derivation": "pending",
-   "derivation_reason": "templates/crossborder/pack.json 正被并行 session 改（capability_matrix 采纳），本 change 不碰；待其落地后跑 `publish-notes --template templates/crossborder` 重写三处，并把 derivation 置 applied",
+   "derivation": "applied",
+   "derivation_reason": "2026-11-10 由电商线会话收口：capability_matrix 已采纳（pack 1.5.1 / manifest 1.4.1），三处注记已按本记录重写；市场版本未推进（仍为 v2），发布状态仍以 published=true 表述，源侧待上架另见 fleet-packs 台账注记",
    "notes": {
-    "notes": "只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；Shopify 写真 id，国内平台用角色绑定；拼多多上游 schema 缺失故不声明",
-    "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: Shopify uses a real id and CN platforms use role bindings; Pinduoduo is not declared because the upstream schema is missing",
-    "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。Shopify 写真 id，国内平台用角色绑定（客户自己选平台）；拼多多上游 schema 缺失故不声明；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
+    "notes": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志",
+    "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged",
+    "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录；能力面以包内 capability-matrix.json 为准，对外说「需一次接入」而不是「已支持」；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
    }
   }
  }
