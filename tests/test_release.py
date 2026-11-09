@@ -148,3 +148,32 @@ def test_render_gate_names_fix_for_conflicts(tmp_path):
     assert "发布门：阻断" in text
     assert "修法：" in text
     assert "boom" in text
+
+def test_derived_views_match_ledger(tmp_path):
+    """READINESS / ENTRY-MATRIX 里的版本必须与台账一致。
+
+    这条防的是「脚本跑了但没 --write」：我在本会话就踩过——release_readiness.py
+    默认只打印，文件仍停在上一版，而肉眼看表格是新的。
+    """
+    import json as _json
+    from fd_erp_vertical_templates.release import Ledger
+
+    ledger_path = Path(__file__).resolve().parent.parent / "releases" / "ledger.jsonl"
+    readiness = (ledger_path.parent / "READINESS.md").read_text(encoding="utf-8")
+    entry = (ledger_path.parent / "ENTRY-MATRIX.md").read_text(encoding="utf-8")
+    latest = {}
+    for row in (_json.loads(l) for l in ledger_path.read_text().splitlines() if l.strip()):
+        latest[row["asset_id"]] = row
+
+    missing = [f"{a} v{r['version']}" for a, r in latest.items()
+               if f"v{r['version']}" not in readiness]
+    assert not missing, (
+        f"READINESS.md 落后于台账：{missing}——重跑 "
+        "`python3 scripts/release_readiness.py --write`（默认只打印不写盘）")
+
+    units = ("connector-pack", "account-mapping-pack", "recon-fleet")
+    stale = [f"{u} v{latest[u]['version']}" for u in units
+             if f"v{latest[u]['version']}" not in entry]
+    assert not stale, (
+        f"ENTRY-MATRIX.md 落后于台账：{stale}——重跑 "
+        "`python3 scripts/entry_matrix.py --write`")
