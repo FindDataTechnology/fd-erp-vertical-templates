@@ -319,7 +319,9 @@ def _i18n_block(matrix: CapabilityMatrix, pack: dict) -> dict:
             status = cell.status if cell else "unmapped"
             display = I18N_PLATFORMS[lang].get(key, key)
             parts.append(f"{display}: {I18N_STATUS[lang][status]}")
-        block[lang] = {
+        # 保留非本生成器负责的键（如 publish-notes 写入的 i18n.<lang>.notes）——
+        # 否则每次重生成都会把发布注记抹掉，两个生成器互相删除对方的结果。
+        generated = {
             "name": I18N_NAME[lang],
             "description": (I18N_PREFIX[lang]
                             + I18N_SEPARATOR[lang].join(parts)
@@ -329,6 +331,8 @@ def _i18n_block(matrix: CapabilityMatrix, pack: dict) -> dict:
                        for s in pack.get("skills") or []
                        if s.get("name")},
         }
+        existing = (pack.get("i18n") or {}).get(lang) or {}
+        block[lang] = {**existing, **generated}
     return block
 
 
