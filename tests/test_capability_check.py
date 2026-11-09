@@ -7,6 +7,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from fd_erp_vertical_templates.capability_check import check_template, render_lint
 
 REPO = Path(__file__).resolve().parent.parent
@@ -21,6 +23,10 @@ DOCS = [
 ]
 
 
+@pytest.mark.skipif(
+    not all(p.is_file() for p in DOCS),
+    reason="finddata 根的 docs/ 与 collateral-* 不在位（CI 单仓 checkout，根不是 git 仓）："
+           "锚点对位需要真文档，机制用例见下方 tmp_path 系列")
 def test_repo_docs_agree_with_matrix():
     result = check_template(TEMPLATE, today=date(2026, 11, 10), doc_paths=DOCS)
     assert result["ok"], render_lint(result)
