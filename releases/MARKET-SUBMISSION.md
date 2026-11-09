@@ -8,11 +8,11 @@
 
 | 资产 | 版本 | 路径 | tags 长度（逐语言） |
 |---|---|---|---|
-| connector-pack | v1.5.1 | `connector-pack/pack.json` | 5/5/5/5 |
-| account-mapping-pack | v1.1.0 | `account-mapping/pack.json` | 4/4/4/4 |
-| recon-fleet | v1.1.0 | `recon-fleet/template.json` | 4/4/4/4 |
+| connector-pack | v1.5.3 | `connector-pack/pack.json` | 5/5/5/5 |
+| account-mapping-pack | v1.1.2 | `account-mapping/pack.json` | 4/4/4/4 |
+| recon-fleet | v1.1.2 | `recon-fleet/template.json` | 4/4/4/4 |
 
-## connector-pack · v1.5.1
+## connector-pack · v1.5.3
 
 > 连接器 pack：能力面逐平台由 capability-matrix.json 生成
 
@@ -116,7 +116,7 @@ Pack de connecteurs pour le modèle de réconciliation e-commerce transfrontali�
 ERP / e-commerce transfrontalière / réconciliation / connecteur / BYOK
 ```
 
-## account-mapping-pack · v1.1.0
+## account-mapping-pack · v1.1.2
 
 > 科目映射 pack：呈现层口径，替换映射不改账
 
@@ -220,7 +220,7 @@ Pack de mapping de comptes pour le modèle de réconciliation e-commerce transfr
 ERP / e-commerce transfrontalière / mapping de comptes / couche de présentation
 ```
 
-## recon-fleet · v1.1.0
+## recon-fleet · v1.1.2
 
 > 对账舰队模板：巡检/核对/拍板三岗
 

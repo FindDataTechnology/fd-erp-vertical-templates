@@ -5,11 +5,11 @@
 
 | 资产 | 版本 | 台账 | 上架单元 | 语言 | 缺语言 | 待办 |
 |---|---|---|---|---|---|---|
-| capability-matrix | v1.0.0 | draft v1.0.0 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
-| connector-pack | v1.5.1 | draft v1.5.1 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
-| report-preset | v1.1.0 | draft v1.1.0 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
-| account-mapping-pack | v1.1.0 | draft v1.1.0 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
-| recon-fleet | v1.1.0 | draft v1.1.0 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
+| capability-matrix | v1.1.0 | draft v1.1.0 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
+| connector-pack | v1.5.3 | draft v1.5.3 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
+| report-preset | v1.1.2 | draft v1.1.2 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
+| account-mapping-pack | v1.1.2 | draft v1.1.2 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
+| recon-fleet | v1.1.2 | draft v1.1.2 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
 
 ## 口径
 
