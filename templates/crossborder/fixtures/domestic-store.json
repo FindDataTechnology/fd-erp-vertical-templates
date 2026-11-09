@@ -1,0 +1,38 @@
+{
+  "schema": "erp-store-fixture/v1",
+  "note": "合成店 fixture（非真实商家数据）。用于演示与回归：国内轨迹经商家电商 ERP 取三腿；settlements_missing 变体用于验证缺腿不会被渲染成零差异。",
+  "store": "demo-cn-shop",
+  "platform": "merchant_erp",
+  "days": ["2026-11-05", "2026-11-06"],
+  "orders": [
+    {"id": "CN-O-1001", "amount": "1180.00", "currency": "CNY", "status": "paid",
+     "occurred_at": "2026-11-06T09:15:00", "link": "CN-O-1001"},
+    {"id": "CN-O-1002", "amount": "256.00", "currency": "CNY", "status": "paid",
+     "occurred_at": "2026-11-06T11:02:00", "link": "CN-O-1002"},
+    {"id": "CN-O-1003", "amount": "432.00", "currency": "CNY", "status": "paid",
+     "occurred_at": "2026-11-06T15:40:00", "link": "CN-O-1003"}
+  ],
+  "settlements": [
+    {"id": "CN-S-9001", "amount": "1168.20", "currency": "CNY", "status": "settled",
+     "occurred_at": "2026-11-06T23:00:00", "link": "CN-O-1001",
+     "fees": {"commission": "9.44", "payment_fee": "2.36"}},
+    {"id": "CN-S-9002", "amount": "253.44", "currency": "CNY", "status": "settled",
+     "occurred_at": "2026-11-06T23:00:00", "link": "CN-O-1002",
+     "fees": {"commission": "2.05", "payment_fee": "0.51"}},
+    {"id": "CN-S-9003", "amount": "427.68", "currency": "CNY", "status": "settled",
+     "occurred_at": "2026-11-06T23:00:00", "link": "CN-O-1003",
+     "fees": {"commission": "3.46", "payment_fee": "0.86"}}
+  ],
+  "inventory": [
+    {"id": "CN-I-7001", "amount": "0", "status": "deducted",
+     "occurred_at": "2026-11-06T09:16:00", "link": "CN-O-1001"},
+    {"id": "CN-I-7003", "amount": "0", "status": "deducted",
+     "occurred_at": "2026-11-06T15:41:00", "link": "CN-O-1003"}
+  ],
+  "variants": {
+    "settlements_missing": {
+      "note": "该厂商未开放账单面：结算腿不可得，报表与对账必须显式标注而不是零差异",
+      "drop": ["settlements"]
+    }
+  }
+}
