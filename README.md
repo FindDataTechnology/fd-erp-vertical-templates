@@ -26,9 +26,20 @@ fd_erp_vertical_templates/
   boundary.py       模板边界审计器（AST + JSON 静态证明四条边界）
   kernel_client.py  内核 8 工具同形协议（MCP 工具面为生产形态）
   stores.py         餐饮门店主数据 + 确认车道（非账务参考数据，不落内核）
-  connectors/       shopify / cn_commerce / pos / payments（BYOK，只读滩头）
+  connectors/       shopify / tiktok_shop / merchant_erp / cn_commerce / pos / payments
+                    （出网单口=连接器运行时 runtime_client；BYOK，只读滩头）
+  runtime_client.py 连接器运行时客户端（POST /v1/actions/<provider>.<action>，
+                    模板层不拼 vendor URL、不发 HTTP、不读凭证）
+  capability.py     电商能力矩阵（平台×流三态 + 证据/复核窗 + 对账降级/报表腿派生）
+  capability_check.py 矩阵 ↔ 产物 ↔ 对外文档锚点的一致性门
+  release.py        发布门与台账（同版本不同摘要拒、版本回退拒、同摘要幂等跳过）
   recon/            three_way（四类差异）+ crossborder / restaurant 驱动
                     + shares（分成对账单，零资金执行面）+ writeback（白名单车道）
+scripts/
+  gen_capability_artifacts.py  矩阵 → 报表 preset / 连接器 pack i18n / REVIEW-PENDING
+  release_readiness.py         上架就绪（语言缺口/台账状态/下一步）
+  market_submission.py         市场提交材料（四语 name/description/tags）
+  entry_matrix.py              对外入口矩阵（built ≠ published）
 templates/
   crossborder/        四件套清单 + connector-pack / recon-fleet /
                       account-mapping / report-preset
@@ -44,6 +55,9 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # 边界审计（只读，零写路径）
 .venv/bin/fd-erp-vertical-templates audit
 .venv/bin/fd-erp-vertical-templates validate --template templates/crossborder
+.venv/bin/fd-erp-vertical-templates capability-check --template templates/crossborder
+.venv/bin/fd-erp-vertical-templates release-check --template templates/crossborder \
+    --ledger releases/ledger.jsonl
 
 # 测试（e2e 需真实 Postgres，DB 约束层不可 mock）
 ERP_LEDGER_DATABASE_URL="postgresql://..." .venv/bin/pytest -q
@@ -69,10 +83,15 @@ ERP_LEDGER_DATABASE_URL="postgresql://..." .venv/bin/pytest -q
 - 中央厨房/采购/BOM/排班/会员等重域当前不提供（后续渐进模板资产）。
 - 谦面市场 live 上架、registry 推送属独立部署步骤（挂账）——本包为
   publish-ready 形态（同 erp-ledger-kernel-pack 先例）。
+- **能力面以 `templates/crossborder/capability-matrix.json` 为准**：内圈当前
+  0 格可得、拼多多 4 格「不提供」、其余 24 格「需一次接入」。要升格须有
+  provider 动作 + 一次真实读取记录（缺一不可）；`available` 不是「写了代码」的意思。
+- Shopify payout 动作（`list_payouts`）已落地但**尚无真实店读取**，结算面仍按
+  「需一次接入」表述；商户未启用 Shopify Payments 时该面不适用（与「没有收款」区分）。
 
 ## appliance 三档（fd-appliance/tenants）
 
-- `crossborder/` v1.1.0：三舰 + 对账舰队 + 模板四件套（10 组件）。
+- `crossborder/` v1.2.0：三舰 + 对账舰队 + 模板四件套 + 能力矩阵（11 组件）。
 - `restaurant-chain/` v1.0.0：日结舰队 + 模板四件套（4 组件，新建租户）。
 - 出包验证：`python3 -m appliance_packer build tenants/<tenant> --out <dir>`
-  → VERIFY PASS（2026-11-07 实跑）。
+  → VERIFY PASS（跨境租户 2026-11-10 实跑：components=11）。

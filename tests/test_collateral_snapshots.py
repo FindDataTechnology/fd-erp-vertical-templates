@@ -45,3 +45,27 @@ def test_snapshot_directory_documents_provenance():
     assert "finddata/" in text and "不是" in text
     for name, _ in PAIRS:
         assert name in text, f"README 未登记 {name}"
+
+
+# ── README 门面一致性（防「目录段写了不存在的模块」） ──────────────────
+
+def test_readme_directory_section_lists_real_files():
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    named = ("runtime_client.py", "capability.py", "capability_check.py", "release.py",
+             "gen_capability_artifacts.py", "release_readiness.py",
+             "market_submission.py", "entry_matrix.py")
+    missing = [n for n in named if not any(REPO.rglob(n))]
+    assert not missing, f"README 提到的文件不存在：{missing}"
+
+    connectors = ("shopify", "tiktok_shop", "merchant_erp", "cn_commerce", "pos", "payments")
+    absent = [c for c in connectors
+              if not (REPO / "fd_erp_vertical_templates" / "connectors" / f"{c}.py").is_file()]
+    assert not absent, f"README 连接器清单里有多余项：{absent}"
+
+
+def test_readme_states_the_matrix_caliber():
+    """README 必须写明「能力面以矩阵为准」，否则门面会把待接入读成已支持。"""
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    assert "capability-matrix.json" in readme
+    assert "需一次接入" in readme
+    assert "真实读取记录" in readme
