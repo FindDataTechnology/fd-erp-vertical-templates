@@ -1,30 +1,109 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商科目映射包",
- "version": "1.0.0",
+ "version": "1.1.0",
  "description": "跨境电商对账模板·科目映射 pack：行业科目对齐内核通用科目最小集（呈现层口径）。映射只影响报表与查询呈现，已落账分录零改动；替换映射不改账。映射 MUST NOT 向内核注入行业科目行（本包无任何写内核路径）。",
- "tags": ["ERP", "跨境电商", "科目映射", "呈现层"],
+ "tags": [
+  "ERP",
+  "跨境电商",
+  "科目映射",
+  "呈现层"
+ ],
  "visibility": "public",
  "category": "facet",
  "account_mapping": {
   "schema": "erp-account-mapping/v1",
   "vertical": "crossborder",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "universal_preset_version": "v1",
   "industry_accounts": [
-   {"code": "X-0001", "name_zh": "平台销售收入", "name_en": "Platform sales revenue", "maps_to": "4000", "kind": "revenue"},
-   {"code": "X-0002", "name_zh": "销货成本", "name_en": "Cost of goods sold", "maps_to": "5000", "kind": "expense"},
-   {"code": "X-0003", "name_zh": "平台佣金与收款手续费", "name_en": "Platform commission and payment fees", "maps_to": "5100", "kind": "expense"},
-   {"code": "X-0004", "name_zh": "跨境物流费用", "name_en": "Cross-border logistics costs", "maps_to": "5200", "kind": "expense"},
-   {"code": "X-0005", "name_zh": "应收平台款", "name_en": "Platform receivables", "maps_to": "1100", "kind": "asset"},
-   {"code": "X-0006", "name_zh": "平台在途回款", "name_en": "Platform settlements in transit", "maps_to": "1300", "kind": "asset"},
-   {"code": "X-0007", "name_zh": "商品库存", "name_en": "Merchandise inventory", "maps_to": "1200", "kind": "asset"},
-   {"code": "X-0008", "name_zh": "供应商应付", "name_en": "Supplier payables", "maps_to": "2000", "kind": "liability"}
+   {
+    "code": "X-0001",
+    "name_zh": "平台销售收入",
+    "name_en": "Platform sales revenue",
+    "maps_to": "4000",
+    "kind": "revenue"
+   },
+   {
+    "code": "X-0002",
+    "name_zh": "销货成本",
+    "name_en": "Cost of goods sold",
+    "maps_to": "5000",
+    "kind": "expense"
+   },
+   {
+    "code": "X-0003",
+    "name_zh": "平台佣金与收款手续费",
+    "name_en": "Platform commission and payment fees",
+    "maps_to": "5100",
+    "kind": "expense"
+   },
+   {
+    "code": "X-0004",
+    "name_zh": "跨境物流费用",
+    "name_en": "Cross-border logistics costs",
+    "maps_to": "5200",
+    "kind": "expense"
+   },
+   {
+    "code": "X-0005",
+    "name_zh": "应收平台款",
+    "name_en": "Platform receivables",
+    "maps_to": "1100",
+    "kind": "asset"
+   },
+   {
+    "code": "X-0006",
+    "name_zh": "平台在途回款",
+    "name_en": "Platform settlements in transit",
+    "maps_to": "1300",
+    "kind": "asset"
+   },
+   {
+    "code": "X-0007",
+    "name_zh": "商品库存",
+    "name_en": "Merchandise inventory",
+    "maps_to": "1200",
+    "kind": "asset"
+   },
+   {
+    "code": "X-0008",
+    "name_zh": "供应商应付",
+    "name_en": "Supplier payables",
+    "maps_to": "2000",
+    "kind": "liability"
+   }
   ],
   "report_rows": [
-   {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue", "includes": ["X-0001"]},
-   {"key": "cost", "label_zh": "成本与费用", "label_en": "Costs and expenses", "includes": ["X-0002", "X-0003", "X-0004"]},
-   {"key": "working-capital", "label_zh": "营运资本", "label_en": "Working capital", "includes": ["X-0005", "X-0006", "X-0007", "X-0008"]}
+   {
+    "key": "revenue",
+    "label_zh": "营业收入",
+    "label_en": "Revenue",
+    "includes": [
+     "X-0001"
+    ]
+   },
+   {
+    "key": "cost",
+    "label_zh": "成本与费用",
+    "label_en": "Costs and expenses",
+    "includes": [
+     "X-0002",
+     "X-0003",
+     "X-0004"
+    ]
+   },
+   {
+    "key": "working-capital",
+    "label_zh": "营运资本",
+    "label_en": "Working capital",
+    "includes": [
+     "X-0005",
+     "X-0006",
+     "X-0007",
+     "X-0008"
+    ]
+   }
   ]
  },
  "skills": [
@@ -41,7 +120,10 @@
  "mcpServers": [
   {
    "registryName": "fd-erp-ledger-mcp",
-   "allowTools": ["query_balance", "query_entries"]
+   "allowTools": [
+    "query_balance",
+    "query_entries"
+   ]
   }
  ],
  "fleet": {
@@ -51,14 +133,70 @@
     "ref": "xb-mapping-operator",
     "title": "映射产出位",
     "parentRef": null,
-    "target": {"kind": "pack-preset", "packId": "Mo3_aWe7tF2eFVzkqFT9mA", "presetId": "erp-ledger-board-post"},
-    "kpiSlots": [{"key": "mapping_versions", "label": "映射版本"}]
+    "target": {
+     "kind": "pack-preset",
+     "packId": "Mo3_aWe7tF2eFVzkqFT9mA",
+     "presetId": "erp-ledger-board-post"
+    },
+    "kpiSlots": [
+     {
+      "key": "mapping_versions",
+      "label": "映射版本"
+     }
+    ]
    }
   ],
-  "orchestration": {"mode": "supervisor", "edges": []}
+  "orchestration": {
+   "mode": "supervisor",
+   "edges": []
+  }
  },
  "_casting": {
-  "packDependencies": {"fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"},
+  "packDependencies": {
+   "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
+  },
   "note": "映射包内嵌 account_mapping 载荷（erp-account-mapping/v1）。mcpServers 仅内核只读两工具（映射无写面）。publish-ready：上架挂账。"
+ },
+ "i18n": {
+  "en": {
+   "name": "Cross-border e-commerce account mapping pack",
+   "description": "Account mapping pack for the cross-border e-commerce reconciliation template: aligns industry accounts onto the ledger kernel's universal minimum account set (presentation-layer caliber). The mapping only affects reports and query presentation; posted entries are untouched, and replacing the mapping does not change the books. The mapping must not inject industry account rows into the kernel (this pack has no kernel write path).",
+   "tags": [
+    "ERP",
+    "cross-border e-commerce",
+    "account mapping",
+    "presentation layer"
+   ]
+  },
+  "ja": {
+   "name": "越境EC勘定科目マッピングパック",
+   "description": "越境EC照合テンプレート用の科目マッピングパック：業界科目を帳簿カーネルの共通最小科目セットに寄せます（表示層の口径）。マッピングはレポートと照会の表示にのみ影響し、記帳済み仕訳は一切変更しません。マッピングを差し替えても帳簿は変わりません。カーネルに業界科目行を注入してはならず、本パックにカーネルへの書き込み経路はありません。",
+   "tags": [
+    "ERP",
+    "越境EC",
+    "科目マッピング",
+    "表示層"
+   ]
+  },
+  "es": {
+   "name": "Pack de mapeo de cuentas de comercio electrónico transfronterizo",
+   "description": "Pack de mapeo de cuentas para la plantilla de conciliación de comercio electrónico transfronterizo: alinea las cuentas del sector con el conjunto mínimo universal del núcleo contable (calibre de presentación). El mapeo solo afecta a informes y consultas; los asientos ya registrados no se modifican y sustituir el mapeo no cambia los libros. El mapeo no debe inyectar cuentas del sector en el núcleo (este pack no tiene ruta de escritura al núcleo).",
+   "tags": [
+    "ERP",
+    "comercio electrónico transfronterizo",
+    "mapeo de cuentas",
+    "capa de presentación"
+   ]
+  },
+  "fr": {
+   "name": "Pack de mapping de comptes e-commerce transfrontalière",
+   "description": "Pack de mapping de comptes pour le modèle de réconciliation e-commerce transfrontalière : aligne les comptes du secteur sur le jeu minimal universel du noyau comptable (calibre de présentation). Le mapping n'affecte que les rapports et les requêtes ; les écritures comptabilisées restent intactes et remplacer le mapping ne change pas les livres. Le mapping ne doit pas injecter de comptes du secteur dans le noyau (ce pack n'a aucun chemin d'écriture vers le noyau).",
+   "tags": [
+    "ERP",
+    "e-commerce transfrontalière",
+    "mapping de comptes",
+    "couche de présentation"
+   ]
+  }
  }
 }

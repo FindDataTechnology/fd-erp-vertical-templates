@@ -1,48 +1,297 @@
 {
-  "schema": "erp-report-preset/v1",
-  "name": "跨境电商对账报表 preset",
-  "vertical": "crossborder",
-  "version": "1.0.0",
-  "reports": [
+ "schema": "erp-report-preset/v1",
+ "name": "跨境电商对账报表 preset",
+ "vertical": "crossborder",
+ "version": "1.1.0",
+ "reports": [
+  {
+   "key": "xb-store-recon",
+   "title_zh": "店铺对账日报",
+   "title_en": "Store reconciliation daily",
+   "kind": "report",
+   "source": "recon driver + kernel get_recon_report",
+   "sections": [
     {
-      "key": "xb-store-recon",
-      "title_zh": "店铺对账日报",
-      "title_en": "Store reconciliation daily",
-      "kind": "report",
-      "source": "recon driver + kernel get_recon_report",
-      "sections": [
-        {"key": "orders", "label_zh": "订单流", "label_en": "Orders", "metrics": ["order_count", "order_amount_original", "order_amount_base"]},
-        {"key": "payments", "label_zh": "收款流（payouts）", "label_en": "Payments (payouts)", "metrics": ["payout_count", "payout_amount", "commission", "payment_fee"]},
-        {"key": "inventory", "label_zh": "库存状态腿", "label_en": "Inventory leg", "metrics": ["matched_count", "in_transit_count"]},
-        {"key": "diffs", "label_zh": "差异（四类）", "label_en": "Diffs (four kinds)", "metrics": ["missing_in_right", "extra_in_right", "amount_mismatch", "status_mismatch"]}
-      ],
-      "caliber": "逐店出账；原币对账为准，本位币折算带汇率出处（ecb-exr）；无出处汇率标注 fx_unsourced 不折算"
+     "key": "orders",
+     "label_zh": "订单流",
+     "label_en": "Orders",
+     "metrics": [
+      "order_count",
+      "order_amount_original",
+      "order_amount_base"
+     ],
+     "leg_flow": "orders",
+     "availability_source": "capability-matrix",
+     "unavailable_reason_template": "不可得：当前无通道提供该数据腿（见能力矩阵 jd.orders, merchant_erp.orders, pinduoduo.orders, shopify.orders, taobao.orders, tiktok_shop.orders, tmall.orders）"
     },
     {
-      "key": "xb-fee-report",
-      "title_zh": "平台费用对账",
-      "title_en": "Platform fee report",
-      "kind": "report",
-      "source": "recon driver fee_report",
-      "sections": [
-        {"key": "fees", "label_zh": "费用维度", "label_en": "Fee dimensions", "metrics": ["payouts", "commission", "payment_fee"]},
-        {"key": "explanations", "label_zh": "费率解释", "label_en": "Rate explanations", "metrics": ["explained", "unexplained"]}
-      ],
-      "caliber": "payouts/佣金/手续费独立维度；费率解释带出处，无出处如实 unexplained"
+     "key": "payments",
+     "label_zh": "收款流（payouts）",
+     "label_en": "Payments (payouts)",
+     "metrics": [
+      "payout_count",
+      "payout_amount",
+      "commission",
+      "payment_fee"
+     ],
+     "leg_flow": "settlements",
+     "availability_source": "capability-matrix",
+     "unavailable_reason_template": "不可得：当前无通道提供该数据腿（见能力矩阵 jd.settlements, merchant_erp.settlements, pinduoduo.settlements, shopify.settlements, taobao.settlements, tiktok_shop.settlements, tmall.settlements）"
     },
     {
-      "key": "xb-balance-board",
-      "title_zh": "经营余额看板（映射口径）",
-      "title_en": "Business balance board (mapping caliber)",
-      "kind": "dashboard",
-      "source": "kernel query_balance + account mapping pack",
-      "sections": [
-        {"key": "revenue", "label_zh": "营业收入", "label_en": "Revenue"},
-        {"key": "cost", "label_zh": "成本与费用", "label_en": "Costs and expenses"},
-        {"key": "working-capital", "label_zh": "营运资本", "label_en": "Working capital"}
-      ],
-      "caliber": "呈现层口径：行业科目经科目映射对齐内核通用科目；账本分录零改动"
+     "key": "inventory",
+     "label_zh": "库存状态腿",
+     "label_en": "Inventory leg",
+     "metrics": [
+      "matched_count",
+      "in_transit_count"
+     ],
+     "leg_flow": "inventory",
+     "availability_source": "capability-matrix",
+     "unavailable_reason_template": "不可得：当前无通道提供该数据腿（见能力矩阵 jd.inventory, merchant_erp.inventory, pinduoduo.inventory, shopify.inventory, taobao.inventory, tiktok_shop.inventory, tmall.inventory）"
+    },
+    {
+     "key": "diffs",
+     "label_zh": "差异（四类）",
+     "label_en": "Diffs (four kinds)",
+     "metrics": [
+      "missing_in_right",
+      "extra_in_right",
+      "amount_mismatch",
+      "status_mismatch"
+     ]
     }
-  ],
-  "notes": "报表 preset 消费内核工具面数据（query_balance/query_entries/get_recon_report）与对账驱动报告；无任何直连库表面。"
+   ],
+   "caliber": "逐店出账；原币对账为准，本位币折算带汇率出处（ecb-exr）；无出处汇率标注 fx_unsourced 不折算"
+  },
+  {
+   "key": "xb-fee-report",
+   "title_zh": "平台费用对账",
+   "title_en": "Platform fee report",
+   "kind": "report",
+   "source": "recon driver fee_report",
+   "sections": [
+    {
+     "key": "fees",
+     "label_zh": "费用维度",
+     "label_en": "Fee dimensions",
+     "metrics": [
+      "payouts",
+      "commission",
+      "payment_fee"
+     ]
+    },
+    {
+     "key": "explanations",
+     "label_zh": "费率解释",
+     "label_en": "Rate explanations",
+     "metrics": [
+      "explained",
+      "unexplained"
+     ]
+    }
+   ],
+   "caliber": "payouts/佣金/手续费独立维度；费率解释带出处，无出处如实 unexplained"
+  },
+  {
+   "key": "xb-balance-board",
+   "title_zh": "经营余额看板（映射口径）",
+   "title_en": "Business balance board (mapping caliber)",
+   "kind": "dashboard",
+   "source": "kernel query_balance + account mapping pack",
+   "sections": [
+    {
+     "key": "revenue",
+     "label_zh": "营业收入",
+     "label_en": "Revenue"
+    },
+    {
+     "key": "cost",
+     "label_zh": "成本与费用",
+     "label_en": "Costs and expenses"
+    },
+    {
+     "key": "working-capital",
+     "label_zh": "营运资本",
+     "label_en": "Working capital"
+    }
+   ],
+   "caliber": "呈现层口径：行业科目经科目映射对齐内核通用科目；账本分录零改动"
+  }
+ ],
+ "notes": "报表 preset 消费内核工具面数据（query_balance/query_entries/get_recon_report）与对账驱动报告；无任何直连库表面。",
+ "leg_capability": {
+  "orders": {
+   "flow": "orders",
+   "by_platform": {
+    "shopify": "unmapped",
+    "tiktok_shop": "unmapped",
+    "taobao": "unmapped",
+    "tmall": "unmapped",
+    "jd": "unmapped",
+    "merchant_erp": "unmapped",
+    "pinduoduo": "unavailable"
+   },
+   "supplied_by_any": false
+  },
+  "payments": {
+   "flow": "settlements",
+   "by_platform": {
+    "shopify": "unmapped",
+    "tiktok_shop": "unmapped",
+    "taobao": "unmapped",
+    "tmall": "unmapped",
+    "jd": "unmapped",
+    "merchant_erp": "unmapped",
+    "pinduoduo": "unavailable"
+   },
+   "supplied_by_any": false
+  },
+  "inventory": {
+   "flow": "inventory",
+   "by_platform": {
+    "shopify": "unmapped",
+    "tiktok_shop": "unmapped",
+    "taobao": "unmapped",
+    "tmall": "unmapped",
+    "jd": "unmapped",
+    "merchant_erp": "unmapped",
+    "pinduoduo": "unavailable"
+   },
+   "supplied_by_any": false
+  }
+ },
+ "capability_source": {
+  "path": "capability-matrix.json",
+  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15",
+  "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
+ },
+ "_generated_from": {
+  "generator": "scripts/gen_capability_artifacts.py",
+  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15"
+ },
+ "metric_calibers": [
+  {
+   "key": "order_count",
+   "label_zh": "订单笔数",
+   "label_en": "Order count",
+   "definition": "对账期内平台订单流笔数（按平台单号去重，重复推送只计一次）",
+   "definition_source": "recon driver: reconcile_orders_payments（连接器只读面 → 订单流）",
+   "grain": "store × day"
+  },
+  {
+   "key": "order_amount",
+   "label_zh": "订单金额",
+   "label_en": "Order amount",
+   "definition": "对账期内订单原币金额合计；本位币折算仅作呈现且须带汇率出处",
+   "definition_source": "recon driver: reconcile_orders_payments（订单流 amount 字段）",
+   "grain": "store × day"
+  },
+  {
+   "key": "payout_count",
+   "label_zh": "结算笔数",
+   "label_en": "Payout count",
+   "definition": "对账期内平台结算（payouts）笔数；结算面不可得时该指标不可得，不以订单笔数顶替",
+   "definition_source": "recon driver: fee_report（结算流 payouts）",
+   "grain": "store × day"
+  },
+  {
+   "key": "payout_amount",
+   "label_zh": "结算金额",
+   "label_en": "Payout amount",
+   "definition": "对账期内平台结算金额合计；**不得由订单金额加总推算**（佣金/运费险/补贴只在结算侧）",
+   "definition_source": "recon driver: fee_report（结算流 amount）",
+   "grain": "store × day"
+  },
+  {
+   "key": "commission",
+   "label_zh": "平台佣金",
+   "label_en": "Commission",
+   "definition": "结算侧披露的佣金合计，独立维度不与销售流水混算",
+   "definition_source": "recon driver: fee_report（raw.fees.commission）",
+   "grain": "store × settlement"
+  },
+  {
+   "key": "payment_fee",
+   "label_zh": "支付手续费",
+   "label_en": "Payment fee",
+   "definition": "结算侧披露的支付手续费合计，独立维度",
+   "definition_source": "recon driver: fee_report（raw.fees.payment_fee）",
+   "grain": "store × settlement"
+  },
+  {
+   "key": "matched_count",
+   "label_zh": "已配对笔数",
+   "label_en": "Matched count",
+   "definition": "订单与库存状态已对齐的笔数；库存腿不可得时本指标不可得，不写 0",
+   "definition_source": "recon driver: reconcile_orders_inventory（状态对齐）",
+   "grain": "store × day"
+  },
+  {
+   "key": "in_transit_count",
+   "label_zh": "在途笔数",
+   "label_en": "In-transit count",
+   "definition": "订单已发未签收导致库存未扣减的笔数，打 needs_explanation=logistics",
+   "definition_source": "recon driver: reconcile_orders_inventory（状态腿）",
+   "grain": "store × day"
+  },
+  {
+   "key": "missing_in_right",
+   "label_zh": "缺失笔数",
+   "label_en": "Missing",
+   "definition": "左有右无的差异笔数，每条带双侧原始引用",
+   "definition_source": "recon driver: align_pair（差异四类）",
+   "grain": "store × pair × day"
+  },
+  {
+   "key": "extra_in_right",
+   "label_zh": "多余笔数",
+   "label_en": "Extra",
+   "definition": "右多出的差异笔数，每条带双侧原始引用",
+   "definition_source": "recon driver: align_pair（差异四类）",
+   "grain": "store × pair × day"
+  },
+  {
+   "key": "amount_mismatch",
+   "label_zh": "金额不符笔数",
+   "label_en": "Amount mismatch",
+   "definition": "金额不一致的差异笔数（差额 = 双侧金额之差）",
+   "definition_source": "recon driver: align_pair（差异四类）",
+   "grain": "store × pair × day"
+  },
+  {
+   "key": "status_mismatch",
+   "label_zh": "状态不符笔数",
+   "label_en": "Status mismatch",
+   "definition": "状态不一致的差异笔数（如在途 vs 已签收）",
+   "definition_source": "recon driver: align_pair / align_status（差异四类）",
+   "grain": "store × pair × day"
+  }
+ ],
+ "threshold_alerts": [
+  {
+   "metric": "amount_mismatch",
+   "threshold": "0",
+   "op": "gt",
+   "severity": "high",
+   "disposal_task": "金额不符复核：逐笔对双侧原始引用，定性后走内核 proposal 车道回写（确认门在拍板席）",
+   "assignee_hint": "reconciler"
+  },
+  {
+   "metric": "status_mismatch",
+   "threshold": "0",
+   "op": "gt",
+   "severity": "medium",
+   "disposal_task": "状态不符复核：引用物流舰观测证据解释在途/签收差异，不在对账层自行判定",
+   "assignee_hint": "reconciler"
+  },
+  {
+   "metric": "missing_in_right",
+   "threshold": "0",
+   "op": "gt",
+   "severity": "high",
+   "disposal_task": "缺失笔数复核：确认收款/库存侧是否漏单，漏单挂应收（内核 proposal，科目白名单）",
+   "assignee_hint": "reconciler"
+  }
+ ]
 }

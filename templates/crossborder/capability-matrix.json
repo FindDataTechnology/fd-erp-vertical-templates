@@ -1,0 +1,330 @@
+{
+  "schema": "ecommerce-capability-matrix/v1",
+  "vertical": "crossborder",
+  "updated_at": "2026-11-10",
+  "review_window_days": {
+    "platform_api": 90,
+    "catalog_snapshot": 90,
+    "static_schema_missing": 365,
+    "merchant_erp": 90
+  },
+  "platforms": [
+    {
+      "key": "shopify",
+      "display_zh": "Shopify",
+      "display_en": "Shopify",
+      "channel_kind": "platform_api",
+      "connector": "shopify_admin",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "shopify_admin.list_orders / get_order",
+          "evidence": [
+            {
+              "kind": "provider_action",
+              "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:665",
+              "note": "list_orders / get_order 已在目录"
+            }
+          ],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture）"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "shopify_admin.list_payouts（GraphQL shopifyPaymentsAccount.payouts）",
+          "evidence": [
+            {
+              "kind": "provider_action",
+              "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:816",
+              "note": "动作已落地（2026-11-10）：runtime.ts:308 的 listPayoutsQuery；catalog 27 个动作含 list_payouts"
+            }
+          ],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "动作已落地但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "shopify_admin.list_inventory_items / get_inventory_item",
+          "evidence": [
+            {
+              "kind": "provider_action",
+              "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:669",
+              "note": "list_inventory_items / get_inventory_item 已在目录"
+            }
+          ],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "待确认（订单面含退款标记）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "退款作为独立流尚未在模板层消费；当前由订单状态与差异类型覆盖"
+        }
+      }
+    },
+    {
+      "key": "tiktok_shop",
+      "display_zh": "TikTok Shop",
+      "display_en": "TikTok Shop",
+      "channel_kind": "platform_api",
+      "connector": "tiktok_shop",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "待立 provider（官方 Shop API，BYOK）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现：全仓仅见一句文案，无 provider、无适配器"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "待立 provider（官方 Shop API 结算面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "待立 provider（官方 Shop API 库存面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "待立 provider",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现"
+        }
+      }
+    },
+    {
+      "key": "taobao",
+      "display_zh": "淘宝",
+      "display_en": "Taobao",
+      "channel_kind": "platform_api",
+      "connector": "taobao",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "待立 provider（淘宝开放平台 TOP，OAuth + session key）",
+          "evidence": [
+            {
+              "kind": "catalog_entry",
+              "ref": "open-connector-mt/docs/adr/0002-no-generic-http-provider.md",
+              "note": "目录 1570 家 provider 内无淘宝"
+            }
+          ],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "待立 provider（TOP 账单面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "待立 provider（TOP 库存面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "待立 provider",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        }
+      }
+    },
+    {
+      "key": "tmall",
+      "display_zh": "天猫",
+      "display_en": "Tmall",
+      "channel_kind": "platform_api",
+      "connector": "taobao",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "同淘宝通道（TOP，OAuth + session key）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户（与淘宝共用同一 provider）"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "同淘宝通道",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户（与淘宝共用同一 provider）"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "同淘宝通道",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户（与淘宝共用同一 provider）"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "同淘宝通道",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        }
+      }
+    },
+    {
+      "key": "jd",
+      "display_zh": "京东",
+      "display_en": "JD",
+      "channel_kind": "platform_api",
+      "connector": "jd",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "待立 provider（京东开放平台，app key + 签名）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户：目录无 provider"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "待立 provider（京东账单面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "待立 provider（京东库存面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "待立 provider",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "骨架待锚点客户"
+        }
+      }
+    },
+    {
+      "key": "merchant_erp",
+      "display_zh": "商家电商 ERP（旺店通/聚水潭等）",
+      "display_en": "Merchant e-commerce ERP",
+      "channel_kind": "merchant_erp",
+      "connector": "merchant_erp",
+      "flows": {
+        "orders": {
+          "status": "unmapped",
+          "channel": "待立 provider（电商 ERP 开放 API，BYOK）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现；国内库存腿的唯一来源，优先实现"
+        },
+        "settlements": {
+          "status": "unmapped",
+          "channel": "待立 provider（电商 ERP 结算面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现；取决于所选厂商是否开放结算面"
+        },
+        "inventory": {
+          "status": "unmapped",
+          "channel": "待立 provider（电商 ERP 库存面）",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现；国内三方对账缺此腿不成立"
+        },
+        "refunds": {
+          "status": "unmapped",
+          "channel": "待立 provider",
+          "evidence": [],
+          "measured_at": null,
+          "review_window_days": 90,
+          "reason": "通道未实现"
+        }
+      }
+    },
+    {
+      "key": "pinduoduo",
+      "display_zh": "拼多多",
+      "display_en": "Pinduoduo",
+      "channel_kind": "static_schema_missing",
+      "connector": null,
+      "flows": {
+        "orders": {
+          "status": "unavailable",
+          "channel": "不立 provider",
+          "evidence": [
+            {
+              "kind": "catalog_entry",
+              "ref": "open-connector-mt/docs/cn-commerce-skeleton-contract.md",
+              "note": "上游接口 schema 缺失"
+            }
+          ],
+          "measured_at": "2026-11-10",
+          "review_window_days": 365,
+          "reason": "上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位"
+        },
+        "settlements": {
+          "status": "unavailable",
+          "channel": "不立 provider",
+          "evidence": [],
+          "measured_at": "2026-11-10",
+          "review_window_days": 365,
+          "reason": "同上：上游 schema 缺失"
+        },
+        "inventory": {
+          "status": "unavailable",
+          "channel": "不立 provider",
+          "evidence": [],
+          "measured_at": "2026-11-10",
+          "review_window_days": 365,
+          "reason": "同上：上游 schema 缺失"
+        },
+        "refunds": {
+          "status": "unavailable",
+          "channel": "不立 provider",
+          "evidence": [],
+          "measured_at": "2026-11-10",
+          "review_window_days": 365,
+          "reason": "同上：上游 schema 缺失"
+        }
+      }
+    }
+  ]
+}
