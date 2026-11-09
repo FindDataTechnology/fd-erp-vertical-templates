@@ -1,0 +1,372 @@
+{
+  "integrations": [
+    {
+      "binding_keys": [
+        "cn-commerce-store"
+      ],
+      "external_system": "国内电商店铺（淘宝/天猫/京东）",
+      "missing": [
+        "catalog",
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "cn-commerce",
+      "provider_role": true,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": null,
+          "ok": false
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "crossborder"
+    },
+    {
+      "binding_keys": [
+        "shopify-store"
+      ],
+      "external_system": "Shopify 店铺",
+      "missing": [
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "shopify_admin",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/shopify_admin.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "crossborder"
+    },
+    {
+      "binding_keys": [
+        "pos-sales"
+      ],
+      "external_system": "门店 POS（厂商按客户插拔）",
+      "missing": [
+        "catalog",
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "pos",
+      "provider_role": true,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": null,
+          "ok": false
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "restaurant-chain"
+    },
+    {
+      "binding_keys": [
+        "payments-merchant"
+      ],
+      "external_system": "收款渠道（微信支付/支付宝/美团，商户侧）",
+      "missing": [
+        "live"
+      ],
+      "optional": true,
+      "provider": "wechatpay",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/wechatpay.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": "open-connector-mt/src/providers/wechatpay/*.test.ts (2)",
+          "ok": true
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "restaurant-chain"
+    },
+    {
+      "binding_keys": [
+        "carrier-portal"
+      ],
+      "external_system": "承运商门户/CP 页面集",
+      "missing": [
+        "catalog",
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "carrier-portal",
+      "provider_role": true,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": null,
+          "ok": false
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
+        "kingdee-cloud"
+      ],
+      "external_system": "金蝶云星空",
+      "missing": [
+        "executor_tests",
+        "live"
+      ],
+      "optional": false,
+      "provider": "kingdee",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/kingdee.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
+        "supplier-portal"
+      ],
+      "external_system": "供应商门户/SP 页面集",
+      "missing": [
+        "catalog",
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "supplier-portal",
+      "provider_role": true,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": null,
+          "ok": false
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
+        "payments-merchant"
+      ],
+      "external_system": "支付渠道（微信支付/支付宝/银联）",
+      "missing": [
+        "live"
+      ],
+      "optional": false,
+      "provider": "wechatpay",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/wechatpay.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": "open-connector-mt/src/providers/wechatpay/*.test.ts (2)",
+          "ok": true
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
+        "wms-snapshot"
+      ],
+      "external_system": "客户 WMS（品牌待定）",
+      "missing": [
+        "catalog",
+        "executor_tests",
+        "live"
+      ],
+      "optional": true,
+      "provider": "wms",
+      "provider_role": true,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": null,
+          "ok": false
+        },
+        "executor_tests": {
+          "evidence": null,
+          "ok": false
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    }
+  ],
+  "planned_surfaces": {
+    "available": true,
+    "by_capability": {
+      "supply-chain.cp": 4,
+      "supply-chain.se": 5,
+      "supply-chain.sp": 6,
+      "supply-chain.ue": 5
+    },
+    "count": 20
+  },
+  "role_bindings": [
+    {
+      "binding_keys": [
+        "supply-chain/carrier-portal"
+      ],
+      "candidates": [],
+      "install_blocked": true,
+      "reason": "目录无该角色可用 provider；由客户在连接器里选定实际品牌后按其流程新增",
+      "role": "carrier-portal",
+      "templates": [
+        "supply-chain"
+      ]
+    },
+    {
+      "binding_keys": [
+        "crossborder/cn-commerce-store"
+      ],
+      "candidates": [],
+      "install_blocked": true,
+      "reason": "目录无该角色可用 provider；由客户在连接器里选定实际品牌后按其流程新增",
+      "role": "cn-commerce",
+      "templates": [
+        "crossborder"
+      ]
+    },
+    {
+      "binding_keys": [
+        "restaurant-chain/pos-sales"
+      ],
+      "candidates": [],
+      "install_blocked": true,
+      "reason": "目录无该角色可用 provider；由客户在连接器里选定实际品牌后按其流程新增",
+      "role": "pos",
+      "templates": [
+        "restaurant-chain"
+      ]
+    },
+    {
+      "binding_keys": [
+        "supply-chain/supplier-portal"
+      ],
+      "candidates": [],
+      "install_blocked": true,
+      "reason": "目录无该角色可用 provider；由客户在连接器里选定实际品牌后按其流程新增",
+      "role": "supplier-portal",
+      "templates": [
+        "supply-chain"
+      ]
+    },
+    {
+      "binding_keys": [
+        "supply-chain/wms-snapshot"
+      ],
+      "candidates": [],
+      "install_blocked": true,
+      "reason": "目录无该角色可用 provider；由客户在连接器里选定实际品牌后按其流程新增",
+      "role": "wms",
+      "templates": [
+        "supply-chain"
+      ]
+    }
+  ],
+  "schema": "erp-connector-status/v1",
+  "source": {
+    "bindings": "templates/*/connector-pack/pack.json#connector_bindings",
+    "catalog": "open-connector-mt/catalog/apps",
+    "live_acceptance": "connector-live-acceptance.json",
+    "planned_surfaces": "fd-erp-vertical-api/planned-surfaces.json",
+    "provider_tests": "open-connector-mt/src/providers/*/*.test.ts"
+  },
+  "verdict": {
+    "connected": [],
+    "not_connected": [
+      "crossborder/cn-commerce",
+      "crossborder/shopify_admin",
+      "restaurant-chain/pos",
+      "restaurant-chain/wechatpay",
+      "supply-chain/carrier-portal",
+      "supply-chain/kingdee",
+      "supply-chain/supplier-portal",
+      "supply-chain/wechatpay",
+      "supply-chain/wms"
+    ],
+    "problems": []
+  }
+}

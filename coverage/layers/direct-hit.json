@@ -1,0 +1,375 @@
+{
+  "count": 23,
+  "layer": "直接命中",
+  "points": [
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/pickup-checkin",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-pickup-checkin",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-CD5B02C27D"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/dock-slots",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/dock-reservation",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-dock-reserve",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-BC2932A296"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/pod",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-pod-report",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-C3B02ABA17"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/waybills/{waybillId}/events",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-track",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-5010FFCC3F"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/waybills",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/waybills/{waybillId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/cp/waybills/{waybillId}/accept",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-waybill-accept",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-742B8457EE"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/customers/{customerId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/se/customers/{customerId}/orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-customer-detail",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-C032E7BB05"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/customers",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/se/leads",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-customer-list",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-CC82FF6C73"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/customers/{customerId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/se/customers/{customerId}/orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-customer-detail",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-E84EAB55A9"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/se/orders/proxy",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-order-proxy",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-1E69992459"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/se/orders/{orderId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-order-track",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-EC4D471F9F"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/se/alerts/{alertId}/handle",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-alert-handle",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-1822A792BC"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/alerts",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-alert-inbox",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-7CF33FD696"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/arrival-notices",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/sp/arrival-notices",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-arrival-notice",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-50D3E0D442"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/sp/purchase-orders/{poId}/delivery-feedback",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-delivery-feedback",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-E1C45B5CCC"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/purchase-orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/purchase-orders/{poId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/sp/purchase-orders/{poId}/accept",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-order-accept",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-66D8EBC76A"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "DELETE /erp/supply-chain/v1/ue/cart/lines/{lineId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/cart",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/cart/lines",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/cart/price-preview",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-cart",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-D63CCF3DE1"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-order-create",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-B543162F57"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/product-categories",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/products",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-home",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-41B8E314D1"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/products",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-product-search",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-D5890ABFEE"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/products/{productId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-product-detail",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-985DE80226"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/statements",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/statements/{statementId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/statements/{statementId}/confirm",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-statement-confirm",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-CB05DC4DFA"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/orders/{orderId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-order-detail",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-9325149B93"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/orders",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-order-list",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-E4C7579834"
+    }
+  ],
+  "schema": "erp-coverage-layers/v1",
+  "vertical": "supply-chain"
+}

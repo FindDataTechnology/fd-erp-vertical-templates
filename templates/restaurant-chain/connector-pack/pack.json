@@ -126,7 +126,7 @@
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付/外卖写真 id。已上架：市场 v1（packId 3RZRBdc66rKdLV5I8tuKIg），无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
+  "note": "已上架：市场 v2（packId 3RZRBdc66rKdLV5I8tuKIg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付写真 id；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {
@@ -143,7 +143,9 @@
     "erp-restaurant-recon-discipline": {
      "description": "Restaurant chain reconciliation discipline: three-way store reconciliation, the three stages of daily close, unadapted vendors reported honestly, an export-file fallback channel, zero writes to the channel side, and the fund red line."
     }
-   }
+   },
+   "notes": "Published: market v2 (packId 3RZRBdc66rKdLV5I8tuKIg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: POS uses a role binding (the customer picks the vendor) and payments use real ids; unadapted vendors are reported honestly with a file-export fallback."
   }
- }
+ },
+ "notes": "已上架：市场 v2（packId 3RZRBdc66rKdLV5I8tuKIg）。只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；POS 用角色绑定（客户自己选厂商），支付写真 id；未适配厂商如实报出 + 导出文件替代通道。"
 }

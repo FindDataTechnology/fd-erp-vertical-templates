@@ -348,8 +348,12 @@ restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三
 | 包 | packId | 首版 | 现状 |
 | --- | --- | --- | --- |
 | 供应链连接器包 | `y8gnMHFMze-Mylsd6JXpkA` | v1 → 现 v3 | 角色绑定 + 纠正声明 |
-| 餐饮连锁连接器包 | `3RZRBdc66rKdLV5I8tuKIg` | v1 | 角色 `pos` + 两条真 id |
-| 跨境电商连接器包 | `cv0kj9mRHGrz6nNMA7glVg` | v1 | 真 id `shopify` + 角色 `cn-commerce` |
+| 餐饮连锁连接器包 | `3RZRBdc66rKdLV5I8tuKIg` | v1 → 现 v2 | 角色 `pos` + 支付真 id（v2 面级纠错：删 `delivery-settlement`、备选去 `meituan`） |
+| 跨境电商连接器包 | `cv0kj9mRHGrz6nNMA7glVg` | v1 → 现 v2 | 真 id `shopify_admin` + 角色 `cn-commerce`（v2 面级纠错：`shopify` → `shopify_admin`） |
+
+> 本表与 §8.1 的口径同源：`publish-record.json` 是唯一出处，改市场版本先改记录、
+> 再跑 `publish-notes` 重写 pack 三处注记；文档、记录、市场台账（兄弟仓
+> `fleet-packs/README.md` 机器台账）三处不一致即判红。
 
 上架踩到的门（记下来省下一次）：**官方身份发新包时市场强制要求 en 展示面全覆盖**
 （`name` / `description` / `tags` / 每个 skill 的 `description`），缺一项即

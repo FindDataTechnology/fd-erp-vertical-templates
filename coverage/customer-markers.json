@@ -1,0 +1,5 @@
+{
+  "schema": "erp-coverage-customer-markers/v1",
+  "note": "客户名 denylist（只有名字，不含任何清单条目正文）。覆盖矩阵校验时，条目里出现这些名字即拒绝并点名。可用环境变量 ERP_COVERAGE_CUSTOMER_MARKERS（逗号分隔）追加；公司全称后缀（有限公司/股份有限公司）另有通用规则，不依赖本文件。",
+  "markers": ["全日", "全日供应链", "全日数字"]
+}

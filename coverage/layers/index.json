@@ -1,0 +1,38 @@
+{
+  "commercial_claims": [],
+  "layers": [
+    {
+      "count": 23,
+      "file": "direct-hit.json",
+      "key": "direct-hit",
+      "layer": "直接命中"
+    },
+    {
+      "count": 12,
+      "file": "pattern-reuse.json",
+      "key": "pattern-reuse",
+      "layer": "模式复用"
+    },
+    {
+      "count": 0,
+      "file": "new-build.json",
+      "key": "new-build",
+      "layer": "新建"
+    },
+    {
+      "count": 0,
+      "file": "not-doing.json",
+      "key": "not-doing",
+      "layer": "不做"
+    }
+  ],
+  "matrix_fingerprint": "sha256:b03aea81e89cc33e4fb1ada68d50cc80ff4485e9cbecc554033704741277eaea",
+  "schema": "erp-coverage-layers/v1",
+  "totals": {
+    "不做": 0,
+    "新建": 0,
+    "模式复用": 12,
+    "直接命中": 23
+  },
+  "vertical": "supply-chain"
+}

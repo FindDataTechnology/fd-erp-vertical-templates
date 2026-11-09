@@ -7,7 +7,7 @@
   "description_zh": "行业模板四件套：连接器 pack（POS BYOK 适配器框架 + 收款渠道商户侧适配 + 外卖结算）+ 门店日结舰队蓝图（巡检/核对/拍板，多门店错峰）+ 科目映射 pack（门店营业收入/平台佣金等对齐内核通用科目）+ 报表 preset（日报三段/佣金核对/分成核对单/映射看板）。资金红线模板层落死：分成只出核对对账单与核对指令，无任何资金执行工具面。重域（中央厨房/BOM/排班/会员/采购）如实挂账不在范围。",
   "description_en": "Four-piece vertical template: connector pack (POS BYOK adapter framework + merchant-side payment channels + delivery settlement) + daily-close fleet blueprint (staggered per-store cadence) + account mapping pack + report preset (three-section daily close, commission check, share verification statement). Fund red line enforced at template layer: verification data only, zero fund-execution surface. Heavy domains honestly out of scope.",
   "assets": {
-    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.0.0"},
+    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.2.0"},
     "fleet_blueprint": {"kind": "fleet-blueprint", "path": "dailyclose-fleet/template.json", "version": "1.0.0"},
     "account_mapping_pack": {"kind": "pack", "path": "account-mapping/pack.json", "version": "1.0.0"},
     "report_preset": {"kind": "report-preset", "path": "report-preset/preset.json", "version": "1.0.0"}

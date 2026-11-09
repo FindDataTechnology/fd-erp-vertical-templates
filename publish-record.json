@@ -1,0 +1,73 @@
+{
+ "schema": "erp-template-publish-record/v1",
+ "note": "发布状态唯一出处（design D4）。pack 内三处注记（顶层 notes / i18n.en.notes / _casting.note）由 `publish-notes` 从本文件派生，校验器逐处比对。市场版本与 packId 的实测出处见 evidence：兄弟仓 fleet-packs/README.md 的机器台账是 cast 脚本与漂移哨共用的那张表；`publish_gate` 逐包对拍。未上架的包也必须显式写 published=false（不许用缺省值冒充）。",
+ "updated_at": "2026-11-10",
+ "surfaces": {
+  "note": "发布面（非 pack 类）：官网 deploy / 网关 rollout / registry 写入的 live 状态只能写在这里，且必须带证据。claims 里 assert_live 指向本段——宣称已 live 而这里为空或 live=false 即判红（task 4.5）。",
+  "official-web.deploy": {"live": false, "evidence": "本地内容完整性 gate 通过（0 hits）；site deploy 需真实凭据，未执行"},
+  "gateway.rollout": {"live": false, "evidence": "无集群变更记录"},
+  "registry.snapshot": {"live": false, "evidence": "未写入 registry"},
+  "market.connector-packs": {"live": true, "evidence": "packs 段逐包记录 + 兄弟仓 fleet-packs/README.md 机器台账"}
+ },
+ "packs": {
+  "supply-chain/connector-pack": {
+   "asset": "connector-pack/pack.json",
+   "published": true,
+   "market_version": 3,
+   "pack_id": "y8gnMHFMze-Mylsd6JXpkA",
+   "published_at": "2026-11-08",
+   "channel": "facet-market",
+   "evidence": [
+    "fleet-packs/README.md#机器台账: supply-chain-connector-pack v3",
+    "docs/connector-onboarding-supply-chain.md#5.1",
+    "docs/connector-onboarding-supply-chain.md#8.1",
+    "templates/supply-chain/connector-pack/pack.json#_casting"
+   ],
+   "derivation": "applied",
+   "notes": {
+    "notes": "只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED",
+    "notes_en": "Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted; an unconnected provider is reported as NOT_WIRED",
+    "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id；无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）"
+   }
+  },
+  "restaurant-chain/connector-pack": {
+   "asset": "connector-pack/pack.json",
+   "published": true,
+   "market_version": 2,
+   "pack_id": "3RZRBdc66rKdLV5I8tuKIg",
+   "published_at": "2026-11-08",
+   "channel": "facet-market",
+   "evidence": [
+    "fleet-packs/README.md#机器台账: restaurant-chain-connector-pack v2（面级纠错：删 delivery-settlement / payments 备选去 meituan）",
+    "docs/connector-onboarding-supply-chain.md#5.1",
+    "docs/connector-onboarding-supply-chain.md#8.1"
+   ],
+   "derivation": "applied",
+   "notes": {
+    "notes": "只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；POS 用角色绑定（客户自己选厂商），支付写真 id；未适配厂商如实报出 + 导出文件替代通道",
+    "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: POS uses a role binding (the customer picks the vendor) and payments use real ids; unadapted vendors are reported honestly with a file-export fallback",
+    "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付写真 id；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
+   }
+  },
+  "crossborder/connector-pack": {
+   "asset": "connector-pack/pack.json",
+   "published": true,
+   "market_version": 2,
+   "pack_id": "cv0kj9mRHGrz6nNMA7glVg",
+   "published_at": "2026-11-08",
+   "channel": "facet-market",
+   "evidence": [
+    "fleet-packs/README.md#机器台账: crossborder-connector-pack v2（面级纠错：shopify-store provider → shopify_admin）",
+    "docs/connector-onboarding-supply-chain.md#5.1",
+    "docs/connector-onboarding-supply-chain.md#8.1"
+   ],
+   "derivation": "pending",
+   "derivation_reason": "templates/crossborder/pack.json 正被并行 session 改（capability_matrix 采纳），本 change 不碰；待其落地后跑 `publish-notes --template templates/crossborder` 重写三处，并把 derivation 置 applied",
+   "notes": {
+    "notes": "只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；Shopify 写真 id，国内平台用角色绑定；拼多多上游 schema 缺失故不声明",
+    "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: Shopify uses a real id and CN platforms use role bindings; Pinduoduo is not declared because the upstream schema is missing",
+    "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。Shopify 写真 id，国内平台用角色绑定（客户自己选平台）；拼多多上游 schema 缺失故不声明；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
+   }
+  }
+ }
+}

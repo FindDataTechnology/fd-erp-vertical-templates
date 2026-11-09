@@ -9,7 +9,7 @@
   "连接器",
   "只读滩头"
  ],
- "notes": "publish-ready 源清单（未上架，packId 未铸造）：只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED。",
+ "notes": "已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA）。只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED。",
  "visibility": "public",
  "category": "facet",
  "connector_bindings": [
@@ -133,13 +133,13 @@
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id。已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA），无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。"
+  "note": "已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id；无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {
    "name": "Warehousing & distribution connector pack",
    "description": "Connector pack for the warehousing & distribution template: every external integration goes through the open-connector carrier (multi-tenant, credentials never leave its vault). Kingdee Cloud Galaxy uses the directory provider (live verification pending); the customer's WMS, supplier portal and carrier portal are declared as connector roles — the pack names the kind of system it needs and the customer picks the actual vendor in their own connector, so no same-named directory provider is required; payment channels use merchant-side connectors (read-only statements plus callback records); the template keeps push/return instructions only, with zero external writes. This pack declares the binding contract and read-only boundaries; an unchosen role or an uncovered surface is reported as such by the status face, and no provider implementation is embedded.",
-   "notes": "Publish-ready source (not yet published; packId not minted). Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted.",
+   "notes": "Published: market v3 (packId y8gnMHFMze-Mylsd6JXpkA). Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted; an unconnected provider is reported as NOT_WIRED.",
    "tags": [
     "ERP",
     "warehousing & distribution",

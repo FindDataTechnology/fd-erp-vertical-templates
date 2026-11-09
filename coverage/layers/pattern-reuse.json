@@ -1,0 +1,184 @@
+{
+  "count": 12,
+  "layer": "模式复用",
+  "points": [
+    {
+      "evidence": [
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-ai-assistant",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-E53D49970F"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/freight-statements",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/cp/freight-statements/{statementId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/cp/freight-statements/{statementId}/confirm",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/cp-carrier/manifest.json#page/cp-reconciliation",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-17BEB36689"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-ai-assistant",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-81419990AE"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/visits",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/se/leads",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/se/visits",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-lead-visit",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-C5180255DF"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-ai-assistant",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-F297C80EED"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/invoices",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/sp/invoices",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-invoice-upload",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-27A1358226"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/settlements",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-payment-view",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-565645923D"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/statements",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/sp/statements/{statementId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/sp/statements/{statementId}/confirm",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/sp-supplier/manifest.json#page/sp-reconciliation",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-1C71CD5911"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-ai-assistant",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-B05562FB95"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/aftersale-requests",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-aftersale-apply",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-3417FD3390"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/aftersale-requests",
+          "type": "endpoint"
+        },
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/aftersale-requests/{requestId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-aftersale-detail",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-71D59BF175"
+    },
+    {
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/ue/invoice-requests",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/invoice-requests",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-invoice-apply",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-A22470015A"
+    }
+  ],
+  "schema": "erp-coverage-layers/v1",
+  "vertical": "supply-chain"
+}

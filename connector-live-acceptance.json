@@ -1,0 +1,5 @@
+{
+  "schema": "erp-connector-live-acceptance/v1",
+  "note": "live 验收记录的唯一出处。live 态只能在这里写入并附证据路径（相对 finddata 根）；evidence 指向的文件必须真实存在，否则派生器判失败。没有真实凭据就不要写。",
+  "accepted": {}
+}

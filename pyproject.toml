@@ -17,6 +17,9 @@ dev = [
     "psycopg[binary]>=3.1",
     "psycopg-pool>=3.2",
     "fastmcp>=2",
+    # 内核包（sys.path 引入，未进打包依赖）自 optimize-erp-solution 6.1 起在 import
+    # 时就需要 prometheus_client；不声明则 dev 安装后跑测试直接 ImportError。
+    "prometheus_client>=0.20",
 ]
 
 [project.scripts]

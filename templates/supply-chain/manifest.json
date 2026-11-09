@@ -7,7 +7,7 @@
   "description_zh": "行业模板四件套 + 扩展 pack：连接器 pack（金蝶/WMS/支付/门户只读与留痕面）+ 仓配分销舰队蓝图（巡检/核对/拍板错峰，账实一致差异清单驱动）+ 科目映射 pack（呈现层对齐内核通用科目）+ 报表 preset（四组报表 + 指标口径单一出处 + 阈值预警派处置任务）；扩展件：取价规则 pack（三层规则带生效期与出处）+ 四端页面集 pack（壹座底座契约）。编排层零写 WMS/门户，作业执行在外部系统；账务全部经内核工具面确认车道。",
   "description_en": "Four-piece vertical template + extension packs: connector pack (read-only and trace surfaces for ERP/WMS/payments/portals) + warehousing distribution fleet blueprint (staggered watch/reconcile/approve posts, book-vs-physical diff driven) + account mapping pack (presentation layer over kernel universal accounts) + report preset (four reports + single-source metric calibers + threshold alerts dispatching disposal tasks); extensions: pricing rules pack (three-layer rules with validity and source) + four-end pagesets pack (miniapp base contracts). Orchestration layer writes nothing to WMS/portals — execution lives in external systems; all accounting goes through kernel tool confirmation lanes.",
   "assets": {
-    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.0.0"},
+    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.1.0"},
     "fleet_blueprint": {"kind": "fleet-blueprint", "path": "warehousing-fleet/template.json", "version": "1.0.0"},
     "account_mapping_pack": {"kind": "pack", "path": "account-mapping/pack.json", "version": "1.0.0"},
     "report_preset": {"kind": "report-preset", "path": "report-preset/preset.json", "version": "1.0.0"},

@@ -1,0 +1,55 @@
+{
+ "schema": "erp-connector-gaps/v1",
+ "note": "连接器缺口清单（唯一出处，task 3.8）。四项必填：银联无 provider / 客户 WMS 无 provider / 支付有 provider 而 ERP 未接线 / 金蝶执行器无测试。每项带 detect（机器判据）——跨仓实测已解除而本仓仍写 open 即判红；登记 resolved 而实测未解除同样判红。责任仓：连接器 provider 归 open-connector-mt（独立 openspec 根），ERP 接线归本仓。",
+ "updated_at": "2026-11-10",
+ "gaps": [
+  {
+   "id": "unionpay-no-provider",
+   "capability": "银联收款渠道（结算流水只读）",
+   "responsible_repo": "open-connector-mt",
+   "blocking": "目录无 unionpay provider；模板层只能声明角色/真 id，不得以自建 HTTP 适配补齐（ADR 0002）",
+   "status": "open",
+   "fix": "在 open-connector-mt 按 SDK/definition 流程新增 unionpay provider（auth 用 custom_credential，首版 read 账单下载 + trigger 回调记录），刷新 connector-status.json；anchor 客户有银联需求才立项",
+   "detect": {"kind": "catalog_provider", "provider": "unionpay"},
+   "evidence": ["open-connector-mt/catalog/apps（无 unionpay.json）",
+                "templates/supply-chain/connector-pack/pack.json#connector_bindings payments-merchant"]
+  },
+  {
+   "id": "wms-no-provider",
+   "capability": "客户 WMS（库存快照只读，角色绑定 wms）",
+   "responsible_repo": "open-connector-mt",
+   "blocking": "目录无任何可映射到角色 wms 的 provider，角色候选集为空 → 安装该角色绑定被阻断（bindings.py）",
+   "status": "open",
+   "fix": "品牌由锚点客户确定后按 open-connector-mt 流程新增 provider 与角色映射；骨架契约见 open-connector-mt/docs/（WMS 角色）",
+   "detect": {"kind": "role_candidates", "role": "wms"},
+   "evidence": ["connector-status.json#role_bindings[wms].candidates = []",
+                "templates/supply-chain/connector-pack/pack.json#connector_bindings wms-snapshot"]
+  },
+  {
+   "id": "payments-not-wired",
+   "capability": "支付渠道结算读取（微信支付/支付宝，经连接器运行时）",
+   "responsible_repo": "fd-erp-vertical-templates",
+   "blocking": "此前 ERP 侧自建 generic HTTP 结算适配（绕过连接器载体）；现已改为经 RuntimeClient 调 wechatpay.download_bill / alipay.download_settlement_bill，并由 gate 禁止回退",
+   "status": "resolved",
+   "resolved_at": "2026-11-09",
+   "fix": "已解除。live 面仍缺验收：见 connector-status.json 中 wechatpay/alipay 的 live 态（缺验收记录不得声明已接通）",
+   "detect": {"kind": "erp_runtime_path",
+              "module": "fd_erp_vertical_templates/connectors/payments.py",
+              "providers": ["wechatpay", "alipay"]},
+   "evidence": ["fd_erp_vertical_templates/connectors/payments.py（RuntimeClient + CHANNEL_PROVIDERS）",
+                "scripts/payment_direct_call_gate.py（禁止新增自建直连）",
+                "tests/test_payment_direct_call_gate.py"]
+  },
+  {
+   "id": "kingdee-no-executor-test",
+   "capability": "金蝶云星空（凭证/单据同步）",
+   "responsible_repo": "open-connector-mt",
+   "blocking": "目录有 kingdee provider，但执行器目录无测试文件（*.test.ts 计数为 0）",
+   "status": "open",
+   "fix": "在 open-connector-mt/src/providers/kingdee 补执行器测试（动作面覆盖 query_records/push_records 的 read/write 归因），随后 build_connector_status.py 的 executor_tests 态自动转绿",
+   "detect": {"kind": "executor_tests", "provider": "kingdee", "min": 1},
+   "evidence": ["connector-status.json#integrations[kingdee].states.executor_tests.ok = false",
+                "open-connector-mt/src/providers/kingdee（无 *.test.ts）"]
+  }
+ ]
+}
