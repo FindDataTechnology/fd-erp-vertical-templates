@@ -163,12 +163,12 @@
  },
  "capability_source": {
   "path": "capability-matrix.json",
-  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15",
+  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6",
   "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15"
+  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6"
  },
  "metric_calibers": [
   {

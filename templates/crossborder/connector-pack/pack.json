@@ -218,7 +218,7 @@
  },
  "capability": {
   "source": "capability-matrix.json",
-  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15",
+  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6",
   "platforms": {
    "shopify": {
     "display_zh": "Shopify",
@@ -231,7 +231,7 @@
      },
      "settlements": {
       "status": "unmapped",
-      "reason": "动作已落地但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
+      "reason": "payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
      },
      "inventory": {
       "status": "unmapped",
@@ -386,7 +386,7 @@
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15"
+  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6"
  },
  "notes": "已上架：市场 v2（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志。"
 }

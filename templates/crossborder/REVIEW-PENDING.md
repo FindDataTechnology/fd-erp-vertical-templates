@@ -1,6 +1,6 @@
 # 待补复核清单（能力矩阵）
 
-> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:1f86722852120f524c9ad2866810bd10c050830f203ceab89c94393e4f26ab15`）。
+> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6`）。
 > 生成时刻的矩阵状态：{'available': 0, 'unavailable': 4, 'unmapped': 24}。
 
 ## 未接通（unmapped）：24 格
@@ -18,7 +18,7 @@
 | shopify | inventory | provider 动作存在（动作面已核对 catalog），但无真实店读取记录 | 做一次真实读取并留测量记录 |
 | shopify | orders | provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture） | 做一次真实读取并留测量记录 |
 | shopify | refunds | 退款作为独立流尚未在模板层消费；当前由订单状态与差异类型覆盖 | 在连接器目录立 provider 并实现只读动作 |
-| shopify | settlements | 动作已落地但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格 | 做一次真实读取并留测量记录 |
+| shopify | settlements | payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格 | 确认承载通道是否已部署，再补证据 |
 | taobao | inventory | 骨架待锚点客户 | 在连接器目录立 provider 并实现只读动作 |
 | taobao | orders | 骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现 | 确认承载通道是否已部署，再补证据 |
 | taobao | refunds | 骨架待锚点客户 | 在连接器目录立 provider 并实现只读动作 |

@@ -37,12 +37,17 @@
             {
               "kind": "provider_action",
               "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:816",
-              "note": "动作已落地（2026-11-10）：runtime.ts:308 的 listPayoutsQuery；catalog 27 个动作含 list_payouts"
+              "note": "list_payouts 已在目录（catalog 27 项）"
+            },
+            {
+              "kind": "runtime_read",
+              "ref": "POST /v1/actions/shopify_admin.list_payouts → 401（动作已注册，无凭证=AUTH_FAILED 而非 404）",
+              "note": "runtime 冒烟 2026-11-10：动作接线成功，无真实凭证故未读到数据"
             }
           ],
           "measured_at": null,
           "review_window_days": 90,
-          "reason": "动作已落地但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
+          "reason": "payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
         },
         "inventory": {
           "status": "unmapped",
