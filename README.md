@@ -55,9 +55,11 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # 边界审计（只读，零写路径）
 .venv/bin/fd-erp-vertical-templates audit
 .venv/bin/fd-erp-vertical-templates validate --template templates/crossborder
-.venv/bin/fd-erp-vertical-templates capability-check --template templates/crossborder
-.venv/bin/fd-erp-vertical-templates release-check --template templates/crossborder \
-    --ledger releases/ledger.jsonl
+# 全部一致性门（10 道，一次跑完；CI 与人工共用这一条）
+python3 scripts/check_all.py
+
+# 单独跑某几道
+python3 scripts/check_all.py 发布门 提交材料
 
 # 测试（e2e 需真实 Postgres，DB 约束层不可 mock）
 ERP_LEDGER_DATABASE_URL="postgresql://..." .venv/bin/pytest -q
