@@ -194,10 +194,11 @@ class FakeCreditKernel:
         return dict(self.state)
 
     def reserve_credit(self, customer_id, stable_id, amount, currency,
-                       source_ref=None):
+                       source_ref=None, expires_at=None):
+        assert expires_at, "占用必须带失效时点（模板层按单据类型给出）"
         self.reserve_calls.append({"customer_id": customer_id,
                                    "stable_id": stable_id, "amount": amount,
-                                   "currency": currency})
+                                   "currency": currency, "expires_at": expires_at})
         from decimal import Decimal
         self.state["reserved"] = str(Decimal(self.state["reserved"])
                                      + Decimal(amount))
@@ -205,8 +206,9 @@ class FakeCreditKernel:
                                       - Decimal(amount))
         return {"stable_id": stable_id, "status": "reserved"}
 
-    def release_credit(self, customer_id, stable_id):
-        self.release_calls.append((customer_id, stable_id))
+    def release_credit(self, customer_id, stable_id, released_by="system", reason=None):
+        self.release_calls.append({"customer_id": customer_id, "stable_id": stable_id,
+                                   "released_by": released_by, "reason": reason})
         return {"stable_id": stable_id, "status": "released"}
 
 
@@ -255,10 +257,12 @@ def test_order_accept_confirm_handoff_and_cancel(tmp_path, order_board):
     confirmed = board.confirm_order(out["request_id"], decided_by="owner")
     assert confirmed["status"] == "confirmed"
     assert confirmed["handoff_ref"].startswith("FH-")  # 履约移交记录
-    # 取消：信用回冲经内核 release_credit
+    # 取消：信用回冲经内核 release_credit，且带上"谁取消、凭什么"
     cancelled = board.cancel_order(out["order_ref"], "客户改单")
     assert cancelled["status"] == "cancelled"
-    assert kernel.release_calls and kernel.release_calls[0][1] == call["stable_id"]
+    assert kernel.release_calls and kernel.release_calls[0]["stable_id"] == call["stable_id"]
+    assert kernel.release_calls[0]["released_by"] == "agent"
+    assert "客户改单" in (kernel.release_calls[0]["reason"] or "")
 
 
 def test_order_frozen_customer_blocked(tmp_path, order_board):

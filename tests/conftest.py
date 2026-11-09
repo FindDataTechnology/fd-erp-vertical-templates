@@ -161,19 +161,28 @@ class InProcessKernelClient:
         return billing
 
     def reserve_credit(self, customer_id, stable_id, amount, currency,
-                       source_ref=None):
+                       source_ref=None, expires_at=None):
         mod = self._credit_mod()
         with connection(self._s) as conn:
             return mod.reserve_credit(
                 conn, settings=self._s, tenant_id=self._tenant,
                 customer_id=customer_id, stable_id=stable_id, amount=amount,
-                currency=currency, source_ref=source_ref)
+                currency=currency, source_ref=source_ref, expires_at=expires_at)
 
-    def release_credit(self, customer_id, stable_id):
+    def list_credit_reservations(self, customer_id=None, include_expired=True):
+        mod = self._credit_mod()
+        with connection(self._s) as conn:
+            rows = mod.list_reservations(conn, tenant_id=self._tenant,
+                                         customer_id=customer_id,
+                                         include_expired=include_expired)
+            return {"ok": True, "rows_returned": len(rows), "reservations": rows}
+
+    def release_credit(self, customer_id, stable_id, released_by="system", reason=None):
         mod = self._credit_mod()
         with connection(self._s) as conn:
             return mod.release_credit(conn, settings=self._s, tenant_id=self._tenant,
-                                      customer_id=customer_id, stable_id=stable_id)
+                                      customer_id=customer_id, stable_id=stable_id,
+                                      released_by=released_by, reason=reason)
 
     def query_credit(self, customer_id):
         mod = self._credit_mod()

@@ -67,10 +67,10 @@ class _FakeCredit:
         return dict(self.state)
 
     def reserve_credit(self, customer_id, stable_id, amount, currency,
-                       source_ref=None):
+                       source_ref=None, expires_at=None):
         return {"stable_id": stable_id, "status": "reserved"}
 
-    def release_credit(self, customer_id, stable_id):
+    def release_credit(self, customer_id, stable_id, released_by="system", reason=None):
         return {"stable_id": stable_id, "status": "released"}
 
 

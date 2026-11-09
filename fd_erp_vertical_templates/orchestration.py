@@ -18,7 +18,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -30,6 +32,18 @@ from .masterdata import MasterData
 from .pricing import PricingRuleBook
 
 ORCH_SCHEMA = "erp-supply-orchestration/v1"
+
+
+def _order_reservation_days() -> int:
+    """订单占用的存续期（天）：模板层按单据类型声明，内核只校验上界。
+
+    该值是"一张订单从受理到确认最多等多久"的业务口径，不是技术默认值——
+    所以放在模板层并可由部署覆盖，而不是藏在内核里。
+    """
+    try:
+        return max(1, int(os.environ.get("ERP_ORDER_RESERVATION_DAYS", "7")))
+    except ValueError:
+        return 7
 
 
 def _dec(value: Any, what: str) -> Decimal:
@@ -528,13 +542,18 @@ class OrderOrchestrator:
             }
 
         # ---- 3) 信用占用（账本记账；stable_id 幂等）----
+        # 失效时点由模板层按单据类型给出：内核行业无关，不知道一张订单该活多久。
+        # 未声明的占用无法被识别为孤儿（change: close-orphan-credit-reservations）。
         order_seed = f"{self._tenant}|{customer_id}|{day}|{uuid.uuid4().hex}"
         order_ref = _ref("SO", order_seed)
         credit_stable = hashlib.sha1(
             f"credit-reserve|{self._tenant}|{order_ref}".encode()).hexdigest()
+        expires_at = (
+            datetime.now(timezone.utc) + timedelta(days=_order_reservation_days())
+        ).isoformat()
         reserve = self._kernel.reserve_credit(
             str(customer_id), credit_stable, _fmt(total.quantize(Decimal("0.000001"))),
-            self._currency, source_ref=f"order:{order_ref}")
+            self._currency, source_ref=f"order:{order_ref}", expires_at=expires_at)
 
         # ---- 4) 订单提案（模板确认车道）----
         self._append({"record": "order", "ref": order_ref,
@@ -598,7 +617,8 @@ class OrderOrchestrator:
                                 f"订单不可取消（当前 {po.get('status')}）：{order_ref}")
         res = po["payload"].get("credit_reservation") or {}
         release = self._kernel.release_credit(
-            po["payload"]["customer_id"], res.get("stable_id"))
+            po["payload"]["customer_id"], res.get("stable_id"),
+            released_by=requested_by, reason=f"order cancelled: {reason}")
         self._append({"record": "order", "ref": order_ref,
                       "event": "cancelled", "status": "cancelled",
                       "payload": {"reason": reason, "release": release},

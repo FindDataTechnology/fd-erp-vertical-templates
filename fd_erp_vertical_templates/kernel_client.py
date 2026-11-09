@@ -73,16 +73,27 @@ class KernelClient(Protocol):
     # ---- 信用额度扩展（占用/释放/回冲由账本记账，design D4）----
 
     def reserve_credit(self, customer_id: str, stable_id: str, amount: str,
-                       currency: str, source_ref: str | None = None) -> dict[str, Any]:
-        """占用信用额度（账本记账；stable_id 幂等，同单重推只占一次）。"""
+                       currency: str, source_ref: str | None = None,
+                       expires_at: str | None = None) -> dict[str, Any]:
+        """占用信用额度（账本记账；stable_id 幂等，同单重推只占一次）。
+
+        `expires_at` 必填：占用没有失效时点就无法被识别为孤儿占用。
+        """
         ...
 
-    def release_credit(self, customer_id: str, stable_id: str) -> dict[str, Any]:
+    def release_credit(self, customer_id: str, stable_id: str,
+                       released_by: str = "system",
+                       reason: str | None = None) -> dict[str, Any]:
         """释放/回冲信用额度（按占用 stable_id 定位）。"""
         ...
 
     def query_credit(self, customer_id: str) -> dict[str, Any]:
         """查询信用额度：{limit, ar_balance, reserved, available}。"""
+        ...
+
+    def list_credit_reservations(self, customer_id: str | None = None,
+                                 include_expired: bool = True) -> dict[str, Any]:
+        """列出信用占用明细（只读）。孤儿报表用它取占用侧的事实。"""
         ...
 
     # ---- 计费引擎扩展（erp-billing-engine 工具面）----
@@ -217,17 +228,23 @@ class McpKernelClient:
     # ---- 信用额度扩展（MCP 工具面同形；内核未上线时 fastmcp 如实报 UNKNOWN_TOOL）----
 
     def reserve_credit(self, customer_id, stable_id, amount, currency,
-                       source_ref=None):
+                       source_ref=None, expires_at=None):
         return self._call("reserve_credit", {
             "customer_id": customer_id, "stable_id": stable_id,
-            "amount": str(amount), "currency": currency, "source_ref": source_ref})
+            "amount": str(amount), "currency": currency, "source_ref": source_ref,
+            "expires_at": expires_at})
 
-    def release_credit(self, customer_id, stable_id):
+    def release_credit(self, customer_id, stable_id, released_by="system", reason=None):
         return self._call("release_credit", {
-            "customer_id": customer_id, "stable_id": stable_id})
+            "customer_id": customer_id, "stable_id": stable_id,
+            "released_by": released_by, "reason": reason})
 
     def query_credit(self, customer_id):
         return self._call("query_credit", {"customer_id": customer_id})
+
+    def list_credit_reservations(self, customer_id=None, include_expired=True):
+        return self._call("list_credit_reservations", {
+            "customer_id": customer_id, "include_expired": include_expired})
 
     # ---- 计费引擎扩展（MCP 工具面同形）----
 
