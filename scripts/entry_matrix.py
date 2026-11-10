@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""入口矩阵（change `ship-ecommerce-commercial` 任务 4.2）。
+"""入口矩阵（spec `ecommerce-release-gates`，任务 4.2；原 change `ship-ecommerce-commercial` 已于 2026-11-10 归档）。
 
 对外入口只认台账，不认「我觉得已经发了」：
 

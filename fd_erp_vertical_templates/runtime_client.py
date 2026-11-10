@@ -1,4 +1,4 @@
-"""连接器运行时客户端（change `wire-ecommerce-merchant-channels` 任务 1.1-1.3）。
+"""连接器运行时客户端（spec `ecommerce-merchant-channel-wiring`，任务 1.1-1.3；原 change `wire-ecommerce-merchant-channels` 已于 2026-11-10 归档）。
 
 **模板层唯一的出网口。** 所有商家数据读取都经 `POST /v1/actions/<provider>.<action>`
 （带 connection alias）执行，模板层不拼 vendor URL、不持签名逻辑、不读凭证。

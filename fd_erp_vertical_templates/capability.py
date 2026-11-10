@@ -1,4 +1,4 @@
-"""电商能力矩阵（change `truth-ecommerce-capability-surface` 任务 1.1-1.3）。
+"""电商能力矩阵（spec `ecommerce-capability-matrix`，任务 1.1-1.3；原 change `truth-ecommerce-capability-surface` 已于 2026-11-10 归档）。
 
 矩阵回答一个问题：「这个平台、这条流，现在到底拿不拿得到」。它是电商能力
 表述的**唯一真源**——报表腿、对账降级、供给清单、绑定状态与对外话术都从

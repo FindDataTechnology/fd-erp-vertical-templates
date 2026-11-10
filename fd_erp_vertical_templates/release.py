@@ -1,4 +1,4 @@
-"""发布门与台账（change `ship-ecommerce-commercial` 任务 1.1-1.3）。
+"""发布门与台账（spec `ecommerce-release-gates`，任务 1.1-1.3；原 change `ship-ecommerce-commercial` 已于 2026-11-10 归档）。
 
 上架/出包前要过的门，以及一道门跑完后要留的账。两件事解决的是同一类事故：
 

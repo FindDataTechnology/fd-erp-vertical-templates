@@ -3,9 +3,9 @@
 微信支付 / 支付宝 / 美团商户侧：结算流水只读拉取。
 
 **出网只有一个口**：经连接器运行时执行 provider 动作（`wechatpay.download_bill`
-等），模板层不持 base URL、不发 HTTP（change `wire-ecommerce-merchant-channels`
-任务 1.2 的静态门在守这条）。历史实现从环境变量取端点 + Bearer 直连，属
-ADR 0002 拒绝的通用 HTTP 通道形状，已撤。
+等），模板层不持 base URL、不发 HTTP——这条由 spec `ecommerce-merchant-channel-wiring`
+（任务 1.2）的静态门守着（原 change `wire-ecommerce-merchant-channels` 已于 2026-11-10 归档）。
+历史实现从环境变量取端点 + Bearer 直连，属 ADR 0002 拒绝的通用 HTTP 通道形状，已撤。
 
 - 未注入凭据 / 运行时未配置 = `NOT_WIRED` 如实报出（不伪造接入）；
 - live 面以实测为准（`LIVE_SURFACES` 当前为空 = 未实测不宣称）；

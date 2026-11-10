@@ -1,4 +1,4 @@
-"""国内电商平台读取器（change `truth-ecommerce-capability-surface` 任务 3.x）。
+"""国内电商平台读取器（spec `ecommerce-capability-matrix`，任务 3.x；原 change `truth-ecommerce-capability-surface` 已于 2026-11-10 归档）。
 
 **本模块不再出网。** 历史版本从环境变量取 base URL、拿客户 token 直接 POST
 `/flows/{platform}/{flow}`——那正是连接器线 ADR 0002 明令不做的

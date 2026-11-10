@@ -1,4 +1,4 @@
-"""能力面一致性检查（change `truth-ecommerce-capability-surface` 任务 6.2）。
+"""能力面一致性检查（spec `ecommerce-capability-matrix`，任务 6.2；原 change `truth-ecommerce-capability-surface` 已于 2026-11-10 归档）。
 
 把四处会漂移的东西对到同一个真源上：
 
