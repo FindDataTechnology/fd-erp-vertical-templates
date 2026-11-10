@@ -61,10 +61,11 @@ python3 scripts/check_all.py            # 一次跑完全部门（含 tests/ 全
 python3 scripts/check_all.py 发布门 提交材料
 
 # 各道门的独立入口：脚本级
-python3 -m fd_erp_vertical_templates.cli capability-check --template templates/crossborder   # 矩阵 ↔ 产物 ↔ 19 锚点
+python3 -m fd_erp_vertical_templates.cli capability-check --template templates/crossborder   # 矩阵 ↔ 产物 ↔ 文档锚点（活文件优先，仓内快照兜底）
 python3 -m fd_erp_vertical_templates.cli release-check --template templates/crossborder --ledger releases/ledger.jsonl
 python3 -m fd_erp_vertical_templates.cli publish-notes                                      # 三处注记 ↔ 发布记录
 python3 scripts/gen_capability_artifacts.py --check        # 矩阵改了没重生成即红
+python3 scripts/check_evidence_refs.py                     # 凭据：禁行号锚，符号须真实存在
 python3 scripts/entry_matrix.py --check                    # 未发布入口不得进试用列表
 python3 scripts/market_submission.py --check               # 四语齐全 + tags 同长 + 版本新鲜
 python3 scripts/build_connector_status.py --check          # 对接三态证据链与派生文件一致
