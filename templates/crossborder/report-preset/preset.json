@@ -2,7 +2,7 @@
  "schema": "erp-report-preset/v1",
  "name": "跨境电商对账报表 preset",
  "vertical": "crossborder",
- "version": "1.1.0",
+ "version": "1.1.2",
  "reports": [
   {
    "key": "xb-store-recon",

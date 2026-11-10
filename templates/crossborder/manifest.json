@@ -3,34 +3,34 @@
  "vertical": "crossborder",
  "name_zh": "跨境电商对账模板",
  "name_en": "Cross-border E-commerce Reconciliation Template",
- "version": "1.4.1",
+ "version": "1.4.3",
  "description_zh": "行业模板四件套：连接器 pack（Shopify 复用已采纳件 + 国内平台只读实测面）+ 对账舰队蓝图（巡检/核对/拍板，复用三舰观测面）+ 科目映射 pack（呈现层对齐内核通用科目）+ 报表 preset（店铺对账日报/费用/映射看板）。三方对账、多币种出处汇率、平台费用独立维度；平台侧零写入；真实店读写暂缓待商家自带凭证。 能力矩阵（capability-matrix.json）随连接器 pack 分发：报表腿与对账腿数由矩阵派生，不可得腿显式标注。",
  "description_en": "Four-piece vertical template: connector pack (Shopify adopted + CN platforms read-only measured surface) + recon fleet blueprint (watch/reconcile/approve reusing the three watch fleets) + account mapping pack (presentation layer over kernel universal accounts) + report preset. Three-way recon, sourced FX, independent fee dimensions; zero platform writes; real-store writes deferred pending merchant credentials.",
  "assets": {
   "connector_pack": {
    "kind": "pack",
    "path": "connector-pack/pack.json",
-   "version": "1.5.1"
+   "version": "1.5.3"
   },
   "fleet_blueprint": {
    "kind": "fleet-blueprint",
    "path": "recon-fleet/template.json",
-   "version": "1.1.0"
+   "version": "1.1.2"
   },
   "account_mapping_pack": {
    "kind": "pack",
    "path": "account-mapping/pack.json",
-   "version": "1.1.0"
+   "version": "1.1.2"
   },
   "report_preset": {
    "kind": "report-preset",
    "path": "report-preset/preset.json",
-   "version": "1.1.0"
+   "version": "1.1.2"
   },
   "capability_matrix": {
    "kind": "capability-matrix",
    "path": "capability-matrix.json",
-   "version": "1.0.0"
+   "version": "1.1.0"
   }
  },
  "constraints": {

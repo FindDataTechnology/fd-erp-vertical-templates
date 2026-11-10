@@ -143,6 +143,26 @@ def test_diff_conversion_flags_unsourced():
     assert conv["fx_unsourced"] is True and conv["amount_base"] is None
 
 
+def test_correction_lines_reject_non_positive_amount():
+    """零/负差额不能出更正分录。
+
+    差 0 意味着两条本来一致，还要出「更正」就是凭空造两笔账；负差额则说明
+    借贷方向该反过来——两种情况都只能人工看，机器车道必须拒绝而不是
+    按绝对值硬出。
+    """
+    recon = CrossborderRecon("s")
+    for amount in ("0", "-5"):
+        with pytest.raises(TemplateError) as ei:
+            recon.propose_correction_lines(
+                {"kind": "amount_mismatch",
+                 "left_raw": {"amount": amount, "currency": "CNY"},
+                 "right_raw": {"amount": amount, "currency": "CNY"}})
+        assert ei.value.code == "INVALID_ARGUMENT", amount
+    with pytest.raises(TemplateError) as ei:
+        recon.propose_correction_lines({"kind": "amount_mismatch"})
+    assert ei.value.code == "INVALID_ARGUMENT"
+
+
 def test_correction_lines_whitelist_only():
     recon = CrossborderRecon("s")
     diff = {"kind": "missing_in_right", "left_raw": {"amount": "100",

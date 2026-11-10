@@ -39,6 +39,30 @@ def test_ledger_appends_and_reports_unchanged(tmp_path):
     assert len(ledger.history("connector-pack")) == 1
 
 
+def test_malformed_ledger_line_is_rejected_not_skipped(tmp_path):
+    """台账里有一行坏 JSON → 必须拒载，不得静默跳过。
+
+    这是「读不到当成不存在」的同族坑：坏行被跳过等于历史少一条，而后续
+    append 的版本单调与同版本判重全基于一个残缺的历史——门会绿，记录是假的。
+    所以宁可当场炸。
+    """
+    path = tmp_path / "ledger.jsonl"
+    path.write_text(json.dumps(_entry().as_dict(), ensure_ascii=False) + "\n"
+                    + "这不是 JSON\n", encoding="utf-8")
+    with pytest.raises(TemplateError) as ei:
+        Ledger(path)
+    assert ei.value.code == "MANIFEST_INVALID"
+    assert "台账" in str(ei.value)
+
+
+def test_blank_lines_in_ledger_are_tolerated(tmp_path):
+    """空行是排版不是坏行——区分「空」与「坏」，不该因空行拒载。"""
+    path = tmp_path / "ledger.jsonl"
+    path.write_text("\n" + json.dumps(_entry().as_dict(), ensure_ascii=False)
+                    + "\n\n", encoding="utf-8")
+    assert len(Ledger(path).history("connector-pack")) == 1
+
+
 def test_same_version_different_content_is_rejected(tmp_path):
     ledger = Ledger(tmp_path / "ledger.jsonl")
     ledger.append(_entry(artifact="sha256:a"))

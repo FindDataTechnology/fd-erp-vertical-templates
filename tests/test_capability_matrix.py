@@ -87,6 +87,22 @@ def test_pinduoduo_is_unavailable_not_unmapped():
     assert m.status("taobao", "orders") == STATUS_UNMAPPED
 
 
+def test_partial_flow_declaration_reports_undeclared_legs_as_missing():
+    """只声明部分流时，recon_shape 只数已声明的可用腿，未声明的按缺腿报。
+
+    这条防的是「没声明 = 没这一腿」被读成「没声明 = 没问题」：如果 recon_shape
+    按固定的三腿减法、而缺腿只看已声明项，一个只声明 orders 的平台会被算成
+    「已完整」（0 缺腿），实际结算与库存两腿根本不存在。
+    """
+    body = _matrix({"orders": _cell(STATUS_AVAILABLE, measured_at="2026-11-09",
+                                    evidence=[{"kind": EVIDENCE_PROVIDER_ACTION, "ref": "a"},
+                                              {"kind": EVIDENCE_RUNTIME_READ, "ref": "b"}])})
+    m = load_matrix(body, today=date(2026, 11, 10))
+    assert m.recon_shape("p1") == 1
+    missing = {d["flow"] for d in m.missing_legs("p1")}
+    assert missing == {"settlements", "inventory"}, missing
+
+
 def test_recon_shape_is_zero_before_wiring():
     m = load_matrix(MATRIX, today=date(2026, 11, 10))
     for platform in m.platform_keys():

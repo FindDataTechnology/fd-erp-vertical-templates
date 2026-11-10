@@ -1,7 +1,7 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商对账连接器包",
- "version": "1.5.1",
+ "version": "1.5.3",
  "description": "跨境电商对账模板·连接器 pack。能力面以包内 capability-matrix.json 为准：Shopify：需一次接入（provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture））；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）。凭证 BYOK 经连接器运行时注入，零落库零日志；对外部系统零写入。真实店读写沿 crm-board 2026-10-30 裁决逐店开通。",
  "tags": [
   "ERP",
