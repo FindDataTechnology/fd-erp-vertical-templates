@@ -148,8 +148,17 @@ json.dump({"providers": {k: full["providers"][k] for k in ref}}, ...)
 ### 改动 A：`scripts/build_connector_status.py` —— 刷新入口只写被引用项
 
 只改 `refresh_facts_fixture()`：把「遍历目录全部 provider」换成「遍历模板绑定」。
+下面是**真实生成**的完整 diff（由临时 clone 里改完 `git diff` 得到，非手写），
+已在真仓用 `git apply --check` 验证可干净套用。
 
 ```diff
+diff --git a/scripts/build_connector_status.py b/scripts/build_connector_status.py
+index 1c83dce..0e86c29 100644
+--- a/scripts/build_connector_status.py
++++ b/scripts/build_connector_status.py
+@@ -79,14 +79,21 @@ def provider_facts() -> tuple[dict[str, dict], str]:
+ 
+ 
  def refresh_facts_fixture() -> int:
 -    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。"""
 -    providers = sorted(p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json"))
@@ -157,23 +166,35 @@ json.dump({"providers": {k: full["providers"][k] for k in ref}}, ...)
 -        p: {"catalog": True, "executor_tests": executor_test_count(p)} for p in providers
 -    }
 -    # 绑定里提到的、但目录没有的角色名也要留一行，否则快照会"看起来都齐"
--    for b in bindings():
--        facts.setdefault(str(b["provider"]), {"catalog": False, "executor_tests": 0})
 +    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。
 +
 +    只写**模板已引用**的 provider：这份快照回答的是「CI 要相信哪些 provider 的事实」，
 +    不是「目录里有谁」。覆盖不全由 `uncovered_bindings()` 在派生时断言兜住。
 +    """
 +    catalog = {p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json")}
-+    facts = {}
-+    for b in bindings():
++    facts: dict[str, dict] = {}
+     for b in bindings():
+-        facts.setdefault(str(b["provider"]), {"catalog": False, "executor_tests": 0})
 +        provider = b.get("provider")
-+        if not provider or provider in facts:
++        if not provider or str(provider) in facts:
 +            continue
 +        facts[str(provider)] = {
-+            "catalog": provider in catalog,
-+            "executor_tests": executor_test_count(provider) if provider in catalog else 0,
++            "catalog": str(provider) in catalog,
++            "executor_tests": executor_test_count(str(provider)) if str(provider) in catalog else 0,
 +        }
+     body = {
+         "_comment": (
+             "open-connector-mt 的 provider 事实快照。CI 只有本仓 checkout，读不到连接器仓；"
+```
+
+落地步骤（两行）：
+
+```bash
+# 1) 把上面 fenced diff 原样存成文件（编辑器另存即可），然后校验它确实匹配当前源码
+git apply --check /tmp/curate-facts-fixture.patch
+
+# 2) 套用
+git apply /tmp/curate-facts-fixture.patch
 ```
 
 保留原样、**不要动**的部分：`body` 里的 `_comment`（仍说明刷新命令）、`source`、`count`
@@ -216,3 +237,67 @@ json.dump({"providers": {k: full["providers"][k] for k in ref}}, ...)
    `事实快照缺模板已引用的 provider：kingdee`；还原后退出码 0。
 
 结论：改精选不会削弱任何现有断言，漏项仍被门拦住。
+
+### 5.3 落地顺序与回滚命令（裁决通过后照此执行）
+
+**落地（4 步，顺序不能换）**
+
+```bash
+cd fd-erp-vertical-templates
+
+# 0) 先备份快照（回滚要用；不依赖 git 操作）
+cp tests/fixtures/connector-provider-facts.json /tmp/facts-full.bak
+
+# 1) 套用改动 A（脚本必须先改，否则第 2 步又写回全量）
+git apply --check /tmp/curate-facts-fixture.patch && git apply /tmp/curate-facts-fixture.patch
+
+# 2) 用刷新入口重写快照（只写被引用的 8 项；这一步会删掉其余 1567 个键）
+python3 scripts/build_connector_status.py --refresh-fixture
+
+# 3) 派生状态面 + 跑门（顺序同 check_all：先真源后派生）
+python3 scripts/build_connector_status.py
+python3 scripts/check_all.py
+```
+
+预期：第 2 步输出 `wrote …（8 个 provider）`；快照 `39 行 / 887 B`；
+`check_all` 15 道门全绿；`集成 0 连接 / 9 未接通 / 501 挂账 20` 不变。
+
+**回滚（任一步出错都能整体退回，不用 `git checkout --`）**
+
+```bash
+# 代码：逆向套用同一份 patch（-R 就是 revert，不会碰其它文件）
+git apply -R /tmp/curate-facts-fixture.patch
+
+# 快照：用第 0 步的备份覆写回去
+cp /tmp/facts-full.bak tests/fixtures/connector-provider-facts.json
+
+# 重点：快照回滚后必须重新派生状态面，否则 connector-status.json 仍是精选下算出来的
+python3 scripts/build_connector_status.py
+python3 scripts/check_all.py      # 应回到全量下的绿
+```
+
+两点注意（都是踩过的）：
+
+1. **别用 `git checkout -- <file>` / `git restore`** 做回退——它们会连同别人未提交的改动一起丢掉。用 `git apply -R` 与 `cp` 备份。
+2. 回滚只还原文件是**不够**的：`connector-status.json` 是派生件，必须重跑派生，否则会留下「精选下算出的状态」配「全量快照」的混合态，`对接三态` 门会以「与派生不一致」报红——那是真实的不一致，不是抖动。
+
+**只改快照不改脚本的后果**（说明为什么 A 与 B 必须同批）：下次任何人跑 `--refresh-fixture`，又会把 1575 项写回来，diff 白改一次。
+
+### 5.4 5.3 的演练结果（2026-11-10，临时副本 `.probe-flow`，跑完已删）
+
+不是只做语法检查——按 5.3 的顺序**原样执行了一遍**，且 patch 是**从本文档的 fenced 块里抽出来**的
+（证明文档里的 diff 可被提取、可直接套用，不是装饰）：
+
+| 步骤 | 命令 | 结果 |
+|---|---|---|
+| 抽 patch | 从本文 ```` ```diff ```` 块提取 | 33 行，`git apply --check` 通过 |
+| 0 备份 | `cp … /tmp/facts-full.bak` | ok |
+| 1 套用 | `git apply --check && git apply` | 已套用 |
+| 2 刷新 | `--refresh-fixture` | `wrote …（8 个 provider）`；**39 行 / 887 B** |
+| 3 派生+门 | `build_connector_status.py` + `check_all` | 15 道门**全绿** |
+| 回滚·代码 | `git apply -R` | 已逆回滚 |
+| 回滚·快照 | `cp /tmp/facts-full.bak …` | 回到 **6307 行** |
+| 回滚·重派生 | `build_connector_status.py` + `check_all` | 15 道门**全绿** |
+| 回滚后工作树 | `git status --porcelain` | 仅剩本文档差异（代码与快照均回到 HEAD 状态） |
+
+结论：落地与回滚都是可执行的、可整体退回的；回滚不依赖 `git checkout --`。
