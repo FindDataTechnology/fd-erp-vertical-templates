@@ -151,17 +151,42 @@ def test_supply_chain_assets_are_customer_neutral():
     assert offenders == [], f"模板资产出现客户名（须移到提案/design）：{offenders}"
 
 
+def _supply_chain_spec_dirs() -> list[Path]:
+    """该垂直线 spec 的全部落点：活动 change / 归档 change / 合并后的主规格。
+
+    原先写死 `/Users/<某人>/finddata/...` 并在目录不在时 skip。两个毛病：
+    写死路径只在本机有效；而 change 一归档，路径就消失，于是这条
+    「spec 客户中性」的守卫变成永远不跑的装饰——2026-11-10 归档后实测就一直
+    在 skip。改成按根相对解析并覆盖三处落点，归档前后都真在验。
+    """
+    here = Path(__file__).resolve().parent.parent.parent  # 工作区根
+    candidates = (
+        here / "openspec" / "changes" / "add-supply-chain-vertical" / "specs",
+        *sorted((here / "openspec" / "changes" / "archive").glob(
+            "*-add-supply-chain-vertical/specs")),
+        here / "openspec" / "specs" / "erp-vertical-supply-chain",
+    )
+    return [c for c in candidates if c.is_dir()]
+
+
 def test_supply_chain_specs_are_customer_neutral():
-    """spec delta 同样客户中性（design D1：清单不进任何 spec）。"""
-    specs = Path("/Users/chengsishi/finddata/openspec/changes/add-supply-chain-vertical/specs")
-    if not specs.exists():  # 归档后路径消失则跳过（归档进 openspec/specs/ 另行治理）
-        pytest.skip("change specs 目录不存在（可能已归档）")
+    """spec 同样客户中性（design D1：清单不进任何 spec）。
+
+    扫描范围含归档 delta 与合并后的主规格——归档不是遗忘，两份都是「spec 文本」。
+    """
+    dirs = _supply_chain_spec_dirs()
+    if not dirs:
+        pytest.skip("openspec 不在本机（单独检出本仓时正常）——本项未验证")
     offenders: list[str] = []
-    for path in specs.rglob("*.md"):
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        for marker in ANCHOR_CUSTOMER_MARKERS:
-            if marker in text:
-                offenders.append(f"{path.name}: {marker}")
+    scanned = 0
+    for specs in dirs:
+        for path in specs.rglob("*.md"):
+            scanned += 1
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for marker in ANCHOR_CUSTOMER_MARKERS:
+                if marker in text:
+                    offenders.append(f"{path.parent.name}/{path.name}: {marker}")
+    assert scanned > 0, f"解析到目录但没扫到任何 .md（{dirs}）——守卫失去对象"
     assert offenders == [], f"spec 出现客户名（D1 违规）：{offenders}"
 
 
@@ -367,3 +392,26 @@ def test_manifest_without_pagesets_pack_skips_coverage_gate():
     for root in (CROSSBORDER, RESTAURANT):
         body = load_template_manifest(root / "manifest.json")
         assert "pagesets_pack" not in body["assets"]
+
+
+def test_supply_chain_spec_guard_catches_customer_name(tmp_path, monkeypatch):
+    """机制自检：spec 里出现客户名必须被拦下（守卫不能只在真库上「恰好为空」）。"""
+    dirty = tmp_path / "specs" / "supply-chain"
+    dirty.mkdir(parents=True)
+    (dirty / "spec.md").write_text(
+        "### Requirement: 回款对账\n\n面向全日供应链的门店回款核对。\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "test_manifest._supply_chain_spec_dirs", lambda: [tmp_path / "specs"])
+    with pytest.raises(AssertionError) as ei:
+        test_supply_chain_specs_are_customer_neutral()
+    assert "全日" in str(ei.value)
+
+
+def test_supply_chain_spec_guard_fails_when_it_scans_nothing(tmp_path, monkeypatch):
+    """目录在但一个 .md 都没有 → 必须报「守卫失去对象」，不能当成干净。"""
+    empty = tmp_path / "specs"
+    empty.mkdir()
+    monkeypatch.setattr("test_manifest._supply_chain_spec_dirs", lambda: [empty])
+    with pytest.raises(AssertionError) as ei:
+        test_supply_chain_specs_are_customer_neutral()
+    assert "没扫到任何 .md" in str(ei.value)
