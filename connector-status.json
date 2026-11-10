@@ -37,7 +37,6 @@
       ],
       "external_system": "Shopify 店铺",
       "missing": [
-        "executor_tests",
         "live"
       ],
       "optional": true,
@@ -50,8 +49,8 @@
           "ok": true
         },
         "executor_tests": {
-          "evidence": null,
-          "ok": false
+          "evidence": "open-connector-mt/src/providers/shopify_admin/*.test.ts (1)",
+          "ok": true
         },
         "live": {
           "accepted_at": null,
