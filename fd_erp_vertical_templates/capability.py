@@ -262,23 +262,6 @@ class CapabilityMatrix:
                 })
         return out
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema": MATRIX_SCHEMA,
-            "vertical": self.vertical,
-            "updated_at": self.updated_at.isoformat(),
-            "review_window_days": self.review_window_days,
-            "platforms": [
-                {
-                    "key": key,
-                    **{k: v for k, v in meta.items() if k != "flows"},
-                    "flows": {f: self.cells[(key, f)].as_dict()
-                              for f in FLOWS if (key, f) in self.cells},
-                }
-                for key, meta in self.platforms.items()
-            ],
-        }
-
 
 def _next_action(cell: Cell) -> str:
     if cell.downgraded_from == STATUS_AVAILABLE:

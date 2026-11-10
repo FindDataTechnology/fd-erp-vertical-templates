@@ -297,8 +297,13 @@ def test_no_unused_public_helpers_in_capability():
     import pathlib as _pathlib
 
     repo = _pathlib.Path(__file__).resolve().parent.parent
-    src_all = "".join(p.read_text(encoding="utf-8")
-                      for p in repo.rglob("*.py") if "__pycache__" not in str(p))
+    # 排除 .venv/.git 等：否则「有没有安装过」会改变判据——门自己先得了它要治的病
+    # （本会话真实踩到：本地因 .venv 里有副本而假绿，干净检出才暴露 to_dict 是死代码）。
+    skip_dirs = (".venv", ".git", "graphify-out", "__pycache__", "node_modules")
+    src_all = "".join(
+        p.read_text(encoding="utf-8")
+        for p in repo.rglob("*.py")
+        if not any(f"/{d}/" in str(p) for d in skip_dirs))
     tree = _ast.parse((repo / "fd_erp_vertical_templates" / "capability.py")
                       .read_text(encoding="utf-8"))
 

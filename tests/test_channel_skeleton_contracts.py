@@ -15,7 +15,9 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-CONNECTOR_DOCS = REPO.parent / "open-connector-mt" / "docs"
+#: 契约快照（仓内，任何机器都在）；活文件在兄弟仓，存在时只用于「快照没过期」比对。
+SNAP_DOCS = REPO / "docs" / "contract-snapshots"
+LIVE_DOCS = REPO.parent / "open-connector-mt" / "docs"
 
 #: (契约文件, 矩阵平台键)
 CONTRACTS = (
@@ -32,14 +34,16 @@ WRITE_VERBS = ("create", "update", "delete", "submit", "push", "adjust",
 
 
 def _contract_path(name: str) -> Path:
-    return CONNECTOR_DOCS / name
+    """优先读仓内快照——兄弟仓不在时也要能断言，否则这门进 CI 就等于不存在。"""
+    snap = SNAP_DOCS / name
+    return snap if snap.is_file() else LIVE_DOCS / name
 
 
 @pytest.mark.parametrize("doc,platform", CONTRACTS, ids=[c[0] for c in CONTRACTS])
 def test_contract_exists_and_declares_read_only_surface(doc: str, platform: str):
     path = _contract_path(doc)
-    if not path.is_file():
-        pytest.skip(f"{doc} 不在本机（单独检出本仓时正常）")
+    assert path.is_file(), (
+        f"契约快照缺失：{path}——快照是这道门的基础，缺了必须红而不是 skip")
     text = path.read_text(encoding="utf-8")
 
     actions = set(READ_ACTION.findall(text))
@@ -76,3 +80,17 @@ def test_contract_does_not_upgrade_matrix(doc: str, platform: str):
         assert ("骨架" in cell.reason or "未实现" in cell.reason
                 or "schema" in cell.reason), (
             f"{platform}.{flow} 的原因没写清为何不可得：{cell.reason}")
+
+
+@pytest.mark.parametrize("doc,platform", CONTRACTS, ids=[c[0] for c in CONTRACTS])
+def test_contract_snapshot_is_current_when_live_exists(doc: str, platform: str):
+    """兄弟仓在时，快照必须与活文件逐字节一致（否则留档的是旧契约）。
+
+    活文件不在（CI 常态）→ 只跳过这条比对；上面的只读动作面断言已跑在快照上。
+    """
+    live = LIVE_DOCS / doc
+    snap = SNAP_DOCS / doc
+    if not live.is_file():
+        pytest.skip("兄弟仓不在本机（CI 常态）；断言已在快照上完成")
+    assert snap.read_bytes() == live.read_bytes(), (
+        f"{doc} 快照落后于 open-connector-mt：重跑 cp 同步后提交")
