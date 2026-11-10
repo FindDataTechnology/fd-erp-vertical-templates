@@ -202,3 +202,55 @@ def test_review_due_lists_stale_unavailable():
     due = review_due_unavailable(m, today=date(2026, 11, 10))
     assert [d["flow"] for d in due] == ["orders"]
     assert "复核窗" in due[0]["basis"]
+
+
+# ---------------------------------------------------------------- 升格机制（正向）
+
+def test_upgrades_to_available_only_with_both_evidence_halves():
+    """升格的正向路径：provider_action + runtime_read + 新鲜测量时点 → available。
+
+    此前只测过「降级」，「什么情况才该升」没有正向断言——那会让规则半边失守：
+    只剩降级逻辑时，任何格子永远不可能变绿，也就没人发现升格条件写错了。
+    """
+    body = _matrix({"orders": _cell(
+        STATUS_AVAILABLE, measured_at="2026-11-09", review_window_days=90,
+        evidence=[{"kind": EVIDENCE_PROVIDER_ACTION, "ref": "actions.ts:816"},
+                  {"kind": EVIDENCE_RUNTIME_READ, "ref": "run-2026-11-09"}])})
+    m = load_matrix(body, today=date(2026, 11, 10))
+    cell = m.cell("p1", "orders")
+    assert cell.available, cell.reason
+    assert cell.downgraded_from is None
+    assert m.recon_shape("p1") == 1
+    assert m.missing_legs("p1") == [
+        d for d in m.missing_legs("p1") if d["flow"] != "orders"]
+
+
+def test_upgrade_requires_both_halves_even_when_fresh():
+    """新鲜度够、但只有一半证据 → 仍不升格（两条正交条件）。"""
+    fresh = "2026-11-09"
+    only_action = _matrix({"orders": _cell(
+        STATUS_AVAILABLE, measured_at=fresh,
+        evidence=[{"kind": EVIDENCE_PROVIDER_ACTION, "ref": "a"}])})
+    assert not load_matrix(only_action, today=date(2026, 11, 10)).cell(
+        "p1", "orders").available
+
+    only_read = _matrix({"orders": _cell(
+        STATUS_AVAILABLE, measured_at=fresh,
+        evidence=[{"kind": EVIDENCE_RUNTIME_READ, "ref": "b"}])})
+    assert not load_matrix(only_read, today=date(2026, 11, 10)).cell(
+        "p1", "orders").available
+
+
+def test_runtime_smoke_alone_does_not_upgrade():
+    """接线成功的冒烟（runtime_read=接线）不等于读到数据——settlements 就是这种状态。
+
+    真实状态锚点：shopify.settlements 有 provider_action + runtime_read(接线)，
+    但仍必须是 unmapped，因为「动作能调用」与「读到真实数据」是两件事。
+    """
+    m = load_matrix(MATRIX, today=date(2026, 11, 10))
+    cell = m.cell("shopify", "settlements")
+    kinds = {e.kind for e in cell.evidence}
+    assert EVIDENCE_PROVIDER_ACTION in kinds
+    assert EVIDENCE_RUNTIME_READ in kinds, "接线冒烟应作为 runtime_read 记录在案"
+    assert not cell.available, (
+        "接线冒烟就升格了 available——真实数据还没读到，这条会骗客户")
