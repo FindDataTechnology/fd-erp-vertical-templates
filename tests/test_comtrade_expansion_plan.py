@@ -120,6 +120,37 @@ def test_done_list_parsing(tmp_path: Path):
     assert load_done(tmp_path / "absent.jsonl") == set()
 
 
+def test_done_list_rejects_json_without_key(tmp_path: Path):
+    """是 JSON 却定位不到组合 → 必须报错，不能变成字面量 "None" 混进已完成集合。
+
+    配额按次计费：含糊的断点清单比没有更危险（以为记了，实际没记，重跑超配额）。
+    """
+    p = tmp_path / "done.jsonl"
+    p.write_text('{"foo": 1}\n', encoding="utf-8")
+    with pytest.raises(ValueError) as ei:
+        load_done(p)
+    assert "缺字符串 key" in str(ei.value)
+    p.write_text("null\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_done(p)
+
+
+def test_done_list_accepts_plain_text_and_json_string(tmp_path: Path):
+    """纯文本行与 JSON 字符串都算 key——容错边界在这两侧，不是无限宽。"""
+    p = tmp_path / "done.jsonl"
+    p.write_text('156|2024|854142|X|0\n"156|2024|854142|M|0"\n', encoding="utf-8")
+    assert load_done(p) == {"156|2024|854142|X|0", "156|2024|854142|M|0"}
+
+
+def test_check_reports_structure_problems_instead_of_crashing():
+    """计划文件结构破损 → 给可读结论（这道是门，不能抛 KeyError 崩掉）。"""
+    combos = build_matrix()
+    assert any("budget_per_day" in p for p in check({}, combos, set()))
+    assert any("batches" in p for p in check({"budget_per_day": 500}, combos, set()))
+    broken = {"budget_per_day": 500, "batches": [{"combos": [{"nokey": 1}]}]}
+    assert any("缺字符串 key" in p for p in check(broken, combos, set()))
+
+
 def test_daily_budget_matches_spider_doc():
     """预算常量必须与爬虫档案一致（档案写 500 次/天）。"""
     readme = Path(__file__).resolve().parent.parent.parent / "fd-industry-data" / \

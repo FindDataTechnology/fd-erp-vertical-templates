@@ -89,37 +89,79 @@ def plan(combos: list[Combo], *, done: set[str] | None = None,
 
 
 def load_done(path: Path) -> set[str]:
-    """已完成组合清单（JSONL，一行一个 key 或 {key: ...}）。缺文件=全未做。"""
+    """已完成组合清单（JSONL，一行一个 key、{key: ...}，或纯文本 key）。缺文件=全未做。
+
+    容错有边界：
+    - 纯文本行（运维手写的断点清单）照收——只认 JSON 会把人工记录的断点当成
+      「全未做」，重跑直接超配额；
+    - 但**是 JSON 却不带 key 的行要报错**。早先这类行会被 `str(None)` 变成字面量
+      "None" 塞进已完成集合：既不匹配任何组合，又让人以为这行被认了。
+      配额按次计费，含糊的清单比没有清单更危险。
+    """
     if not path.is_file():
         return set()
     out: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
+    for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
         if not line:
             continue
         try:
             body = json.loads(line)
         except json.JSONDecodeError:
-            # 纯文本 key 行（运维手写的断点清单）同样认——只认 JSON 会把
-            # 人工记录的断点当成「全未做」，重跑直接超配额。
             out.add(line)
             continue
-        out.add(str(body.get("key") if isinstance(body, dict) else body))
+        if isinstance(body, dict):
+            key = body.get("key")
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError(
+                    f"{path}:{lineno} 是 JSON 对象但缺字符串 key：{line[:120]}"
+                    "——已完成清单每行必须能定位到一个组合（key 或纯文本行）")
+            out.add(key.strip())
+        elif isinstance(body, str):
+            out.add(body)
+        else:
+            raise ValueError(
+                f"{path}:{lineno} 解析为 {type(body).__name__}（{line[:80]}），"
+                "无法当作组合 key——只接受 key 字符串、{key: ...} 或纯文本行")
     return out
 
 
 def check(plan_body: dict, combos: list[Combo], done: set[str]) -> list[str]:
-    """计划自洽性检查：不重复、不漏、不超预算、已完成项不重排。"""
+    """计划自洽性检查：结构完整、不重复、不漏、不超预算、已完成项不重排。
+
+    结构缺失按「问题」报告，不抛 KeyError——这道是门，门要给出可读结论。
+    """
     problems: list[str] = []
+    budget = plan_body.get("budget_per_day")
+    if not isinstance(budget, int) or budget <= 0:
+        problems.append(f"计划缺合法 budget_per_day（拿到 {budget!r}）")
+        budget = 0
+    batches = plan_body.get("batches")
+    if not isinstance(batches, list):
+        problems.append(f"计划缺 batches 列表（拿到 {type(batches).__name__}）")
+        batches = []
+
     keys: list[str] = []
-    for batch in plan_body.get("batches") or []:
-        actual = len(batch["combos"])
-        if actual != batch.get("count"):
+    for i, batch in enumerate(batches, start=1):
+        if not isinstance(batch, dict):
+            problems.append(f"第 {i} 批不是对象（{type(batch).__name__}）")
+            continue
+        items = batch.get("combos")
+        if not isinstance(items, list):
+            problems.append(f"第 {i} 批缺 combos 列表")
+            continue
+        actual = len(items)
+        declared = batch.get("count")
+        if declared is not None and actual != declared:
             problems.append(
-                f"第 {batch['day']} 批声明 {batch.get('count')} 条但实际 {actual} 条（清单与内容不一致）")
-        if actual > plan_body["budget_per_day"]:
-            problems.append(f"第 {batch['day']} 批 {actual} 条超过日预算 {plan_body['budget_per_day']}")
-        keys.extend(c["key"] for c in batch["combos"])
+                f"第 {i} 批声明 {declared} 条但实际 {actual} 条（清单与内容不一致）")
+        if budget and actual > budget:
+            problems.append(f"第 {i} 批 {actual} 条超过日预算 {budget}")
+        for item in items:
+            if not isinstance(item, dict) or not isinstance(item.get("key"), str):
+                problems.append(f"第 {i} 批里有条目缺字符串 key：{item!r}"[:120])
+                continue
+            keys.append(item["key"])
     if len(keys) != len(set(keys)):
         problems.append("计划内出现重复组合（幂等键失效）")
     if set(keys) & done:
@@ -140,7 +182,11 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     combos = build_matrix()
-    done = load_done(Path(args.done)) if args.done else set()
+    try:
+        done = load_done(Path(args.done)) if args.done else set()
+    except ValueError as exc:
+        print(f"已完成清单不可用：{exc}")
+        return 1
 
     if args.check:
         body = json.loads(Path(args.check).read_text(encoding="utf-8"))
@@ -148,7 +194,8 @@ def main(argv: list[str] | None = None) -> int:
         if problems:
             print("计划不自洽：\n  " + "\n  ".join(problems))
             return 1
-        print(f"OK：{body['pending']} 条待取 / {body['days_needed']} 批 / 预算 {body['budget_per_day']}/日")
+        print(f"OK：{body.get('pending')} 条待取 / {body.get('days_needed')} 批 / "
+              f"预算 {body.get('budget_per_day')}/日")
         return 0
 
     body = plan(combos, done=done, budget=args.budget)
