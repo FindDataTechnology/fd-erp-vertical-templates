@@ -73,6 +73,12 @@ GATES: tuple[Gate, ...] = (
     # 写在 ../dashboards/tests。不跑它们等于「本仓绿了就说全线绿了」。
     Gate("看板仓测试", ("-m", "pytest", "../dashboards/tests", "-q"),
          "公开面守卫 + 数据源红线（跨仓）"),
+    # 演示脚本是销售要现场跑的东西，改坏 demo_tracks/矩阵/夹具只有到客户面前才暴露。
+    # 两轨各跑一次（合计 <0.2s，无内核依赖），缺腿/合成数据标注都在断言范围内。
+    Gate("演示双轨", ("../collateral-erp/scripts/demo_recon_only.py", "--track", "shopify"),
+         "shopify 轨：真实矩阵说缺腿 + 假设形状"),
+    Gate("演示双轨-国内", ("../collateral-erp/scripts/demo_recon_only.py", "--track", "domestic"),
+         "domestic 轨：经商家 ERP 三腿"),
 )
 
 
