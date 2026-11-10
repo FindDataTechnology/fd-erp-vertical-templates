@@ -55,7 +55,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # 边界审计（只读，零写路径）
 .venv/bin/fd-erp-vertical-templates audit
 .venv/bin/fd-erp-vertical-templates validate --template templates/crossborder
-# 全部一致性门（10 道，一次跑完；CI 与人工共用这一条）
+# 全部一致性门（一次跑完；CI 与人工共用这一条）
 python3 scripts/check_all.py
 
 # 单独跑某几道

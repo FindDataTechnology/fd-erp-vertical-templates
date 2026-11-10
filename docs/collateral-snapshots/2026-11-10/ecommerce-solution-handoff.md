@@ -55,7 +55,7 @@
 
 ```bash
 cd fd-erp-vertical-templates
-python3 scripts/check_all.py            # 一次跑完 10 道门；红则退出码 1
+python3 scripts/check_all.py            # 一次跑完全部门（含 tests/ 全套）；红则退出码 1
 
 # 下面是各道门的单独入口（排查用）
 python3 -m fd_erp_vertical_templates.cli capability-check --template templates/crossborder   # 矩阵 ↔ 产物 ↔ 19 锚点
