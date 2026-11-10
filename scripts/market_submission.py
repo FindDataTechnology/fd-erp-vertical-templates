@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""导出市场上架提交材料（change `ship-ecommerce-commercial` 任务 2.x 的交付面）。
+"""导出市场上架提交材料（change `ship-ecommerce-commercial`（已归档，见 spec `ecommerce-release-gates`） 任务 2.x 的交付面）。
 
 上架后台要逐语言填 name / description / tags。手工从 JSON 里抄，抄错一个字母
 就把「需一次接入」说成「已支持」；所以这里直接从资产的 `i18n` 块取值导出，

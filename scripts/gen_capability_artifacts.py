@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""由能力矩阵生成派生资产（change `truth-ecommerce-capability-surface` 任务 2.1/2.2）。
+"""由能力矩阵生成派生资产（change `truth-ecommerce-capability-surface`（已归档，见 spec `ecommerce-capability-matrix`） 任务 2.1/2.2）。
 
 派生关系是单向的：**矩阵 → 产物**。产物里带 `_generated_from.fingerprint`，
 测试比对指纹与当前矩阵是否一致——矩阵改了而产物没重生成，测试即红。

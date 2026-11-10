@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""上架就绪清单（change `ship-ecommerce-commercial` 任务 2.x 的前置计算）。
+"""上架就绪清单（change `ship-ecommerce-commercial`（已归档，见 spec `ecommerce-release-gates`） 任务 2.x 的前置计算）。
 
 回答的是「这次上架还缺什么」，而不是「我记得还缺什么」：
 

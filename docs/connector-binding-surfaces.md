@@ -27,7 +27,7 @@
 | `supply-chain` | `kingdee-cloud` | `kingdee` | `query_records`, `get_record`, `submit_records`, `audit_records`, `push_records` | 凭证/往来读写；read 三个 + write 四个（allocate/audit/push/submit），金蝶的 destructive 动作不在授权面内 |
 | `supply-chain` | `payments-merchant` | `wechatpay` | `download_bill`, `query_transaction` | 商户侧结算流水/交易查询；备选 `alipay` 的 `download_settlement_bill`, `query_trade` 同面 |
 | `restaurant-chain` | `payments-merchant` | `wechatpay` | `download_bill`, `query_transaction` | 同上；备选只有 `alipay`（`meituan` 只有 query_travel，已剔除） |
-| `crossborder` | `shopify-store` | `shopify_admin` | `get_order`, `list_orders`, `list_inventory_items`, `get_inventory_item`, `list_payouts` | 订单 + 库存 + 结算；`list_payouts` 为 change `wire-ecommerce-merchant-channels` 新增的只读动作（GraphQL `shopifyPaymentsAccount.payouts`，需 `read_shopify_payments_payouts`）；动作未上线前运行时报 `ACTION_NOT_FOUND`，矩阵把 settlements 记缺口 |
+| `crossborder` | `shopify-store` | `shopify_admin` | `get_order`, `list_orders`, `list_inventory_items`, `get_inventory_item`, `list_payouts` | 订单 + 库存 + 结算；`list_payouts` 为 change `wire-ecommerce-merchant-channels`（已归档，见 spec `ecommerce-merchant-channel-wiring`） 新增的只读动作（GraphQL `shopifyPaymentsAccount.payouts`，需 `read_shopify_payments_payouts`）；动作未上线前运行时报 `ACTION_NOT_FOUND`，矩阵把 settlements 记缺口 |
 | `crossborder` | `tiktok-store` | `tiktok_shop` | `list_orders`, `list_settlements`, `list_inventory` | TikTok Shop 三腿只读；待商家授权 + 平台应用审核，未过审前矩阵为 `unmapped` |
 | `crossborder` | `merchant-erp-store` | `merchant_erp`（按厂商落地为实名 provider，如 `wangdiantong`） | `list_orders`, `list_settlements`, `list_inventory` | 国内三腿；**库存腿唯一来源**，国内三方对账缺此腿不成立 |
 
