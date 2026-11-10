@@ -254,3 +254,31 @@ def test_runtime_smoke_alone_does_not_upgrade():
     assert EVIDENCE_RUNTIME_READ in kinds, "接线冒烟应作为 runtime_read 记录在案"
     assert not cell.available, (
         "接线冒烟就升格了 available——真实数据还没读到，这条会骗客户")
+
+
+# ---------------------------------------------------------------- schema 漂移
+
+def test_schema_declares_every_top_level_key_in_the_matrix():
+    """schema 必须声明矩阵实际出现的每个顶层键。
+
+    本轮真实踩到：给矩阵加了 `version` 字段（发布门要按它判版本单调），
+    但 schema 文件没跟上——`additionalProperties: true` 让校验照样绿，
+    于是「文档契约」静默落后于事实。
+    """
+    schema = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
+    declared = set(schema["properties"])
+    actual = set(json.loads(MATRIX.read_text(encoding="utf-8")))
+    missing = actual - declared
+    assert not missing, (
+        f"矩阵有 schema 未声明的顶层键：{sorted(missing)}——"
+        "schema 是互操作契约，落后于实际文件即漂移")
+
+
+def test_matrix_version_matches_manifest_declaration():
+    """矩阵 version 与 manifest 的 capability_matrix.version 必须一致（发布门按它判单调）。"""
+    matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
+    manifest = json.loads((TEMPLATE_DIR := MATRIX.parent / "manifest.json")
+                          .read_text(encoding="utf-8"))
+    declared = manifest["assets"]["capability_matrix"]["version"]
+    assert matrix.get("version") == declared, (
+        f"矩阵 version={matrix.get('version')} 与清单声明 {declared} 不一致")
