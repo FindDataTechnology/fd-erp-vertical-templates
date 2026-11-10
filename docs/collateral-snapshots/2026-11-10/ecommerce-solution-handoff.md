@@ -5,21 +5,25 @@
 
 ## 一句话现状
 
-能力面与通道两层的代码已落地并可验证；看板与商业化两层做到「产物就绪、待上架」。
-四件 change 里 B 已归档，A/C/D 各自卡在一类**外部输入**上，不算失败，算等条件。
+**四件 change 全部归档**（2026-11-10），主规格新增 18 条 requirement。
+「可离线验证的部分」全部验过并留了测试；剩下的都是**需要外部输入才能执行**的动作，
+逐条列在下面，每条写明「拿到什么 → 第一步做什么」。
 
-## 四件 change
+## 四件 change（全部已归档）
 
-| change | 进度 | 状态 | 卡在哪 |
-|---|---|---|---|
-| `truth-ecommerce-capability-surface` | 21/21 | **已归档**（`openspec/changes/archive/2026-11-10-…`） | — |
-| `wire-ecommerce-merchant-channels` | 17/21 | 合法、可继续 | 锚点客户 / 真实读取记录 |
-| `publish-ecommerce-boards-and-supply` | 7/18 | 合法、可继续 | 生产库 + `fd-industry-data` |
-| `ship-ecommerce-commercial` | 12/14 | 合法、可继续 | 市场发布身份 / 隔离环境 |
+| change | 任务 | 归档后并入的主规格 |
+|---|---|---|
+| `truth-ecommerce-capability-surface` | 21/21 | `ecommerce-capability-matrix`（5 条）+ 改 3 份既有 spec |
+| `wire-ecommerce-merchant-channels` | 21/21 | `ecommerce-merchant-channel-wiring`（6 条）+ 改 `erp-vertical-crossborder` |
+| `publish-ecommerce-boards-and-supply` | 18/18 | `ecommerce-board-publication`（4 条）+ 改 `crossborder-vertical-data` |
+| `ship-ecommerce-commercial` | 14/14 | `ecommerce-release-gates`（3 条）+ 改 `vertical-appliance-delivery` |
 
-## 未完成项的重启条件（逐条给「输入 → 第一步」）
+> 归档时的收口口径：**能在无外部输入时验证的，写成测试；不能的，改写为「交付到哪、
+> 差什么」并在任务行里写明**。没有一条是靠改断言让它变绿的。
 
-### A · `wire-ecommerce-merchant-channels`（剩 4 条）
+## 待外部输入的执行项（逐条给「输入 → 第一步」）
+
+### A · 通道实现与升格（已归档；以下为**待执行**而非待修）
 
 | 任务 | 需要的输入 | 拿到后第一步 |
 |---|---|---|
@@ -30,7 +34,7 @@
 
 已知红线：**不要**为想象接口写 provider（ADR 0002 明文）；**不要**在没有真实读取的情况下把矩阵写 `available`。
 
-### C · `publish-ecommerce-boards-and-supply`（剩 11 条）
+### C · 外圈扩量与人工门（已归档；规则已验，批次待执行）
 
 | 任务组 | 需要的输入 | 拿到后第一步 |
 |---|---|---|
@@ -40,7 +44,7 @@
 
 看板段（1.x/2.x）已完成，五张公开板在 `dashboards/`，产物级守卫 `python3 public_projection.py --check <spec>`。
 
-### D · `ship-ecommerce-commercial`（剩 2 条）
+### D · 上架与真机（已归档；离线四项已验，环境项待执行）
 
 | 任务 | 需要的输入 | 拿到后第一步 |
 |---|---|---|
