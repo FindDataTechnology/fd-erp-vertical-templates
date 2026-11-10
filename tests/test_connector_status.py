@@ -154,3 +154,52 @@ def test_committed_status_is_in_sync_with_derivation(mod, tmp_path, monkeypatch)
     tampered.write_text(json.dumps(broken), encoding="utf-8")
     monkeypatch.setattr(mod, "STATUS_PATH", tampered)
     assert mod.main(["--check"]) == 1
+
+
+# ---- 事实快照的覆盖面：模板引用了什么，快照就必须有什么 ------------------
+
+
+def test_snapshot_covers_every_provider_the_templates_reference(mod):
+    """现行数据：模板引用的每个 provider 都在快照里。
+
+    这条是正向基线——它同时说明了「引用集」与「快照集」的口径来自哪里
+    （`bindings()` 与 fixtures），不是另抄一份名单。
+    """
+    referenced = {b["provider"] for b in mod.bindings() if b.get("provider")}
+    assert referenced, "模板未引用任何 provider？bindings() 可能读错了路径"
+    assert mod.uncovered_bindings() == [], (
+        f"快照缺模板已引用的 provider：{mod.uncovered_bindings()}——"
+        "重跑 scripts/build_connector_status.py --refresh-fixture")
+
+
+def test_missing_snapshot_coverage_breaks_the_gate(mod, tmp_path, monkeypatch):
+    """机制：快照里少一个被引用的 provider → 派生必须报 problem（门红）。
+
+    为什么要这条：有连接器仓 checkout 时派生走实时分支，快照缺项在本地完全看不见；
+    CI 只有本仓、只能读快照，缺一项就把「有」写成「没有」，而门照绿。所以
+    「快照够不够全」必须是断言，不能靠刷新时恰好带上。
+    """
+    full = json.loads((REPO / "tests" / "fixtures" / "connector-provider-facts.json")
+                      .read_text(encoding="utf-8"))
+    referenced = sorted({b["provider"] for b in mod.bindings() if b.get("provider")})
+    assert referenced, "没有可删的引用项，用例失去意义"
+    victim = referenced[0]
+    trimmed = {"providers": {k: v for k, v in full["providers"].items() if k != victim}}
+    fixture = tmp_path / "facts.json"
+    fixture.write_text(json.dumps(trimmed, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(mod, "FACTS_FIXTURE", fixture)
+
+    assert mod.uncovered_bindings() == [victim]
+
+    problems = mod.derive()["verdict"]["problems"]
+    assert any(victim in p and "事实快照缺" in p for p in problems), problems
+
+
+def test_missing_snapshot_entirely_reports_unavailable_not_missing_coverage(mod, tmp_path, monkeypatch):
+    """快照整体缺失时只报「事实不可得」，不额外刷一条覆盖面问题（避免噪音双报）。"""
+    monkeypatch.setattr(mod, "FACTS_FIXTURE", tmp_path / "nope.json")
+    monkeypatch.setattr(mod, "CONNECTOR_REPO", tmp_path / "no-connector-repo")
+    assert mod.uncovered_bindings() == []
+    problems = mod.derive()["verdict"]["problems"]
+    assert any("事实不可得" in p for p in problems)
+    assert not any("事实快照缺" in p for p in problems)

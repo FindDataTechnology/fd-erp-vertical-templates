@@ -68,7 +68,13 @@ def provider_facts() -> tuple[dict[str, dict], str]:
         )
     if FACTS_FIXTURE.is_file():
         data = _load(FACTS_FIXTURE)
-        return dict(data.get("providers") or {}), f"snapshot:{FACTS_FIXTURE.relative_to(REPO)}"
+        # 快照可能在仓外（测试把夹具指到 tmp、或有人用配置改路径）。直接
+        # relative_to(REPO) 会在那种情形抛 ValueError，把「换了个路径」变成崩溃。
+        try:
+            label = FACTS_FIXTURE.relative_to(REPO).as_posix()
+        except ValueError:
+            label = str(FACTS_FIXTURE)
+        return dict(data.get("providers") or {}), f"snapshot:{label}"
     return {}, "missing"
 
 
@@ -94,6 +100,29 @@ def refresh_facts_fixture() -> int:
         json.dumps(body, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return len(facts)
+
+
+def snapshot_covered_providers() -> set[str]:
+    """仓内事实快照覆盖了哪些 provider。快照不在 → 空集（缺件由 provider_facts 报）。"""
+    if not FACTS_FIXTURE.is_file():
+        return set()
+    data = _load(FACTS_FIXTURE)
+    return set((data.get("providers") or {}).keys())
+
+
+def uncovered_bindings() -> list[str]:
+    """模板已引用、但事实快照里没有的 provider（排序）。
+
+    为什么单独查这一条：有连接器仓 checkout 时派生走**实时**扫描，快照缺项在这一侧
+    完全看不出来；CI 只有本仓、只能读快照，缺一项就会把「目录里有这个 provider」
+    派生成「目录里没有」——把「不知道」写成「不存在」，而门照绿。所以快照的覆盖面
+    必须是**被断言的事**，不能靠上次刷新时恰好带上。
+    """
+    covered = snapshot_covered_providers()
+    if not covered:
+        return []  # 快照整体缺失另行报错，不重复计
+    referenced = {b["provider"] for b in bindings() if b.get("provider")}
+    return sorted(referenced - covered)
 
 
 def bindings() -> list[dict]:
@@ -158,6 +187,16 @@ def derive() -> dict:
         problems.append(
             "连接器 provider 事实不可得：既没有 open-connector-mt checkout，也没有 "
             "tests/fixtures/connector-provider-facts.json（三态无法判定，不得当成全部缺失）"
+        )
+
+    # 快照必须覆盖模板已引用的每个 provider——否则 CI（只能读快照）会把被引用的
+    # provider 派生成「目录里没有」，而实时侧不是，两侧结论分叉且无人被拦。
+    uncovered = uncovered_bindings()
+    if uncovered:
+        problems.append(
+            "事实快照缺模板已引用的 provider：" + "、".join(uncovered)
+            + "（重跑 scripts/build_connector_status.py --refresh-fixture；"
+            "缺项会在只有本仓的 CI 里被误判成「目录无此 provider」）"
         )
 
     integrations: list[dict] = []
