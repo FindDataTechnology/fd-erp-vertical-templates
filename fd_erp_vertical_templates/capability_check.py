@@ -108,12 +108,16 @@ def check_template(template_dir: str | Path, *,
 
     # 文档锚点
     anchor_total = 0
+    docs_scanned = 0
+    docs_missing: list[str] = []
     for doc in doc_paths:
         path = Path(doc)
         if not path.is_file():
+            docs_missing.append(path.name)
             checks.append({"name": f"doc:{path.name}", "ok": True,
-                           "detail": "文件不存在（跳过）"})
+                           "detail": "文件不存在（**未扫描**，不构成验证）"})
             continue
+        docs_scanned += 1
         text = path.read_text(encoding="utf-8")
         for lineno, line in enumerate(text.splitlines(), start=1):
             for m in ANCHOR_RE.finditer(line):
@@ -138,8 +142,17 @@ def check_template(template_dir: str | Path, *,
                         "cell": f"{platform}.{flow}", "found": claimed,
                         "expected": cell.status, "reason": cell.reason,
                         "fix": "改文档措辞与锚点，使其与矩阵一致（矩阵为准）"})
-    checks.append({"name": "doc-anchors", "ok": True,
-                   "detail": f"{anchor_total} 个锚点"})
+    if docs_scanned == 0:
+        # 「0 个锚点」和「锚点全都对」在输出上必须能分开，否则门空转也报 ok。
+        detail = "未扫描任何文档，锚点未验证"
+        if docs_missing:
+            detail += f"（缺 {len(docs_missing)} 个：{'、'.join(docs_missing[:3])}…）"
+    else:
+        detail = f"{anchor_total} 个锚点 / 扫描 {docs_scanned} 份文档"
+        if docs_missing:
+            detail += f"（{len(docs_missing)} 份不在本机未扫描）"
+    checks.append({"name": "doc-anchors", "ok": docs_scanned > 0,
+                   "detail": detail})
 
     return {"ok": not conflicts, "matrix": str(matrix_file),
             "fingerprint": fingerprint, "summary": matrix.summary(),

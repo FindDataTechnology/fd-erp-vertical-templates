@@ -292,16 +292,36 @@ def _run_capability_check(template: str, docs: list[str] | None,
     return 0 if result["ok"] else 1
 
 
-def _default_capability_docs() -> list[Path]:
-    """仓库内已知的能力表述文档（工作区根相对）。
+def _default_capability_docs(workspace: Path | None = None,
+                             snapshot_root: Path | None = None) -> list[Path]:
+    """对外能力表述文档：活文件优先，**仓内快照兜底**。
 
-    找不到就跳过——包里没有这些文档，装了包也没理由因此变红。
+    这些文档的主副本在工作区根下的非 git 目录。原先只认活文件：干净检出时四个
+    文件全不在 → 锚点 0 个而门仍然绿，等于「没扫到 = 没问题」（本仓踩过的老坑）。
+    仓里同时留了同日快照（与主副本逐字节相等，另有测试守着），所以活文件缺席时
+    改读快照——CI 里这道门才真的在验，而不是空转。
+
+    两个参数只为可测：默认值就是真实工作区与真实快照目录。
     """
-    workspace = REPO_ROOT.parent
-    return [workspace / "docs" / "crossborder-supply-map.md",
-            workspace / "docs" / "presales-yichang" / "bossai.md",
-            workspace / "collateral-erp" / "demo-guide-crossborder.md",
-            workspace / "collateral-solution" / "00-方案说明.md"]
+    workspace = workspace or REPO_ROOT.parent
+    snapshot_root = snapshot_root or REPO_ROOT / "docs" / "collateral-snapshots"
+    pairs = (
+        ("docs/crossborder-supply-map.md", "crossborder-supply-map.md"),
+        ("docs/presales-yichang/bossai.md", "bossai.md"),
+        ("collateral-erp/demo-guide-crossborder.md", "demo-guide-crossborder.md"),
+        ("collateral-solution/00-方案说明.md", "collateral-solution-00-方案说明.md"),
+    )
+    out: list[Path] = []
+    for live_rel, snap_name in pairs:
+        live = workspace / live_rel
+        if live.is_file():
+            out.append(live)
+            continue
+        # 快照目录按日期命名，取最新的那个——写死日期的话下次留档就失效了
+        candidates = sorted(snapshot_root.glob(f"*/{snap_name}"))
+        if candidates:
+            out.append(candidates[-1])
+    return out
 
 
 def _run_coverage(action: str, args) -> int:

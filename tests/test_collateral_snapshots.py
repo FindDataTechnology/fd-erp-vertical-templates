@@ -69,3 +69,70 @@ def test_readme_states_the_matrix_caliber():
     assert "capability-matrix.json" in readme
     assert "需一次接入" in readme
     assert "真实读取记录" in readme
+
+
+# ---- 快照的第二用途：干净检出时给 doc-anchors 门做兜底 ----------------
+
+
+def test_capability_docs_fall_back_to_snapshots_when_live_absent(tmp_path):
+    """活文档不在本机时，能力锚点门必须改读仓内快照，而不是退化成 0 个锚点。
+
+    只认活文件时，干净检出（CI）四个文档全不在 → 锚点 0 个而门仍绿 = 空转。
+    这里给一个空工作区根，断言解析结果全部来自仓内快照。
+    """
+    from fd_erp_vertical_templates.cli import _default_capability_docs
+
+    empty_ws = tmp_path / "ws"
+    empty_ws.mkdir()
+    docs = _default_capability_docs(workspace=empty_ws, snapshot_root=SNAP.parent)
+    assert docs, "活文档缺席且未回落到快照——门会空转"
+    assert all("collateral-snapshots" in str(p) for p in docs), docs
+    assert {p.name for p in docs} >= {
+        "crossborder-supply-map.md", "bossai.md", "demo-guide-crossborder.md"}
+
+    from fd_erp_vertical_templates.capability_check import check_template
+
+    res = check_template(REPO / "templates" / "crossborder", doc_paths=docs)
+    anchor_check = next(c for c in res["checks"] if c["name"] == "doc-anchors")
+    assert anchor_check["ok"] is True
+    assert "未扫描" not in anchor_check["detail"]
+    assert "锚点" in anchor_check["detail"]
+
+
+def test_capability_docs_prefer_live_over_snapshot(tmp_path):
+    """活文档存在时优先用它（避免同一份内容被数两遍、也避免拿旧快照当现状）。"""
+    from fd_erp_vertical_templates.cli import _default_capability_docs
+
+    ws = tmp_path / "ws"
+    (ws / "docs").mkdir(parents=True)
+    (ws / "docs" / "crossborder-supply-map.md").write_text("x", encoding="utf-8")
+    docs = _default_capability_docs(workspace=ws, snapshot_root=SNAP.parent)
+    chosen = {p.name: p for p in docs}
+    assert "collateral-snapshots" not in str(chosen["crossborder-supply-map.md"])
+
+
+def test_doc_anchor_gate_reports_unverified_when_no_doc_is_present(tmp_path):
+    """一份文档都没有时必须明说「未验证」，不能报成「0 个锚点」的 ok。"""
+    from fd_erp_vertical_templates.capability_check import check_template
+
+    missing = tmp_path / "nope.md"
+    res = check_template(REPO / "templates" / "crossborder", doc_paths=[missing])
+    anchor_check = next(c for c in res["checks"] if c["name"] == "doc-anchors")
+    assert anchor_check["ok"] is False
+    assert "未验证" in anchor_check["detail"] or "未扫描" in anchor_check["detail"]
+
+
+def test_doc_anchor_drift_on_snapshot_is_caught(tmp_path):
+    """快照里把锚点状态写错 → 必须报 anchor-drift（兜底路径也得能验出问题）。"""
+    from fd_erp_vertical_templates.capability_check import ANCHOR_RE, check_template
+
+    text = (SNAP / "crossborder-supply-map.md").read_text(encoding="utf-8")
+    m = ANCHOR_RE.search(text)
+    assert m, "快照里应当有至少一个能力锚点"
+    bad = tmp_path / "bad.md"
+    bad.write_text(text.replace(
+        m.group(0), f"<!-- capability:{m.group(1)}.{m.group(2)}=available -->", 1),
+        encoding="utf-8")
+    res = check_template(REPO / "templates" / "crossborder", doc_paths=[bad])
+    assert res["ok"] is False
+    assert any(c["kind"] == "anchor-drift" for c in res["conflicts"]), res["conflicts"]
