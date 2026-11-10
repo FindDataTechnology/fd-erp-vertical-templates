@@ -79,14 +79,21 @@ def provider_facts() -> tuple[dict[str, dict], str]:
 
 
 def refresh_facts_fixture() -> int:
-    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。"""
-    providers = sorted(p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json"))
-    facts = {
-        p: {"catalog": True, "executor_tests": executor_test_count(p)} for p in providers
-    }
-    # 绑定里提到的、但目录没有的角色名也要留一行，否则快照会"看起来都齐"
+    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。
+
+    只写**模板已引用**的 provider：这份快照回答的是「CI 要相信哪些 provider 的事实」，
+    不是「目录里有谁」。覆盖不全由 `uncovered_bindings()` 在派生时断言兜住。
+    """
+    catalog = {p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json")}
+    facts: dict[str, dict] = {}
     for b in bindings():
-        facts.setdefault(str(b["provider"]), {"catalog": False, "executor_tests": 0})
+        provider = b.get("provider")
+        if not provider or str(provider) in facts:
+            continue
+        facts[str(provider)] = {
+            "catalog": str(provider) in catalog,
+            "executor_tests": executor_test_count(str(provider)) if str(provider) in catalog else 0,
+        }
     body = {
         "_comment": (
             "open-connector-mt 的 provider 事实快照。CI 只有本仓 checkout，读不到连接器仓；"

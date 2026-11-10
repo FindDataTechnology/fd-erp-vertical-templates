@@ -301,3 +301,22 @@ python3 scripts/check_all.py      # 应回到全量下的绿
 | 回滚后工作树 | `git status --porcelain` | 仅剩本文档差异（代码与快照均回到 HEAD 状态） |
 
 结论：落地与回滚都是可执行的、可整体退回的；回滚不依赖 `git checkout --`。
+
+## 7. 裁决记录（2026-11-10，已执行）
+
+**决定：采用精选（只写模板已引用的 provider）。**
+
+| 项 | 内容 |
+|---|---|
+| 决定 | `refresh_facts_fixture()` 改为遍历 `bindings()`，快照只写被引用的 provider |
+| 依据 | ① 切换后 `connector-status.json` **逐字节不变**（实测 diff 空）→ 零下游连锁；② 唯一失效模式（快照漏项）已被 `uncovered_bindings()` 断言 + 3 条用例覆盖，且有负例实证；③ 全量每次刷新 +6269/−17 行无法 review，且含 1567 个与本仓无关条目 |
+| 可验证判据 | 快照条目数 == 模板引用数（当前 8 == 8）；`uncovered_bindings()` 为空；干净检出 15 道门全绿；删任一被引用项 → `--check` 退出码 1 并点名 |
+| 回滚点 | 改动前 `HEAD = 69a1d3f`；快照备份 `cp tests/fixtures/connector-provider-facts.json /tmp/facts-full.bak`（118,346 B / 1575 项）。回滚 = `git apply -R <patch>` + `cp` 还原 + 重跑派生（§5.3 后三条命令） |
+| 歧义取向 | 「快照代表什么」原有两解（目录清单 / CI 需相信的事实）。按**可验证更严**一侧取后者：口径直接由 `bindings()` 派生，且覆盖不足即门红，不留「看起来都齐」的解释空间 |
+| 执行结果 | 快照 6307 行 / 118,346 B → **39 行 / 887 B**（`count: 8`）；脚本 +14/−7 行；`connector-status.json` 未变；15 道门全绿；干净检出同样 15 道门全绿、引用集与快照集恰好相等 |
+
+**新增的持续成本**（如实记账）：今后新增 provider 绑定必须多跑一次 `--refresh-fixture`。
+漏跑会被门拦住（实测：加假绑定 `erpnext` 不重刷 → 退出码 1，报「事实快照缺模板已引用的
+provider：erpnext」），不是静默遗漏。注意新增绑定在**任何**范围方案下都需要重新派生并提交
+`connector-status.json`（integrations 来自 `bindings()`，与夹具范围无关），所以精选多出的只有
+刷新这一条命令。
