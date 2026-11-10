@@ -139,3 +139,80 @@ ref = sorted({b["provider"] for b in m.bindings() if b.get("provider")})
 json.dump({"providers": {k: full["providers"][k] for k in ref}}, ...)
 ```
 
+
+## 5.1 补丁方案：改回精选（**未提交**，供评审）
+
+> 本节只是补丁文本，**没有应用到仓库**；快照当前仍是全量 1575 项。
+> 已在工作区同级的临时副本（`.probe-curated`，跑完即删）里完整验证过，结果见 5.2。
+
+### 改动 A：`scripts/build_connector_status.py` —— 刷新入口只写被引用项
+
+只改 `refresh_facts_fixture()`：把「遍历目录全部 provider」换成「遍历模板绑定」。
+
+```diff
+ def refresh_facts_fixture() -> int:
+-    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。"""
+-    providers = sorted(p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json"))
+-    facts = {
+-        p: {"catalog": True, "executor_tests": executor_test_count(p)} for p in providers
+-    }
+-    # 绑定里提到的、但目录没有的角色名也要留一行，否则快照会"看起来都齐"
+-    for b in bindings():
+-        facts.setdefault(str(b["provider"]), {"catalog": False, "executor_tests": 0})
++    """从实时连接器仓重写事实快照（本地刷新用；CI 不调用）。
++
++    只写**模板已引用**的 provider：这份快照回答的是「CI 要相信哪些 provider 的事实」，
++    不是「目录里有谁」。覆盖不全由 `uncovered_bindings()` 在派生时断言兜住。
++    """
++    catalog = {p.stem for p in (CONNECTOR_REPO / "catalog" / "apps").glob("*.json")}
++    facts = {}
++    for b in bindings():
++        provider = b.get("provider")
++        if not provider or provider in facts:
++            continue
++        facts[str(provider)] = {
++            "catalog": provider in catalog,
++            "executor_tests": executor_test_count(provider) if provider in catalog else 0,
++        }
+```
+
+保留原样、**不要动**的部分：`body` 里的 `_comment`（仍说明刷新命令）、`source`、`count`
+（`count` 自动等于 `len(facts)`，会随之为 8）、`sort_keys=True`。
+
+### 改动 B：快照文件本身
+
+不手改。落地时跑一次 `python3 scripts/build_connector_status.py --refresh-fixture`，
+由改动 A 之后的新逻辑重写整份文件。等价效果（**要删的键**）：
+
+- 删除：当前 `providers` 中除下列 8 个之外的全部键，共 **1567 个**；
+- 保留 8 个（`count` 字段随之改为 8）：
+  `carrier-portal`、`cn-commerce`、`kingdee`、`pos`、`shopify_admin`、
+  `supplier-portal`、`wechatpay`、`wms`。
+- 文件形态：6307 行 / 118,346 B → **39 行 / 887 B**（实测，见 5.2）。
+
+这 8 个键的来源是 `bindings()`（读 `templates/*/connector-pack/pack.json#connector_bindings`），
+不是手抄清单——新增绑定后重刷即自动纳入。
+
+### 改动 C：三条用例的对应关系（**无需修改**，但它们是为这一刻写的）
+
+| 用例 | 在全量下 | 改精选后 | 它守的是什么 |
+|---|---|---|---|
+| `test_snapshot_covers_every_provider_the_templates_reference` | 通过（1575 ⊇ 8） | 通过（8 ⊇ 8，**恰好相等**） | 正向基线：引用集 ⊆ 快照集；口径与派生同源（都取 `bindings()`） |
+| `test_missing_snapshot_coverage_breaks_the_gate` | 通过（删一项即点名） | 通过（**这条才是精选的安全网**） | 机制：快照少一个被引用 provider → `uncovered_bindings()` 点名 + `derive()` 报 problem |
+| `test_missing_snapshot_entirely_reports_unavailable_not_missing_coverage` | 通过 | 通过 | 快照整体缺失时只报「事实不可得」，不重复刷覆盖面（避免噪音双报） |
+
+三条用例都只依赖 `bindings()` 与 `FACTS_FIXTURE`，不依赖快照规模，所以改动 A/B 不需要动测试。
+换句话说：**精选方案的安全性由第 2 条用例 + `derive()` 里的断言保证，不由快照范围保证**。
+
+### 5.2 验证结果（临时副本，未提交）
+
+在 `finddata/.probe-curated`（真仓的完整副本，位置保证能看到 `../open-connector-mt`）里：
+
+1. 应用改动 A → `--refresh-fixture` 输出 `wrote …（8 个 provider）`，文件 **39 行 / 887 B**；
+2. `check_all`：**15 道门全绿**；
+3. `build_connector_status.py --check`：**退出码 0**，`OK: 三态与派生一致；连接 0 / 未接通 9 / 501 挂账 20`；
+4. `pytest tests/test_connector_status.py`：**15 passed**；
+5. 负例：从精选快照删掉 `kingdee`（剩 7 项）→ `--check` **退出码 1**，点名
+   `事实快照缺模板已引用的 provider：kingdee`；还原后退出码 0。
+
+结论：改精选不会削弱任何现有断言，漏项仍被门拦住。
