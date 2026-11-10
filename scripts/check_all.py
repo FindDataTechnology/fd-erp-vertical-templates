@@ -64,19 +64,36 @@ GATES: tuple[Gate, ...] = (
          "catalog / executor_tests / live 与派生文件一致"),
     Gate("对外声明", ("scripts/claim_gate.py", "check"),
          "能力声明不得越界（对方线，只读调用）"),
-    # 最后一道：全套测试。上面十道是「单点门」，脚本级的；而门级断言大量写在
-    # tests/ 里（骨架契约审计、人工门记录、快照一致、售前对齐、扩量规划…）。
-    # 只跑其中两个文件等于「声称全部通过，实际七个门没跑」——本脚本自己踩过这个坑。
-    Gate("全套测试", ("-m", "pytest", "tests", "-q"),
+    # 本仓全套测试。上面是「单点门」；门级断言大量写在 tests/ 里（骨架契约审计、
+    # 人工门记录、快照一致、售前对齐、扩量规划…）。只跑其中两个文件等于
+    # 「声称全部通过，实际七个门没跑」——本脚本自己踩过这个坑。
+    Gate("本仓全套测试", ("-m", "pytest", "tests", "-q"),
          "tests/ 下全部门级断言 + 既有回归"),
+    # 跨仓门：电商方案的门横跨两个仓，看板侧的门（公开面守卫、数据源红线）
+    # 写在 ../dashboards/tests。不跑它们等于「本仓绿了就说全线绿了」。
+    Gate("看板仓测试", ("-m", "pytest", "../dashboards/tests", "-q"),
+         "公开面守卫 + 数据源红线（跨仓）"),
 )
+
+
+def _available(gate: "Gate") -> bool:
+    """跨仓门在缺少兄弟仓时如实报「不可用」，不假装通过也不判红。"""
+    for arg in gate.argv:
+        if arg.startswith("../"):
+            return (REPO / arg).exists()
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:
     only = set((argv or [])[1:])
     rows: list[tuple[str, bool, str]] = []
+    skipped: list[str] = []
     for gate in GATES:
         if only and gate.name not in only:
+            continue
+        if not _available(gate):
+            skipped.append(gate.name)
+            rows.append((gate.name, True, "不可用（兄弟仓不在本机），未执行"))
             continue
         proc = subprocess.run([PY, *gate.argv], cwd=REPO,
                               capture_output=True, text=True)
@@ -92,7 +109,11 @@ def main(argv: list[str] | None = None) -> int:
     if failed:
         print(f"共 {len(rows)} 道门，{len(failed)} 道红：{'、'.join(failed)}")
         return 1
-    print(f"共 {len(rows)} 道门，全部通过")
+    if skipped:
+        print(f"共 {len(rows)} 道门，全部通过（其中 {len(skipped)} 道因兄弟仓缺失未执行："
+              f"{'、'.join(skipped)}）")
+    else:
+        print(f"共 {len(rows)} 道门，全部通过")
     return 0
 
 
