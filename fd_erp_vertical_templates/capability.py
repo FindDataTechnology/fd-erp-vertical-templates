@@ -138,21 +138,20 @@ class CapabilityMatrix:
     def status(self, platform: str, flow: str) -> str:
         return self.cell(platform, flow).status
 
+    def _legs_of(self, platform: str, *, available: bool = True) -> tuple[str, ...]:
+        """对账三腿里可得（或不可得）的那几条——refunds 不是腿，不在此列。
+
+        `available=False` 目前无调用方；保留参数是为了让 next 一步做「不可得腿」
+        报表时不必再改签名，而非为想象中的需求提前写逻辑。
+        """
+        legit = (SECTION_FLOW_ORDERS, SECTION_FLOW_SETTLEMENTS, SECTION_FLOW_INVENTORY)
+        return tuple(
+            f for f in legit
+            if (platform, f) in self.cells and self.cells[(platform, f)].available is available)
+
     def available_flows(self, platform: str) -> tuple[str, ...]:
-        return tuple(f for f in self._flows_of(platform)
-                     if self.cells.get((platform, f), None) and
-                     self.cells[(platform, f)].available)
-
-    def unavailable_flows(self, platform: str) -> tuple[str, ...]:
-        return tuple(f for f in self._flows_of(platform)
-                     if (platform, f) in self.cells and
-                     not self.cells[(platform, f)].available)
-
-    def _flows_of(self, platform: str) -> tuple[str, ...]:
-        declared = self.platforms.get(platform, {}).get("flows")
-        if isinstance(declared, dict) and declared:
-            return tuple(f for f in FLOWS if f in declared)
-        return tuple(f for (p, f) in self.cells if p == platform)
+        """该平台**可对账的腿**（对账三腿内、且矩阵记 available）。"""
+        return self._legs_of(platform, available=True)
 
     # ---- 对账面 ----
 
@@ -161,21 +160,21 @@ class CapabilityMatrix:
 
         只数 orders / settlements / inventory 三腿——refunds 是差异来源不是腿。
         """
-        legit = (SECTION_FLOW_ORDERS, SECTION_FLOW_SETTLEMENTS, SECTION_FLOW_INVENTORY)
-        return sum(1 for f in legit if (platform, f) in self.cells
-                   and self.cells[(platform, f)].available)
+        return len(self._legs_of(platform, available=True))
 
     def missing_legs(self, platform: str) -> list[dict[str, Any]]:
         """差异清单要带的 `capability_missing` 归因（逐腿，含矩阵引用）。"""
         out: list[dict[str, Any]] = []
         for flow in (SECTION_FLOW_ORDERS, SECTION_FLOW_SETTLEMENTS, SECTION_FLOW_INVENTORY):
+            if flow in self.available_flows(platform):
+                continue
             cell = self.cells.get((platform, flow))
-            if cell is None:
+            if cell is None:      # 缺格也是「不可得」，但要标清是未登记而非状态判定
                 out.append({"kind": "capability_missing", "flow": flow,
                             "status": STATUS_UNMAPPED, "platform": platform,
                             "reason": "矩阵缺格（未登记）",
                             "matrix_ref": f"{platform}.{flow}"})
-            elif not cell.available:
+            else:
                 out.append({"kind": "capability_missing", "flow": flow,
                             "status": cell.status, "platform": platform,
                             "reason": cell.reason,

@@ -282,3 +282,34 @@ def test_matrix_version_matches_manifest_declaration():
     declared = manifest["assets"]["capability_matrix"]["version"]
     assert matrix.get("version") == declared, (
         f"矩阵 version={matrix.get('version')} 与清单声明 {declared} 不一致")
+
+
+# ---------------------------------------------------------------- 死代码防回归
+
+def test_no_unused_public_helpers_in_capability():
+    """能力矩阵模块的公开 helper 必须真的有人用。
+
+    本会话真实清掉过一个 `unavailable_flows`（与 missing_legs 功能重叠、无调用方）
+    和两个从未被调用的 flows 查询。交付物里的死代码就是噪声——更难的是它会被
+    当成「有能力的证据」：读者看到有个 available_flows 就以为有人靠它做决定。
+    """
+    import ast as _ast
+    import pathlib as _pathlib
+
+    repo = _pathlib.Path(__file__).resolve().parent.parent
+    src_all = "".join(p.read_text(encoding="utf-8")
+                      for p in repo.rglob("*.py") if "__pycache__" not in str(p))
+    tree = _ast.parse((repo / "fd_erp_vertical_templates" / "capability.py")
+                      .read_text(encoding="utf-8"))
+
+    dead: list[str] = []
+    for cls in [n for n in tree.body if isinstance(n, _ast.ClassDef)]:
+        for fn in [n for n in cls.body if isinstance(n, _ast.FunctionDef)]:
+            if fn.name.startswith("__"):
+                continue
+            # 属性不算；私有也算进来（私有死代码同样是噪声）
+            if any("property" in _ast.dump(d) for d in fn.decorator_list):
+                continue
+            if src_all.count(fn.name) <= 1:
+                dead.append(f"{cls.name}.{fn.name}")
+    assert not dead, f"capability.py 有无人调用的方法：{dead}"
