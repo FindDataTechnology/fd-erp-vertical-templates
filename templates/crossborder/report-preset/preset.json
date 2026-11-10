@@ -2,7 +2,7 @@
  "schema": "erp-report-preset/v1",
  "name": "跨境电商对账报表 preset",
  "vertical": "crossborder",
- "version": "1.1.2",
+ "version": "1.1.3",
  "reports": [
   {
    "key": "xb-store-recon",
@@ -163,12 +163,12 @@
  },
  "capability_source": {
   "path": "capability-matrix.json",
-  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6",
+  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e",
   "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:1061c7c690a9381a3464fede7d53f83eaaa5354ead811279f77ca71b5b7391e6"
+  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e"
  },
  "metric_calibers": [
   {

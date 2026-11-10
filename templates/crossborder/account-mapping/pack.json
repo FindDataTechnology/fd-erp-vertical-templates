@@ -1,7 +1,7 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商科目映射包",
- "version": "1.1.2",
+ "version": "1.1.3",
  "description": "跨境电商对账模板·科目映射 pack：行业科目对齐内核通用科目最小集（呈现层口径）。映射只影响报表与查询呈现，已落账分录零改动；替换映射不改账。映射 MUST NOT 向内核注入行业科目行（本包无任何写内核路径）。",
  "tags": [
   "ERP",

@@ -22,7 +22,7 @@
      "evidence": [
       {
        "kind": "provider_action",
-       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:665",
+       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_orders",
        "note": "list_orders / get_order 已在目录"
       }
      ],
@@ -36,12 +36,12 @@
      "evidence": [
       {
        "kind": "provider_action",
-       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:816",
+       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_payouts",
        "note": "list_payouts 已在目录（catalog 27 项）"
       },
       {
        "kind": "runtime_read",
-       "ref": "POST /v1/actions/shopify_admin.list_payouts → 401（动作已注册，无凭证=AUTH_FAILED 而非 404）",
+       "ref": "runtime:POST /v1/actions/shopify_admin.list_payouts → 401（动作已注册，无凭证=AUTH_FAILED 而非 404）",
        "note": "runtime 冒烟 2026-11-10：动作接线成功，无真实凭证故未读到数据"
       }
      ],
@@ -55,7 +55,7 @@
      "evidence": [
       {
        "kind": "provider_action",
-       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts:669",
+       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_inventory_items",
        "note": "list_inventory_items / get_inventory_item 已在目录"
       }
      ],
@@ -332,5 +332,5 @@
    }
   }
  ],
- "version": "1.1.0"
+ "version": "1.1.1"
 }

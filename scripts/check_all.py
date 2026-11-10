@@ -46,6 +46,10 @@ GATES: tuple[Gate, ...] = (
          "矩阵 ↔ 产物 ↔ 对外文档锚点"),
     Gate("派生资产同步", ("scripts/gen_capability_artifacts.py", "--check"),
          "矩阵改了没重生成即红"),
+    # 矩阵的凭据（evidence ref）本身出过事：三条跨仓 ref 里两条指向无关代码，因为
+    # 行号锚随编辑漂移而没人核。这道门禁行号锚、验符号真实存在。
+    Gate("凭据可核", ("scripts/check_evidence_refs.py",),
+         "evidence ref 禁行号锚 + 符号必须真实存在于所指文件"),
     Gate("跨链互证", ("-m", "pytest", "tests/test_matrix_status_consistency.py", "-q"),
          "矩阵 ↔ 连接器对接三态"),
     Gate("发布注记", ("-m", "fd_erp_vertical_templates.cli", "publish-notes"),
