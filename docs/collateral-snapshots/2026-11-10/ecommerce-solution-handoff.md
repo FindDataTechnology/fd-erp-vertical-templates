@@ -57,15 +57,27 @@
 cd fd-erp-vertical-templates
 python3 scripts/check_all.py            # 一次跑完全部门（含 tests/ 全套）；红则退出码 1
 
-# 下面是各道门的单独入口（排查用）
+# 单独跑某几道（排查用，门名支持中文过滤）
+python3 scripts/check_all.py 发布门 提交材料
+
+# 各道门的独立入口：脚本级
 python3 -m fd_erp_vertical_templates.cli capability-check --template templates/crossborder   # 矩阵 ↔ 产物 ↔ 19 锚点
 python3 -m fd_erp_vertical_templates.cli release-check --template templates/crossborder --ledger releases/ledger.jsonl
+python3 -m fd_erp_vertical_templates.cli publish-notes                                      # 三处注记 ↔ 发布记录
 python3 scripts/gen_capability_artifacts.py --check        # 矩阵改了没重生成即红
 python3 scripts/entry_matrix.py --check                    # 未发布入口不得进试用列表
-python3 scripts/market_submission.py --check               # 四语齐全 + tags 同长
-python3 scripts/release_readiness.py --write               # 刷新 releases/READINESS.md
+python3 scripts/market_submission.py --check               # 四语齐全 + tags 同长 + 版本新鲜
 python3 scripts/build_connector_status.py --check          # 对接三态证据链与派生文件一致
+python3 scripts/claim_gate.py check                        # 对外声明不得越界（另一线，只读调用）
+python3 scripts/release_readiness.py --write               # 刷新 releases/READINESS.md（派生件，非门）
+
+# 测试级（两组都已在 check_all 里）
+.venv/bin/python -m pytest tests -q
+.venv/bin/python -m pytest ../dashboards/tests -q
 ```
+
+> 门数**不写死**：`check_all.py` 自己报「共 N 道门」。写死数字必然过期
+> （本会话已在「66 项测试」「提交材料版本」「门数」三处栽过）。
 
 ## 并发提示（2026-11-10 02:26 实测）
 
