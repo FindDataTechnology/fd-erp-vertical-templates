@@ -1,524 +1,637 @@
 {
- "schema": "erp-capability-claims/v1",
- "note": "对外能力声明 → 证据引用（optimize-erp-solution task 4.1）。这是「我们能说什么」的唯一出处：官网文案、方案文档与市场描述里的每条能力主张都必须能回指到这里的一条 claim，claim 的每条证据都必须能在仓内解析到。status=not_claimable 的条目可以出现在「不可宣称」清单里，但不得以肯定句式出现在对外材料中。",
- "updated_at": "2026-11-10",
- "surfaces": {
-  "board-doc": "docs/erp/README.md",
-  "official-web": "fd-official-web/src/components/ErpLanding.astro",
-  "official-web-products": "fd-official-web/src/pages/products.astro",
-  "official-web-products-zh": "fd-official-web/src/pages/zh/products.astro",
-  "erp-site": "fd-erp/site/index.html",
-  "erp-ownership-readme": "fd-erp/README.md"
- },
- "scan": {
-  "note": "对外材料的声明扫描：命中 assertion 句式且未被任何 claim 的 patterns 覆盖即判红。negative_markers 用于识别否定语境（「不自研」「不宣称」「挂账」），限定在同句或紧邻前缀内——否定列表不是声明。",
-  "assertions": [
-   {
-    "id": "invoice",
-    "pattern": "(?:支持|提供|可|已|能)(?:开票|发票|代开)"
-   },
-   {
-    "id": "fund-execution",
-    "pattern": "(?:支持|提供|已)(?:资金池|代收代付|分账执行|资金执行|资金归集)"
-   },
-   {
-    "id": "monolith",
-    "pattern": "(?:支持|提供|可|已)(?:单体\\s*ERP|表单式\\s*ERP)"
-   },
-   {
-    "id": "live",
-    "pattern": "已上线|已上架|已发布|已\\s*deploy|已写入\\s*(?:市场|registry)"
-   }
+  "schema": "erp-capability-claims/v1",
+  "note": "对外能力声明 → 证据引用（optimize-erp-solution task 4.1）。这是「我们能说什么」的唯一出处：官网文案、方案文档与市场描述里的每条能力主张都必须能回指到这里的一条 claim，claim 的每条证据都必须能在仓内解析到。status=not_claimable 的条目可以出现在「不可宣称」清单里，但不得以肯定句式出现在对外材料中。",
+  "updated_at": "2026-11-12",
+  "surfaces": {
+    "board-doc": "docs/erp/README.md",
+    "official-web": "fd-official-web/src/components/ErpLanding.astro",
+    "official-web-products": "fd-official-web/src/pages/products.astro",
+    "official-web-products-zh": "fd-official-web/src/pages/zh/products.astro",
+    "erp-site": "fd-erp/site/index.html",
+    "erp-ownership-readme": "fd-erp/README.md"
+  },
+  "scan": {
+    "note": "对外材料的声明扫描：命中 assertion 句式且未被任何 claim 的 patterns 覆盖即判红。negative_markers 用于识别否定语境（「不自研」「不宣称」「挂账」），限定在同句或紧邻前缀内——否定列表不是声明。",
+    "assertions": [
+      {
+        "id": "invoice",
+        "pattern": "(?:支持|提供|可|已|能)(?:开票|发票|代开)"
+      },
+      {
+        "id": "fund-execution",
+        "pattern": "(?:支持|提供|已)(?:资金池|代收代付|分账执行|资金执行|资金归集)"
+      },
+      {
+        "id": "monolith",
+        "pattern": "(?:支持|提供|可|已)(?:单体\\s*ERP|表单式\\s*ERP)"
+      },
+      {
+        "id": "live",
+        "pattern": "已上线|已上架|已发布|已\\s*deploy|已写入\\s*(?:市场|registry)"
+      }
+    ],
+    "negative_markers": [
+      "不",
+      "未",
+      "无",
+      "非",
+      "禁止",
+      "不得",
+      "挂账",
+      "不可",
+      "DO NOT",
+      "免"
+    ],
+    "generated_block_markers": {
+      "not-claimable": [
+        "<!-- claim-gate:begin:not-claimable -->",
+        "<!-- claim-gate:end:not-claimable -->"
+      ],
+      "release-status": [
+        "<!-- claim-gate:begin:release-status -->",
+        "<!-- claim-gate:end:release-status -->"
+      ]
+    }
+  },
+  "claims": [
+    {
+      "id": "ledger.double-entry",
+      "capability": "复式事件账（agent 拟稿经确认门才成为事实；外部系统事实经导入车道按来源权威直接成为事实；事实按人工确认的过账规则派生分录，缺规则即挂待补、不猜科目；借贷必平由数据库约束强制；分录 append-only；余额确定性重算）",
+      "status": "delivered",
+      "patterns": [
+        "复式事件账",
+        "借贷必平",
+        "append-only"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0001_baseline.sql",
+          "contains": "erp_assert_txn_balanced"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "submit_proposal"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "confirm_proposal"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "query_balance"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "ledger.idempotent",
+      "capability": "stable_id 幂等去重（同源重推只落一次）",
+      "status": "delivered",
+      "patterns": [
+        "stable_id 幂等",
+        "幂等去重"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/proposals.py",
+          "contains": "stable_id"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "ledger.fx-provenance",
+      "capability": "多币种：原币 + 本位币折算，汇率带 as_of 与出处，无出处拒绝",
+      "status": "delivered",
+      "patterns": [
+        "多币种原币",
+        "无出处汇率",
+        "汇率.*出处"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0005_billing_fx_provenance.sql",
+          "contains": "fx"
+        },
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/fx.py",
+          "contains": "fx_facts"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "recon.readonly-four-diffs",
+      "capability": "对账只读滩头：四类差异含双侧原始引用，对外部系统零写入",
+      "status": "delivered",
+      "patterns": [
+        "四类差异",
+        "对账引擎只读",
+        "对外部系统零写入"
+      ],
+      "evidence": [
+        {
+          "kind": "mcp_tool",
+          "ref": "run_reconciliation"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "get_recon_report"
+        },
+        {
+          "kind": "test",
+          "ref": "test_missing_and_extra"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "templates.four-piece",
+      "capability": "三个行业模板以四件套交付（连接器 pack / 舰队蓝图 / 科目映射 / 报表 preset），各件独立版本",
+      "status": "delivered",
+      "patterns": [
+        "行业模板四件套",
+        "四件套为核"
+      ],
+      "evidence": [
+        {
+          "kind": "asset",
+          "ref": "templates/crossborder/manifest.json"
+        },
+        {
+          "kind": "asset",
+          "ref": "templates/restaurant-chain/manifest.json"
+        },
+        {
+          "kind": "asset",
+          "ref": "templates/supply-chain/manifest.json"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "templates.extension-packs",
+      "capability": "扩展件：取价规则 pack（规则带出处）+ 四端页面集 pack（壹座底座契约）",
+      "status": "delivered",
+      "patterns": [
+        "取价规则 pack",
+        "页面集 pack",
+        "定价规则 pack"
+      ],
+      "evidence": [
+        {
+          "kind": "asset",
+          "ref": "templates/supply-chain/pricing-rules/pack.json"
+        },
+        {
+          "kind": "asset",
+          "ref": "templates/supply-chain/pagesets/pack.json"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "connector.single-egress",
+      "capability": "出网单口：商家数据只经连接器运行时读取，模板层不持端点、不发 HTTP、不读凭证",
+      "status": "delivered",
+      "patterns": [
+        "出网单口",
+        "经连接器运行时",
+        "BYOK"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/runtime_client.py",
+          "contains": "class RuntimeClient"
+        },
+        {
+          "kind": "test",
+          "ref": "test_connector_modules_do_not_import_http_clients"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "connector.three-state",
+      "capability": "连接器三态证据链（目录 provider / 执行器测试 / live 验收），缺一态即未接通",
+      "status": "delivered",
+      "patterns": [
+        "三态",
+        "未接通须返回 501",
+        "缺 live 验收"
+      ],
+      "evidence": [
+        {
+          "kind": "asset",
+          "ref": "connector-status.json"
+        },
+        {
+          "kind": "test",
+          "ref": "test_kingdee_has_catalog_but_no_executor_test"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "shares.no-fund-execution",
+      "capability": "分成只产出双方可核对的分成对账单与核对指令，零资金执行面（二清红线）",
+      "status": "delivered",
+      "patterns": [
+        "分成.*核对对账单",
+        "无资金执行面",
+        "二清红线"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/recon/shares.py",
+          "contains": "SHARE_EXECUTION_DENIED"
+        },
+        {
+          "kind": "test",
+          "ref": "test_share_execution_denied"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "billing.event",
+      "capability": "事件计费与计费规则审批（bill_event / approve_billing_rule）",
+      "status": "delivered",
+      "patterns": [
+        "事件计费"
+      ],
+      "evidence": [
+        {
+          "kind": "mcp_tool",
+          "ref": "bill_event"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "approve_billing_rule"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "tenant.isolation",
+      "capability": "双客群租户隔离：经营数据按租户（cell）隔离，查询闸强制租户列",
+      "status": "delivered",
+      "patterns": [
+        "租户隔离",
+        "按租户.*隔离"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/tenancy.py",
+          "contains": "tenant"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web"
+      ]
+    },
+    {
+      "id": "market.connector-packs",
+      "capability": "三个行业连接器包已在市场（supply-chain v3 / restaurant-chain v2 / crossborder v2）",
+      "status": "delivered",
+      "patterns": [
+        "已在市场",
+        "已上架：市场 v"
+      ],
+      "asserts_live": "market.connector-packs",
+      "evidence": [
+        {
+          "kind": "release",
+          "ref": "supply-chain/connector-pack"
+        },
+        {
+          "kind": "release",
+          "ref": "restaurant-chain/connector-pack"
+        },
+        {
+          "kind": "release",
+          "ref": "crossborder/connector-pack"
+        }
+      ],
+      "targets": []
+    },
+    {
+      "id": "invoice.self-built",
+      "capability": "开票自研 / 支持开票",
+      "status": "not_claimable",
+      "pattern_source": "invoice",
+      "patterns": [
+        "支持开票",
+        "可开票",
+        "提供开票",
+        "开票自研"
+      ],
+      "reason": "开票自研当前不提供（挂账）：票据本体由客户既有合规渠道处理，平台不伪造不代开",
+      "evidence": [
+        {
+          "kind": "endpoint",
+          "ref": "GET /erp/supply-chain/v1/sp/invoices"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "invoice.tax-return",
+      "capability": "税务申报",
+      "status": "not_claimable",
+      "patterns": [
+        "支持税务申报",
+        "提供税务申报"
+      ],
+      "reason": "税务申报当前不提供（挂账）",
+      "evidence": [
+        {
+          "kind": "endpoint",
+          "ref": "GET /erp/supply-chain/v1/sp/invoices"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "funds.execution",
+      "capability": "资金执行（资金池 / 代收代付 / 分账执行 / 资金归集）",
+      "status": "not_claimable",
+      "pattern_source": "fund-execution",
+      "patterns": [
+        "支持资金执行",
+        "支持代收代付",
+        "支持分账",
+        "支持资金池",
+        "支持资金归集"
+      ],
+      "reason": "二清红线：平台只产出对账结果与核对指令，资金归集与分账走客户自选的持牌通道",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/recon/shares.py",
+          "contains": "SHARE_EXECUTION_DENIED"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "erp.monolith-ui",
+      "capability": "单体 ERP 应用 / 表单式 UI",
+      "status": "not_claimable",
+      "pattern_source": "monolith",
+      "patterns": [
+        "单体 ERP 应用",
+        "表单式 UI",
+        "表单式 ERP"
+      ],
+      "reason": "ERP 以「集群 + 供给包」组合交付，不是单体 ERP 应用或表单式 UI",
+      "evidence": [
+        {
+          "kind": "asset",
+          "ref": "templates/supply-chain/manifest.json"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "live.official-web-deploy",
+      "capability": "官网已 deploy",
+      "status": "not_claimable",
+      "patterns": [
+        "官网已 deploy",
+        "官网已上线"
+      ],
+      "reason": "官网 ERP 落地页为可发布工件 + 本地校验证据；site deploy 需真实凭据，属独立发布步骤",
+      "asserts_live": "official-web.deploy",
+      "evidence": [
+        {
+          "kind": "surface",
+          "ref": "official-web.deploy"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "live.gateway-rollout",
+      "capability": "网关已上线",
+      "status": "not_claimable",
+      "patterns": [
+        "网关已上线",
+        "gateway 已上线"
+      ],
+      "reason": "gateway rollout 需真实凭据与集群变更，属独立发布步骤",
+      "asserts_live": "gateway.rollout",
+      "evidence": [
+        {
+          "kind": "surface",
+          "ref": "gateway.rollout"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "live.registry-write",
+      "capability": "registry 快照已写入",
+      "status": "not_claimable",
+      "patterns": [
+        "registry 已写入",
+        "registry 快照已 live 写入"
+      ],
+      "reason": "registry 写入属独立发布步骤，需真实凭据",
+      "asserts_live": "registry.snapshot",
+      "evidence": [
+        {
+          "kind": "surface",
+          "ref": "registry.snapshot"
+        }
+      ],
+      "targets": [
+        "board-doc",
+        "official-web",
+        "erp-site"
+      ]
+    },
+    {
+      "id": "event.append-only-facts",
+      "capability": "业务事件层：经营事实只追加，定型按事件自身周期（日/月/年 + 修订窗）推导而非全局秒数；定型前的修订保留旧值、修订来源与时点；定型后更正只走冲正并与原事件关联；两条车道——外部原始事实写入即是事实，agent 拟稿未过确认门不算事实。",
+      "status": "delivered",
+      "patterns": [
+        "业务事件",
+        "事件只追加",
+        "定型",
+        "冲正事件"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0007_business_events.sql",
+          "contains": "erp_event_is_finalized"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "ingest_event"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "submit_event"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "query_events"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "inventory.quantity-face",
+      "capability": "数量面：库存/在途/占用等余额由事件确定性重算，物化值带水位（as_of_event_id）且可全量重算校验；余额是投影产物、不可直写；同一对象维度下单位冲突（kg 与 pcs）拒写而非静默相加。数量只在对象面，账本面只记金额。",
+      "status": "delivered",
+      "patterns": [
+        "数量面",
+        "库存数量",
+        "对象投影",
+        "水位"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0008_objects.sql",
+          "contains": "object_balances"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "query_object_balance"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "project_event"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "posting.versioned-rules",
+      "capability": "过账规则：事件经版本化规则确定性映射为复式分录；规则须审批上线、同一事件类型仅一条生效、升版不重写历史分录；未命中规则的事件挂待补清单、不猜科目、余额不变。",
+      "status": "delivered",
+      "patterns": [
+        "过账规则",
+        "版本化规则",
+        "待补清单"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0009_posting_rules.sql",
+          "contains": "posting_rules_one_active"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "post_event"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "approve_posting_rule"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "recon.event-vs-entry",
+      "capability": "事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。",
+      "status": "delivered",
+      "patterns": [
+        "事件-分录对账",
+        "两套真相"
+      ],
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py",
+          "contains": "KbEventsAdapter"
+        },
+        {
+          "kind": "mcp_tool",
+          "ref": "run_reconciliation"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    }
   ],
-  "negative_markers": [
-   "不",
-   "未",
-   "无",
-   "非",
-   "禁止",
-   "不得",
-   "挂账",
-   "不可",
-   "DO NOT",
-   "免"
-  ],
-  "generated_block_markers": {
-   "not-claimable": [
-    "<!-- claim-gate:begin:not-claimable -->",
-    "<!-- claim-gate:end:not-claimable -->"
-   ],
-   "release-status": [
-    "<!-- claim-gate:begin:release-status -->",
-    "<!-- claim-gate:end:release-status -->"
-   ]
-  }
- },
- "claims": [
-  {
-   "id": "ledger.double-entry",
-   "capability": "复式事件账（agent 拟稿经确认门才成为事实；外部系统事实经导入车道按来源权威直接成为事实；事实按人工确认的过账规则派生分录，缺规则即挂待补、不猜科目；借贷必平由数据库约束强制；分录 append-only；余额确定性重算）",
-   "status": "delivered",
-   "patterns": [
-    "复式事件账",
-    "借贷必平",
-    "append-only"
-   ],
-   "evidence": [
+  "negative_rules": [
     {
-     "kind": "code",
-     "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0001_baseline.sql",
-     "contains": "erp_assert_txn_balanced"
-    },
-    {
-     "kind": "mcp_tool",
-     "ref": "submit_proposal"
-    },
-    {
-     "kind": "mcp_tool",
-     "ref": "confirm_proposal"
-    },
-    {
-     "kind": "mcp_tool",
-     "ref": "query_balance"
+      "id": "numbers.unquoted",
+      "statement": "任何价格 / 客户数 / 用量 / 上线日期数字",
+      "reason": "本文与官网 ERP 文案不引用任何数字；如必须引用，须先有仓内可逐字核验的出处（口径表行 ID）",
+      "patterns": [
+        "\\d+\\s*(?:元|万元|家客户|家|%|天|月上线)"
+      ]
     }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "ledger.idempotent",
-   "capability": "stable_id 幂等去重（同源重推只落一次）",
-   "status": "delivered",
-   "patterns": [
-    "stable_id 幂等",
-    "幂等去重"
-   ],
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/proposals.py",
-     "contains": "stable_id"
-    }
-   ],
-   "targets": [
-    "board-doc"
-   ]
-  },
-  {
-   "id": "ledger.fx-provenance",
-   "capability": "多币种：原币 + 本位币折算，汇率带 as_of 与出处，无出处拒绝",
-   "status": "delivered",
-   "patterns": [
-    "多币种原币",
-    "无出处汇率",
-    "汇率.*出处"
-   ],
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0005_billing_fx_provenance.sql",
-     "contains": "fx"
-    },
-    {
-     "kind": "code",
-     "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/fx.py",
-     "contains": "fx_facts"
-    }
-   ],
-   "targets": [
-    "board-doc"
-   ]
-  },
-  {
-   "id": "recon.readonly-four-diffs",
-   "capability": "对账只读滩头：四类差异含双侧原始引用，对外部系统零写入",
-   "status": "delivered",
-   "patterns": [
-    "四类差异",
-    "对账引擎只读",
-    "对外部系统零写入"
-   ],
-   "evidence": [
-    {
-     "kind": "mcp_tool",
-     "ref": "run_reconciliation"
-    },
-    {
-     "kind": "mcp_tool",
-     "ref": "get_recon_report"
-    },
-    {
-     "kind": "test",
-     "ref": "test_missing_and_extra"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "templates.four-piece",
-   "capability": "三个行业模板以四件套交付（连接器 pack / 舰队蓝图 / 科目映射 / 报表 preset），各件独立版本",
-   "status": "delivered",
-   "patterns": [
-    "行业模板四件套",
-    "四件套为核"
-   ],
-   "evidence": [
-    {
-     "kind": "asset",
-     "ref": "templates/crossborder/manifest.json"
-    },
-    {
-     "kind": "asset",
-     "ref": "templates/restaurant-chain/manifest.json"
-    },
-    {
-     "kind": "asset",
-     "ref": "templates/supply-chain/manifest.json"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "templates.extension-packs",
-   "capability": "扩展件：取价规则 pack（规则带出处）+ 四端页面集 pack（壹座底座契约）",
-   "status": "delivered",
-   "patterns": [
-    "取价规则 pack",
-    "页面集 pack",
-    "定价规则 pack"
-   ],
-   "evidence": [
-    {
-     "kind": "asset",
-     "ref": "templates/supply-chain/pricing-rules/pack.json"
-    },
-    {
-     "kind": "asset",
-     "ref": "templates/supply-chain/pagesets/pack.json"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "connector.single-egress",
-   "capability": "出网单口：商家数据只经连接器运行时读取，模板层不持端点、不发 HTTP、不读凭证",
-   "status": "delivered",
-   "patterns": [
-    "出网单口",
-    "经连接器运行时",
-    "BYOK"
-   ],
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/runtime_client.py",
-     "contains": "class RuntimeClient"
-    },
-    {
-     "kind": "test",
-     "ref": "test_connector_modules_do_not_import_http_clients"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "connector.three-state",
-   "capability": "连接器三态证据链（目录 provider / 执行器测试 / live 验收），缺一态即未接通",
-   "status": "delivered",
-   "patterns": [
-    "三态",
-    "未接通须返回 501",
-    "缺 live 验收"
-   ],
-   "evidence": [
-    {
-     "kind": "asset",
-     "ref": "connector-status.json"
-    },
-    {
-     "kind": "test",
-     "ref": "test_kingdee_has_catalog_but_no_executor_test"
-    }
-   ],
-   "targets": [
-    "board-doc"
-   ]
-  },
-  {
-   "id": "shares.no-fund-execution",
-   "capability": "分成只产出双方可核对的分成对账单与核对指令，零资金执行面（二清红线）",
-   "status": "delivered",
-   "patterns": [
-    "分成.*核对对账单",
-    "无资金执行面",
-    "二清红线"
-   ],
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/recon/shares.py",
-     "contains": "SHARE_EXECUTION_DENIED"
-    },
-    {
-     "kind": "test",
-     "ref": "test_share_execution_denied"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "billing.event",
-   "capability": "事件计费与计费规则审批（bill_event / approve_billing_rule）",
-   "status": "delivered",
-   "patterns": [
-    "事件计费"
-   ],
-   "evidence": [
-    {
-     "kind": "mcp_tool",
-     "ref": "bill_event"
-    },
-    {
-     "kind": "mcp_tool",
-     "ref": "approve_billing_rule"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "tenant.isolation",
-   "capability": "双客群租户隔离：经营数据按租户（cell）隔离，查询闸强制租户列",
-   "status": "delivered",
-   "patterns": [
-    "租户隔离",
-    "按租户.*隔离"
-   ],
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/tenancy.py",
-     "contains": "tenant"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web"
-   ]
-  },
-  {
-   "id": "market.connector-packs",
-   "capability": "三个行业连接器包已在市场（supply-chain v3 / restaurant-chain v2 / crossborder v2）",
-   "status": "delivered",
-   "patterns": [
-    "已在市场",
-    "已上架：市场 v"
-   ],
-   "asserts_live": "market.connector-packs",
-   "evidence": [
-    {
-     "kind": "release",
-     "ref": "supply-chain/connector-pack"
-    },
-    {
-     "kind": "release",
-     "ref": "restaurant-chain/connector-pack"
-    },
-    {
-     "kind": "release",
-     "ref": "crossborder/connector-pack"
-    }
-   ],
-   "targets": []
-  },
-  {
-   "id": "invoice.self-built",
-   "capability": "开票自研 / 支持开票",
-   "status": "not_claimable",
-   "pattern_source": "invoice",
-   "patterns": [
-    "支持开票",
-    "可开票",
-    "提供开票",
-    "开票自研"
-   ],
-   "reason": "开票自研当前不提供（挂账）：票据本体由客户既有合规渠道处理，平台不伪造不代开",
-   "evidence": [
-    {
-     "kind": "endpoint",
-     "ref": "GET /erp/supply-chain/v1/sp/invoices"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "invoice.tax-return",
-   "capability": "税务申报",
-   "status": "not_claimable",
-   "patterns": [
-    "支持税务申报",
-    "提供税务申报"
-   ],
-   "reason": "税务申报当前不提供（挂账）",
-   "evidence": [
-    {
-     "kind": "endpoint",
-     "ref": "GET /erp/supply-chain/v1/sp/invoices"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "funds.execution",
-   "capability": "资金执行（资金池 / 代收代付 / 分账执行 / 资金归集）",
-   "status": "not_claimable",
-   "pattern_source": "fund-execution",
-   "patterns": [
-    "支持资金执行",
-    "支持代收代付",
-    "支持分账",
-    "支持资金池",
-    "支持资金归集"
-   ],
-   "reason": "二清红线：平台只产出对账结果与核对指令，资金归集与分账走客户自选的持牌通道",
-   "evidence": [
-    {
-     "kind": "code",
-     "ref": "fd-erp-vertical-templates/fd_erp_vertical_templates/recon/shares.py",
-     "contains": "SHARE_EXECUTION_DENIED"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "erp.monolith-ui",
-   "capability": "单体 ERP 应用 / 表单式 UI",
-   "status": "not_claimable",
-   "pattern_source": "monolith",
-   "patterns": [
-    "单体 ERP 应用",
-    "表单式 UI",
-    "表单式 ERP"
-   ],
-   "reason": "ERP 以「集群 + 供给包」组合交付，不是单体 ERP 应用或表单式 UI",
-   "evidence": [
-    {
-     "kind": "asset",
-     "ref": "templates/supply-chain/manifest.json"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "live.official-web-deploy",
-   "capability": "官网已 deploy",
-   "status": "not_claimable",
-   "patterns": [
-    "官网已 deploy",
-    "官网已上线"
-   ],
-   "reason": "官网 ERP 落地页为可发布工件 + 本地校验证据；site deploy 需真实凭据，属独立发布步骤",
-   "asserts_live": "official-web.deploy",
-   "evidence": [
-    {
-     "kind": "surface",
-     "ref": "official-web.deploy"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "live.gateway-rollout",
-   "capability": "网关已上线",
-   "status": "not_claimable",
-   "patterns": [
-    "网关已上线",
-    "gateway 已上线"
-   ],
-   "reason": "gateway rollout 需真实凭据与集群变更，属独立发布步骤",
-   "asserts_live": "gateway.rollout",
-   "evidence": [
-    {
-     "kind": "surface",
-     "ref": "gateway.rollout"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  },
-  {
-   "id": "live.registry-write",
-   "capability": "registry 快照已写入",
-   "status": "not_claimable",
-   "patterns": [
-    "registry 已写入",
-    "registry 快照已 live 写入"
-   ],
-   "reason": "registry 写入属独立发布步骤，需真实凭据",
-   "asserts_live": "registry.snapshot",
-   "evidence": [
-    {
-     "kind": "surface",
-     "ref": "registry.snapshot"
-    }
-   ],
-   "targets": [
-    "board-doc",
-    "official-web",
-    "erp-site"
-   ]
-  }
- ],
- "negative_rules": [
-  {
-   "id": "numbers.unquoted",
-   "statement": "任何价格 / 客户数 / 用量 / 上线日期数字",
-   "reason": "本文与官网 ERP 文案不引用任何数字；如必须引用，须先有仓内可逐字核验的出处（口径表行 ID）",
-   "patterns": [
-    "\\d+\\s*(?:元|万元|家客户|家|%|天|月上线)"
-   ]
-  }
- ]
+  ]
 }
