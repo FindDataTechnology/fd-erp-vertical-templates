@@ -4,24 +4,33 @@
       "/health",
       "/healthz"
     ],
-    "mcp_tools": 21,
+    "mcp_tools": 32,
     "placeholder_routes": 20,
     "routes": 65
   },
   "mcp_tools": [
     "approve_billing_rule",
+    "approve_posting_rule",
     "bill_event",
     "bill_period_snapshot",
     "confirm_proposal",
+    "decide_event",
     "get_fee_detail",
     "get_recon_report",
+    "ingest_event",
     "list_billing_rules",
     "list_credit_reservations",
     "list_fees",
+    "list_posting_gaps",
+    "list_posting_rules",
     "list_proposals",
+    "post_event",
+    "project_event",
     "query_balance",
     "query_credit",
     "query_entries",
+    "query_events",
+    "query_object_balance",
     "reject_proposal",
     "release_credit",
     "reserve_credit",
@@ -29,6 +38,8 @@
     "run_reconciliation",
     "simulate_billing",
     "submit_billing_rule",
+    "submit_event",
+    "submit_posting_rule",
     "submit_proposal"
   ],
   "measured_from": {
@@ -38,7 +49,7 @@
   "routes": [
     {
       "function": "cp_dock_slots",
-      "line": 1017,
+      "line": 1020,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/dock-slots",
       "placeholder": true,
@@ -46,7 +57,7 @@
     },
     {
       "function": "cp_freight_statements",
-      "line": 1139,
+      "line": 1142,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements",
       "placeholder": true,
@@ -54,7 +65,7 @@
     },
     {
       "function": "cp_freight_detail",
-      "line": 1149,
+      "line": 1152,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}",
       "placeholder": true,
@@ -62,7 +73,7 @@
     },
     {
       "function": "cp_freight_confirm",
-      "line": 1156,
+      "line": 1159,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm",
       "placeholder": true,
@@ -70,7 +81,7 @@
     },
     {
       "function": "cp_waybills",
-      "line": 948,
+      "line": 951,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills",
       "placeholder": false,
@@ -78,7 +89,7 @@
     },
     {
       "function": "cp_waybill_detail",
-      "line": 972,
+      "line": 975,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}",
       "placeholder": false,
@@ -86,7 +97,7 @@
     },
     {
       "function": "cp_waybill_accept",
-      "line": 998,
+      "line": 1001,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/accept",
       "placeholder": false,
@@ -94,7 +105,7 @@
     },
     {
       "function": "cp_dock_reserve",
-      "line": 1026,
+      "line": 1029,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/dock-reservation",
       "placeholder": false,
@@ -102,7 +113,7 @@
     },
     {
       "function": "cp_waybill_events",
-      "line": 1102,
+      "line": 1105,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/events",
       "placeholder": false,
@@ -110,7 +121,7 @@
     },
     {
       "function": "cp_pickup_checkin",
-      "line": 1058,
+      "line": 1061,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pickup-checkin",
       "placeholder": false,
@@ -118,7 +129,7 @@
     },
     {
       "function": "cp_pod_report",
-      "line": 1075,
+      "line": 1078,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pod",
       "placeholder": false,
@@ -126,7 +137,7 @@
     },
     {
       "function": "cp_workspace",
-      "line": 914,
+      "line": 917,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/workspace",
       "placeholder": false,
@@ -134,7 +145,7 @@
     },
     {
       "function": "list_pagesets",
-      "line": 236,
+      "line": 271,
       "method": "GET",
       "path": "/erp/supply-chain/v1/pagesets",
       "placeholder": false,
@@ -142,7 +153,7 @@
     },
     {
       "function": "se_alerts",
-      "line": 437,
+      "line": 438,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/alerts",
       "placeholder": false,
@@ -150,7 +161,7 @@
     },
     {
       "function": "se_alert_handle",
-      "line": 447,
+      "line": 448,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/alerts/{alert_id}/handle",
       "placeholder": false,
@@ -158,7 +169,7 @@
     },
     {
       "function": "se_customers",
-      "line": 225,
+      "line": 226,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers",
       "placeholder": false,
@@ -166,7 +177,7 @@
     },
     {
       "function": "se_customer_360",
-      "line": 253,
+      "line": 254,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers/{customer_id}",
       "placeholder": false,
@@ -174,7 +185,7 @@
     },
     {
       "function": "se_customer_orders",
-      "line": 278,
+      "line": 279,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers/{customer_id}/orders",
       "placeholder": false,
@@ -182,7 +193,7 @@
     },
     {
       "function": "se_list_leads",
-      "line": 290,
+      "line": 291,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/leads",
       "placeholder": true,
@@ -190,7 +201,7 @@
     },
     {
       "function": "se_create_lead",
-      "line": 297,
+      "line": 298,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/leads",
       "placeholder": true,
@@ -198,7 +209,7 @@
     },
     {
       "function": "se_orders",
-      "line": 362,
+      "line": 363,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/orders",
       "placeholder": false,
@@ -206,7 +217,7 @@
     },
     {
       "function": "se_order_proxy",
-      "line": 322,
+      "line": 323,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/orders/proxy",
       "placeholder": false,
@@ -214,7 +225,7 @@
     },
     {
       "function": "se_order_detail",
-      "line": 390,
+      "line": 391,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/orders/{order_id}",
       "placeholder": false,
@@ -222,7 +233,7 @@
     },
     {
       "function": "se_statements",
-      "line": 471,
+      "line": 472,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/statements",
       "placeholder": false,
@@ -230,7 +241,7 @@
     },
     {
       "function": "se_statement_push",
-      "line": 485,
+      "line": 486,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/statements/{statement_id}/push",
       "placeholder": true,
@@ -238,7 +249,7 @@
     },
     {
       "function": "se_list_visits",
-      "line": 313,
+      "line": 314,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/visits",
       "placeholder": true,
@@ -246,7 +257,7 @@
     },
     {
       "function": "se_create_visit",
-      "line": 304,
+      "line": 305,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/visits",
       "placeholder": true,
@@ -254,7 +265,7 @@
     },
     {
       "function": "se_workspace",
-      "line": 198,
+      "line": 199,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/workspace",
       "placeholder": false,
@@ -262,7 +273,7 @@
     },
     {
       "function": "sp_arrival_notices",
-      "line": 744,
+      "line": 746,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/arrival-notices",
       "placeholder": false,
@@ -270,7 +281,7 @@
     },
     {
       "function": "sp_arrival_notice_create",
-      "line": 762,
+      "line": 764,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/arrival-notices",
       "placeholder": false,
@@ -278,7 +289,7 @@
     },
     {
       "function": "sp_invoice_list",
-      "line": 821,
+      "line": 823,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -286,7 +297,7 @@
     },
     {
       "function": "sp_invoice_upload",
-      "line": 813,
+      "line": 815,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -294,7 +305,7 @@
     },
     {
       "function": "sp_purchase_orders",
-      "line": 642,
+      "line": 644,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/purchase-orders",
       "placeholder": false,
@@ -302,7 +313,7 @@
     },
     {
       "function": "sp_po_detail",
-      "line": 673,
+      "line": 675,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}",
       "placeholder": false,
@@ -310,7 +321,7 @@
     },
     {
       "function": "sp_po_accept",
-      "line": 701,
+      "line": 703,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}/accept",
       "placeholder": false,
@@ -318,7 +329,7 @@
     },
     {
       "function": "sp_delivery_feedback",
-      "line": 723,
+      "line": 725,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}/delivery-feedback",
       "placeholder": false,
@@ -326,7 +337,7 @@
     },
     {
       "function": "sp_settlements",
-      "line": 829,
+      "line": 831,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/settlements",
       "placeholder": true,
@@ -334,7 +345,7 @@
     },
     {
       "function": "sp_statements",
-      "line": 787,
+      "line": 789,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements",
       "placeholder": true,
@@ -342,7 +353,7 @@
     },
     {
       "function": "sp_statement_detail",
-      "line": 794,
+      "line": 796,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}",
       "placeholder": true,
@@ -350,7 +361,7 @@
     },
     {
       "function": "sp_statement_confirm",
-      "line": 799,
+      "line": 801,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}/confirm",
       "placeholder": true,
@@ -358,7 +369,7 @@
     },
     {
       "function": "sp_workspace",
-      "line": 608,
+      "line": 610,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/workspace",
       "placeholder": false,
@@ -366,7 +377,7 @@
     },
     {
       "function": "list_aftersales",
-      "line": 702,
+      "line": 737,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
       "placeholder": true,
@@ -374,7 +385,7 @@
     },
     {
       "function": "create_aftersale",
-      "line": 694,
+      "line": 729,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
       "placeholder": true,
@@ -382,7 +393,7 @@
     },
     {
       "function": "aftersale_detail",
-      "line": 708,
+      "line": 743,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests/{request_id}",
       "placeholder": true,
@@ -390,7 +401,7 @@
     },
     {
       "function": "get_cart",
-      "line": 332,
+      "line": 367,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/cart",
       "placeholder": false,
@@ -398,7 +409,7 @@
     },
     {
       "function": "add_cart_line",
-      "line": 337,
+      "line": 372,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/cart/lines",
       "placeholder": false,
@@ -406,7 +417,7 @@
     },
     {
       "function": "remove_cart_line",
-      "line": 358,
+      "line": 393,
       "method": "DELETE",
       "path": "/erp/supply-chain/v1/ue/cart/lines/{line_id}",
       "placeholder": false,
@@ -414,7 +425,7 @@
     },
     {
       "function": "price_preview",
-      "line": 365,
+      "line": 400,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/cart/price-preview",
       "placeholder": false,
@@ -422,7 +433,7 @@
     },
     {
       "function": "list_invoice_requests",
-      "line": 677,
+      "line": 712,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/invoice-requests",
       "placeholder": true,
@@ -430,7 +441,7 @@
     },
     {
       "function": "create_invoice_request",
-      "line": 684,
+      "line": 719,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/invoice-requests",
       "placeholder": true,
@@ -438,7 +449,7 @@
     },
     {
       "function": "list_orders",
-      "line": 455,
+      "line": 490,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders",
       "placeholder": false,
@@ -446,7 +457,7 @@
     },
     {
       "function": "create_order",
-      "line": 402,
+      "line": 437,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/orders",
       "placeholder": false,
@@ -454,7 +465,7 @@
     },
     {
       "function": "order_detail",
-      "line": 508,
+      "line": 543,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}",
       "placeholder": false,
@@ -462,7 +473,7 @@
     },
     {
       "function": "order_fulfillment",
-      "line": 527,
+      "line": 562,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}/fulfillment",
       "placeholder": false,
@@ -470,7 +481,7 @@
     },
     {
       "function": "trigger_fulfillment",
-      "line": 557,
+      "line": 592,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}/fulfillment",
       "placeholder": false,
@@ -478,7 +489,7 @@
     },
     {
       "function": "list_categories",
-      "line": 284,
+      "line": 319,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/product-categories",
       "placeholder": false,
@@ -486,7 +497,7 @@
     },
     {
       "function": "list_products",
-      "line": 244,
+      "line": 279,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/products",
       "placeholder": false,
@@ -494,7 +505,7 @@
     },
     {
       "function": "product_detail",
-      "line": 306,
+      "line": 341,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/products/{product_id}",
       "placeholder": false,
@@ -502,7 +513,7 @@
     },
     {
       "function": "create_reconciliation",
-      "line": 642,
+      "line": 677,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/reconciliations",
       "placeholder": false,
@@ -510,7 +521,7 @@
     },
     {
       "function": "get_reconciliation",
-      "line": 665,
+      "line": 700,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/reconciliations/{task_id}",
       "placeholder": false,
@@ -518,7 +529,7 @@
     },
     {
       "function": "list_statements",
-      "line": 595,
+      "line": 630,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/statements",
       "placeholder": false,
@@ -526,7 +537,7 @@
     },
     {
       "function": "statement_detail",
-      "line": 606,
+      "line": 641,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/statements/{statement_id}",
       "placeholder": false,
@@ -534,7 +545,7 @@
     },
     {
       "function": "confirm_statement",
-      "line": 612,
+      "line": 647,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/statements/{statement_id}/confirm",
       "placeholder": false,
@@ -542,7 +553,7 @@
     },
     {
       "function": "health",
-      "line": 225,
+      "line": 248,
       "method": "GET",
       "path": "/health",
       "placeholder": false,
@@ -550,7 +561,7 @@
     },
     {
       "function": "health",
-      "line": 226,
+      "line": 249,
       "method": "GET",
       "path": "/healthz",
       "placeholder": false,

@@ -4,7 +4,7 @@
 
 ## 一、已交付（有证据）
 
-- **复式事件账（写路径只出 proposal，确认门唯一落账；借贷必平由数据库约束强制；分录 append-only；余额确定性重算）**  
+- **复式事件账（agent 拟稿经确认门才成为事实；外部系统事实经导入车道按来源权威直接成为事实；事实按人工确认的过账规则派生分录，缺规则即挂待补、不猜科目；借贷必平由数据库约束强制；分录 append-only；余额确定性重算）**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0001_baseline.sql；mcp_tool:submit_proposal；mcp_tool:confirm_proposal；mcp_tool:query_balance
 - **stable_id 幂等去重（同源重推只落一次）**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/proposals.py

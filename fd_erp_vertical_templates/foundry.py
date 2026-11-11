@@ -161,7 +161,7 @@ def _asset_body(kind: str, *, vertical: str, name_zh: str, name_en: str,
                         "description": "差异逐条定性并引用证据",
                         "persona": "逐条定性差异，引用双侧原始引用；结论经 proposal 回写。"},
                        {"id": f"{vertical}-decider", "name": "拍板岗",
-                        "description": "升级差异裁决（确认门唯一落账）",
+                        "description": "升级差异裁决（拟稿经确认门落账）",
                         "persona": "对升级差异裁决；确认门只在本席位。"}],
             "fleet": {
                 "members": [
