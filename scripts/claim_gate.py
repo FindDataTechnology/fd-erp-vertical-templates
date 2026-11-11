@@ -46,6 +46,13 @@ BOARD_DOC = FINDDATA / "docs" / "erp" / "README.md"
 API_PACKAGE = FINDDATA / "fd-erp-vertical-api" / "fd_erp_vertical_api"
 API_PLANNED = FINDDATA / "fd-erp-vertical-api" / "planned-surfaces.json"
 TOOL_SURFACE = FINDDATA / "fd-erp-ledger-mcp" / "tool-surface.json"
+COVERAGE_MATRIX = FINDDATA / "fd-erp" / "shared" / "coverage-matrix.json"
+
+#: 矩阵里算「可用」的两态；needs_onboarding / not_doing 都不构成可宣称依据
+MATRIX_AVAILABLE_STATES = ("delivered", "template_configured")
+#: 边界句特征：宣称的内容是「我们不做什么」，与「不做格」不矛盾（同
+#: fd-erp/tools/check_coverage_matrix.py 的 BOUNDARY_MARKERS，两处同源）
+BOUNDARY_MARKERS = ("不提供", "不自研", "不执行", "禁止", "零", "无资金")
 
 CLAIMS_SCHEMA = "erp-capability-claims/v1"
 MIRROR_SCHEMA = "erp-planned-surfaces-mirror/v1"
@@ -246,7 +253,8 @@ def check(*, claims_path: str | Path | None = None,
           workspace: Path = FINDDATA,
           api_package: Path = API_PACKAGE,
           api_planned: Path = API_PLANNED,
-          tool_surface: Path = TOOL_SURFACE) -> dict[str, Any]:
+          tool_surface: Path = TOOL_SURFACE,
+          coverage_matrix: Path = COVERAGE_MATRIX) -> dict[str, Any]:
     from fd_erp_vertical_templates.publish import load_record
     from fd_erp_vertical_templates.gaps import check as gaps_check
 
@@ -318,6 +326,9 @@ def check(*, claims_path: str | Path | None = None,
         for item in items:
             (warnings if item.get("severity") == "warning" else bucket).append(item)
 
+    # ⑤b 覆盖矩阵联动（establish-erp-event-kernel 6.4）：宣称必须有可用模块背书
+    violations.extend(_check_coverage_matrix(claims, coverage_matrix))
+
     # ⑥ 缺口登记（3.8 的数据进能力清单；这里只确认四项齐全，门本身在 gaps.py）
     try:
         g = gaps_check()
@@ -342,6 +353,80 @@ def check(*, claims_path: str | Path | None = None,
                                         if c["status"] == "delivered"),
                        "not_claimable": sum(1 for c in claims["claims"]
                                             if c["status"] == "not_claimable")}}
+
+
+def _is_boundary_claim(claim: dict[str, Any]) -> bool:
+    text = claim.get("capability") or ""
+    return any(marker in text for marker in BOUNDARY_MARKERS)
+
+
+def _check_coverage_matrix(claims: dict[str, Any], matrix_path: Path
+                           ) -> list[dict[str, Any]]:
+    """矩阵 ↔ 宣称的双向联动（establish-erp-event-kernel 6.4）。
+
+    方向一（本函数，新增）：每条 delivered 宣称必须**被某个可用模块背书**——
+    矩阵里至少有一个引用它的模块处于 delivered / template_configured。
+    否则就是「对外说了、地图上却没有可用的一块」，属于最危险的那类漂移：
+    读者按宣称来问，交付侧按矩阵来答，两边永远对不上。
+
+    两条合法豁免（都必须显式，不许默认放行）：
+      · `board_level_claims` 里逐条给了理由的板块级宣称（如市场在架状态）；
+      · 边界句宣称（「零资金执行面」这类断言我们**不做**什么）。
+
+    方向二（矩阵侧已有）：not_doing 不得引用肯定式 delivered 宣称——由
+    fd-erp/tools/check_coverage_matrix.py 判，这里不重复。
+
+    矩阵缺失时**不静默通过**：记 COVERAGE_MATRIX_MISSING。一个在没有输入时
+    全绿的闸比没有闸更糟。
+    """
+    path = Path(matrix_path)
+    if not path.is_file():
+        return [{"code": "COVERAGE_MATRIX_MISSING", "severity": "error",
+                 "message": f"覆盖矩阵不在位，无法核证「宣称有模块背书」：{path}"}]
+    try:
+        matrix = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [{"code": "COVERAGE_MATRIX_UNPARSABLE", "severity": "error",
+                 "message": f"覆盖矩阵无法解析：{exc}"}]
+
+    modules = matrix.get("modules") or []
+    board_level = set((matrix.get("board_level_claims") or {}).keys())
+    backed: dict[str, list[tuple[str, str]]] = {}
+    for m in modules:
+        for cid in m.get("claims") or []:
+            backed.setdefault(cid, []).append((m.get("id"), m.get("state")))
+
+    known = {c["id"] for c in claims["claims"]}
+    out: list[dict[str, Any]] = []
+
+    # 矩阵引用了不存在的 claim：地图上挂了一个空指针
+    for cid, refs in sorted(backed.items()):
+        if cid not in known:
+            out.append({"code": "COVERAGE_MATRIX_UNKNOWN_CLAIM", "severity": "error",
+                        "claim": cid,
+                        "message": (f"矩阵引用了 claims.json 里不存在的宣称 {cid}"
+                                    f"（引用方：{', '.join(sorted({m for m, _ in refs}))}）")})
+
+    for claim in claims["claims"]:
+        if claim["status"] != "delivered":
+            continue
+        cid = claim["id"]
+        if cid in board_level or _is_boundary_claim(claim):
+            continue
+        refs = backed.get(cid) or []
+        if any(state in MATRIX_AVAILABLE_STATES for _, state in refs):
+            continue
+        if refs:
+            where = ", ".join(f"{m}={s}" for m, s in refs)
+            hint = ("把该宣称挂到一个真正交付了它的模块上，或把模块定态改对"
+                    "（needs_onboarding/not_doing 都不能背书宣称）")
+        else:
+            where = "无任何模块引用"
+            hint = ("在矩阵对应模块的 claims 里登记它；若确属板块级，"
+                    "写进 board_level_claims 并给出理由")
+        out.append(_v("CLAIM_UNBACKED_BY_MATRIX", claim,
+                      f"delivered 宣称在覆盖矩阵里没有可用模块背书（{where}）——{hint}"))
+    return out
 
 
 def _v(code: str, claim: dict[str, Any], message: str) -> dict[str, Any]:
