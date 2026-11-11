@@ -28,6 +28,14 @@
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/tenancy.py
 - **三个行业连接器包已在市场（supply-chain v3 / restaurant-chain v2 / crossborder v2）**  
   证据：release:supply-chain/connector-pack；release:restaurant-chain/connector-pack；release:crossborder/connector-pack
+- **业务事件层：经营事实只追加，定型按事件自身周期（日/月/年 + 修订窗）推导而非全局秒数；定型前的修订保留旧值、修订来源与时点；定型后更正只走冲正并与原事件关联；两条车道——外部原始事实写入即是事实，agent 拟稿未过确认门不算事实。**  
+  证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0007_business_events.sql；mcp_tool:ingest_event；mcp_tool:submit_event；mcp_tool:query_events
+- **数量面：库存/在途/占用等余额由事件确定性重算，物化值带水位（as_of_event_id）且可全量重算校验；余额是投影产物、不可直写；同一对象维度下单位冲突（kg 与 pcs）拒写而非静默相加。数量只在对象面，账本面只记金额。**  
+  证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0008_objects.sql；mcp_tool:query_object_balance；mcp_tool:project_event
+- **过账规则：事件经版本化规则确定性映射为复式分录；规则须审批上线、同一事件类型仅一条生效、升版不重写历史分录；未命中规则的事件挂待补清单、不猜科目、余额不变。**  
+  证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0009_posting_rules.sql；mcp_tool:post_event；mcp_tool:approve_posting_rule
+- **事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。**  
+  证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py；mcp_tool:run_reconciliation
 
 ## 二、规划中（20 条，全部来自挂账清单）
 

@@ -33,6 +33,7 @@ import argparse
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -322,12 +323,17 @@ def check(*, claims_path: str | Path | None = None,
     # ④ 对外材料扫描 与 ⑤ 生成块漂移：这两个函数把「材料/文档不在位」记为 warning，
     # 必须按 severity 分流，否则告警会污染 violations，让「只有某条违规」的断言失效。
     for bucket, items in ((violations, _scan_targets(claims, doc, workspace)),
-                          (violations, _check_blocks(claims, record, doc))):
+                          (violations, _check_blocks(claims, record, doc,
+                                                    coverage_matrix=coverage_matrix))):
         for item in items:
             (warnings if item.get("severity") == "warning" else bucket).append(item)
 
     # ⑤b 覆盖矩阵联动（establish-erp-event-kernel 6.4）：宣称必须有可用模块背书
     violations.extend(_check_coverage_matrix(claims, coverage_matrix))
+
+    # ⑤c 非可用态格子不得在生成块外被写成「已具备」（8.2；spec「对外文案只能引用
+    # 已落地状态」的机器判据——此前只有生成块漂移能拦手改，块外重写一条拦不住）
+    violations.extend(_check_coverage_doc_states(claims, coverage_matrix, doc))
 
     # ⑥ 缺口登记（3.8 的数据进能力清单；这里只确认四项齐全，门本身在 gaps.py）
     try:
@@ -360,10 +366,68 @@ def _is_boundary_claim(claim: dict[str, Any]) -> bool:
     return any(marker in text for marker in BOUNDARY_MARKERS)
 
 
+#: 「已具备」类肯定句式：与非可用态格子（needs_onboarding / not_doing）并置即算宣称。
+#: 刻意窄：只认这几个动词，避免把「需客户口径」这类中性命名的提及判成宣称。
+COVERAGE_CLAIM_WORDS = ("支持", "提供", "具备", "已实现", "已交付", "可实现", "已上线")
+
+#: 否定语境兜底。claims.json 的 `scan.negative_markers` 优先；调用方传入的 claims
+#: 没有 scan（测试合成、或将来别的调用点）时用这份，避免「配置缺失 = 否定词消失 =
+#: 把『不提供』判成宣称」——判据不该依赖调用方有没有带配置。
+DEFAULT_NEGATIVE_MARKERS = ("不", "未", "无", "非", "禁止", "不得", "挂账", "不可", "免")
+
+
+def _check_coverage_doc_states(claims: dict[str, Any], matrix_path: Path,
+                               doc: Path) -> list[dict[str, Any]]:
+    """非可用态格子不得在生成块外被写成「已具备」（establish-erp-event-kernel 8.2）。
+
+    spec「对外文案只能引用已落地状态」给了两个场景，此前只有「生成块漂移」能拦——
+    也就是说：改了块里的字会被抓，但**在块外另写一段**「成本核算已支持先进先出」
+    完全拦不住。本函数补的就是这个洞。
+
+    只在板块文档上判。官网站点的四态表是同一份矩阵生成的，判它等于判生成器本身
+    （那边的判据是 `gen_erp_docs.py --check` 的逐字对拍）。
+
+    否定语境（不 / 未 / 挂账 …）不算宣称，与 _scan_targets 用同一套 negative_markers；
+    否则「税务申报：不自研、当前不提供」会被判红。
+    """
+    matrix = _load_matrix_for_blocks(matrix_path)
+    if matrix is None or not doc.is_file():
+        # 缺矩阵由 COVERAGE_MATRIX_MISSING 报，缺文档由 CLAIM_DOC_MISSING 报；
+        # 这里不重复报，也不静默当成「一致」。
+        return []
+    text = doc.read_text(encoding="utf-8")
+    scan = claims.get("scan") or {}
+    negatives = tuple(scan.get("negative_markers") or DEFAULT_NEGATIVE_MARKERS)
+    blocks = _block_spans(text, scan.get("generated_block_markers") or {})
+    out: list[dict[str, Any]] = []
+    for cell in matrix.get("modules") or []:
+        if cell.get("state") in MATRIX_AVAILABLE_STATES:
+            continue
+        name = cell.get("name_zh") or cell["id"]
+        for match in re.finditer(re.escape(name), text):
+            if any(start <= match.start() <= end for start, end in blocks):
+                continue  # 生成块内由矩阵负责，逐字对拍在 _check_blocks
+            clause = _clause(text, match.start())
+            prefix = _prefix(text, match.start(), 60)
+            if any(mark in clause or mark in prefix for mark in negatives):
+                continue
+            hit = next((word for word in COVERAGE_CLAIM_WORDS if word in clause), None)
+            if hit is None:
+                continue
+            out.append({
+                "code": "CLAIM_COVERAGE_UNBACKED_STATE", "severity": "error",
+                "cell": cell["id"], "path": str(doc),
+                "statement": clause.strip(),
+                "message": (f"格子「{name}」在矩阵里是 {cell['state']}（非可用态），"
+                            f"生成块外却以「{hit}」句式出现：「{clause.strip()}」"
+                            "——对外只能写「需一次接入」或「明确不做」并给理由"),
+            })
+    return out
+
+
 def _check_coverage_matrix(claims: dict[str, Any], matrix_path: Path
                            ) -> list[dict[str, Any]]:
     """矩阵 ↔ 宣称的双向联动（establish-erp-event-kernel 6.4）。
-
     方向一（本函数，新增）：每条 delivered 宣称必须**被某个可用模块背书**——
     矩阵里至少有一个引用它的模块处于 delivered / template_configured。
     否则就是「对外说了、地图上却没有可用的一块」，属于最危险的那类漂移：
@@ -665,6 +729,13 @@ def _prefix(text: str, pos: int, width: int = 40) -> str:
     return text[max(line_start, pos - width):pos].replace("//", " ").replace("*", " ")
 
 
+#: 生成块的通用形态：配置里没登记的新块也要被识别为「机器生成」，
+#: 否则「加一个块」就等于开一个扫描盲区（配置漏登记不该变成放行）。
+_GENERATED_BLOCK_RE = re.compile(
+    r"<!--\s*claim-gate:begin:[\w.-]+\s*-->.*?<!--\s*claim-gate:end:[\w.-]+\s*-->",
+    re.DOTALL)
+
+
 def _block_spans(text: str, markers: dict[str, list[str]]) -> list[tuple[int, int]]:
     spans: list[tuple[int, int]] = []
     for pair in markers.values():
@@ -674,6 +745,9 @@ def _block_spans(text: str, markers: dict[str, list[str]]) -> list[tuple[int, in
         end = text.find(pair[1])
         if start >= 0 and end > start:
             spans.append((start, end + len(pair[1])))
+    # 兜底：按标记的正则形态补齐配置里没登记的块（幂等，已收录的会重复命中去重）。
+    for match in _GENERATED_BLOCK_RE.finditer(text):
+        spans.append((match.start(), match.end()))
     return spans
 
 
@@ -716,6 +790,56 @@ def render_release_status(claims: dict[str, Any], record: dict[str, Any],
     return "\n".join(lines)
 
 
+#: 四态的中文标签与呈现顺序（与 fd-erp/tools/check_coverage_matrix.py 的
+#: STATE 集合同源；顺序决定文档里读起来是先讲有什么、再讲缺什么）。
+COVERAGE_STATE_LABELS = {
+    "delivered": "已实现",
+    "template_configured": "模板可配",
+    "needs_onboarding": "需一次接入",
+    "not_doing": "明确不做",
+}
+COVERAGE_STATE_ORDER = ("delivered", "template_configured",
+                        "needs_onboarding", "not_doing")
+
+
+def render_coverage_matrix(matrix: dict[str, Any]) -> str:
+    """矩阵 → 板块文档的「全覆盖四态」生成块（establish-erp-event-kernel 8.2）。
+
+    逐格写出边界句是刻意的：spec 要求「对外文案引用某一格时，该格边界说明必须
+    随之出现」。只要这一段是引用来源，写文案的人照抄就自动带上边界；反过来，
+    块外再手写一份四态表，就会与块内逐格口径打架——由 CLAIM_BLOCK_DRIFT /
+    CLAIM_UNDECLARED 拦下。
+    """
+    cells = matrix.get("modules") or []
+    counts = Counter(c["state"] for c in cells)
+    unknown = sorted(set(counts) - set(COVERAGE_STATE_LABELS))
+    if unknown:
+        # 第五态不是「多一栏」，是口径破了；生成器拒绝出块，免得把它印进文档。
+        raise SystemExit(f"覆盖矩阵出现第四态之外的状态 {unknown}，先修矩阵再生成文档")
+    lines = [
+        f"**子模块全覆盖四态（矩阵派生，勿手改）**：唯一出处 "
+        f"`fd-erp/shared/coverage-matrix.json`（{len(cells)} 格，"
+        f"{matrix.get('updated_at', '未记日期')}）。"
+    ]
+    for state in COVERAGE_STATE_ORDER:
+        names = [c["name_zh"] for c in cells if c["state"] == state]
+        if not names:
+            continue
+        lines.append(f"- `{state}` {COVERAGE_STATE_LABELS[state]} {counts[state]} 格："
+                     + "、".join(names))
+    lines += ["", "逐格口径（引用任一格时，该格边界句必须原样随之出现）："]
+    for cell in cells:
+        note = f"边界：{cell['boundary']}"
+        if cell["state"] == "not_doing":
+            note += (f"｜理由：{cell.get('reason', '')}"
+                     f"｜裁决来源：{cell.get('decided_by', '')}"
+                     f"｜复核窗口：{cell.get('review_by', '')}")
+        elif cell["state"] == "needs_onboarding":
+            note += f"｜需客户提供：{cell.get('blocker', '')}"
+        lines.append(f"- **{cell['name_zh']}** `{cell['state']}`——{note}")
+    return "\n".join(lines)
+
+
 def render_capability_list(claims: dict[str, Any], mirror: dict[str, Any],
                            record: dict[str, Any],
                            gaps: dict[str, Any] | None = None) -> str:
@@ -753,8 +877,24 @@ def render_capability_list(claims: dict[str, Any], mirror: dict[str, Any],
     return "\n".join(lines)
 
 
+def _load_matrix_for_blocks(path: Path | str | None) -> dict[str, Any] | None:
+    """生成块的矩阵输入。读不到就返回 None——缺失由 _check_coverage_matrix
+    报 COVERAGE_MATRIX_MISSING，这里不能替它把「没有输入」当成「一致」。"""
+    if path is None:
+        return None
+    p = Path(path)
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def _check_blocks(claims: dict[str, Any], record: dict[str, Any],
-                  doc: Path) -> list[dict[str, Any]]:
+                  doc: Path, *,
+                  coverage_matrix: Path | str | None = COVERAGE_MATRIX
+                  ) -> list[dict[str, Any]]:
     if not doc.is_file():
         return [{"code": "CLAIM_DOC_MISSING", "severity": "warning",
                  "message": f"板块文档不在位，生成块未核对：{doc}"}]
@@ -769,6 +909,9 @@ def _check_blocks(claims: dict[str, Any], record: dict[str, Any],
         "not-claimable": render_not_claimable(claims),
         "release-status": render_release_status(claims, record, gaps),
     }
+    matrix = _load_matrix_for_blocks(coverage_matrix)
+    if matrix is not None:
+        wanted["coverage-matrix"] = render_coverage_matrix(matrix)
     out: list[dict[str, Any]] = []
     for name, expected in wanted.items():
         pair = markers.get(name) or []
@@ -798,7 +941,8 @@ def _extract_block(text: str, pair: list[str]) -> str | None:
 
 def render(claims: dict[str, Any], record: dict[str, Any], *,
            doc: Path, out_list: Path,
-           mirror: dict[str, Any]) -> dict[str, Any]:
+           mirror: dict[str, Any],
+           coverage_matrix: Path | str | None = COVERAGE_MATRIX) -> dict[str, Any]:
     from fd_erp_vertical_templates.gaps import check as gaps_check
     try:
         gaps = gaps_check()
@@ -810,6 +954,9 @@ def render(claims: dict[str, Any], record: dict[str, Any], *,
         "not-claimable": render_not_claimable(claims),
         "release-status": render_release_status(claims, record, gaps),
     }
+    matrix = _load_matrix_for_blocks(coverage_matrix)
+    if matrix is not None:
+        blocks["coverage-matrix"] = render_coverage_matrix(matrix)
     written: list[str] = []
     for name, body in blocks.items():
         pair = markers.get(name)
@@ -876,6 +1023,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-package", default=str(API_PACKAGE))
     ap.add_argument("--api-planned", default=str(API_PLANNED))
     ap.add_argument("--tool-surface", default=str(TOOL_SURFACE))
+    ap.add_argument("--coverage-matrix", default=str(COVERAGE_MATRIX),
+                    help="全覆盖矩阵（缺省 fd-erp/shared/coverage-matrix.json）")
     ap.add_argument("--update-planned", action="store_true",
                     help="render 时同时从真源回填挂账镜像")
     args = ap.parse_args(argv)
@@ -885,7 +1034,8 @@ def main(argv: list[str] | None = None) -> int:
                        record_path=args.record, board_doc=args.board_doc,
                        api_package=Path(args.api_package),
                        api_planned=Path(args.api_planned),
-                       tool_surface=Path(args.tool_surface))
+                       tool_surface=Path(args.tool_surface),
+                       coverage_matrix=Path(args.coverage_matrix))
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=1))
         else:
@@ -913,7 +1063,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.action == "list":
         print(render_capability_list(claims, mirror, record))
         return 0
-    result = render(claims, record, doc=doc, out_list=CAPABILITY_LIST, mirror=mirror)
+    result = render(claims, record, doc=doc, out_list=CAPABILITY_LIST, mirror=mirror,
+                    coverage_matrix=Path(args.coverage_matrix))
     print(json.dumps(result, ensure_ascii=False, indent=1))
     return 0
 

@@ -50,6 +50,10 @@
       "release-status": [
         "<!-- claim-gate:begin:release-status -->",
         "<!-- claim-gate:end:release-status -->"
+      ],
+      "coverage-matrix": [
+        "<!-- claim-gate:begin:coverage-matrix -->",
+        "<!-- claim-gate:end:coverage-matrix -->"
       ]
     }
   },
