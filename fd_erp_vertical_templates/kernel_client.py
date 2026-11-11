@@ -128,6 +128,37 @@ class KernelClient(Protocol):
         """历史数据试算（上线前对比，不落任何明细）。"""
         ...
 
+    # ---- 事件层扩展（establish-erp-event-kernel 7.1）----
+    #
+    # 口径变更（原契约把这四个面记在 intentionally_absent，理由见
+    # shared/kernel-client-contract.json 的 note）：供应商到货预告是**外部系统原始事实**
+    # （供应商门户回流的到货申报），模板层就是这条事实的接收方；不把它落进事件层，
+    # 「到货 → 库存 → 分录」就永远只有前段的一笔 jsonl 记录。规则与金额仍在内核侧：
+    # 模板层只提交事实、触发派生，不定义科目、不改金额。
+
+    def ingest_event(self, event_type: str, stable_id: str, occurred_at: Any,
+                     payload: dict[str, Any],
+                     source_ref: str | None = None,
+                     provenance: dict[str, Any] | None = None) -> dict[str, Any]:
+        """导入车道写入一条外部事实（同 stable_id 幂等，重复提交返回首次结果）。"""
+        ...
+
+    def project_event(self, event_id: int, object_type: str, object_key: str,
+                      quantity_delta: Any, unit: str,
+                      dimension: dict[str, Any] | None = None) -> dict[str, Any]:
+        """把已接受事件投影到对象数量面（幂等：同事件同维度不重复计数）。"""
+        ...
+
+    def query_object_balance(self, object_type: str, object_key: str,
+                             dimension: dict[str, Any] | None = None
+                             ) -> dict[str, Any]:
+        """读对象余额（数量面唯一真相；带水位与重算校验）。"""
+        ...
+
+    def post_event(self, event_id: int) -> dict[str, Any]:
+        """按生效过账规则把事件派生成分录；无规则时内核挂待补并抛
+        `POSTING_RULE_MISSING`（调用方据此如实报「未过账」，不得伪造已过账）。"""
+        ...
 
 class McpKernelClient:
     """生产实现：经 MCP 工具面调用内核（http/sse transport）。
@@ -270,3 +301,27 @@ class McpKernelClient:
 
     def simulate_billing(self, config, events):
         return self._call("simulate_billing", {"config": config, "events": events})
+
+    # ---- 事件层扩展（7.1）----
+
+    def ingest_event(self, event_type, stable_id, occurred_at, payload,
+                     source_ref=None, provenance=None):
+        return self._call("ingest_event", {
+            "event_type": event_type, "stable_id": stable_id,
+            "occurred_at": occurred_at, "payload": payload,
+            "source_ref": source_ref, "provenance": provenance})
+
+    def project_event(self, event_id, object_type, object_key, quantity_delta, unit,
+                      dimension=None):
+        return self._call("project_event", {
+            "event_id": event_id, "object_type": object_type,
+            "object_key": object_key, "quantity_delta": quantity_delta,
+            "unit": unit, "dimension": dimension})
+
+    def query_object_balance(self, object_type, object_key, dimension=None):
+        return self._call("query_object_balance", {
+            "object_type": object_type, "object_key": object_key,
+            "dimension": dimension})
+
+    def post_event(self, event_id):
+        return self._call("post_event", {"event_id": event_id})

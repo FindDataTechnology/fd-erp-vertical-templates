@@ -61,6 +61,19 @@ def _fmt(d: Decimal) -> str:
     return format(d.normalize(), "f")
 
 
+#: 内核的「显式未知」一等值（与 fd_erp_ledger_mcp.events.UNKNOWN 同形）。
+#: 到货预告不带库位/批次/单位时写它，而不是空串——空串会被读成「没有」
+#: （内核按空值拒收必填字段），显式未知才是「此刻不知道」。
+UNKNOWN = "__unknown__"
+
+
+def _kernel_error(line: int, step: str, exc: Exception) -> dict[str, Any]:
+    """把内核异常折成可回传的差错项（内存错误码在 `code` 属性上，不做类型依赖）。"""
+    return {"line": line, "step": step,
+            "code": getattr(exc, "code", None) or exc.__class__.__name__,
+            "message": str(exc)[:500]}
+
+
 def _ref(prefix: str, seed: str) -> str:
     return f"{prefix}-{hashlib.sha1(seed.encode()).hexdigest()[:10].upper()}"
 
@@ -69,11 +82,15 @@ class ProcurementOrchestrator:
     """采购编排：需求汇总 → 采购订单（确认车道）→ 推送留痕 → 到货预告 → 入库任务。"""
 
     def __init__(self, tenant_id: str, data_dir: str | Path,
-                 master: MasterData, *, requested_by_default: str = "agent"):
+                 master: MasterData, *, kernel: KernelClient | None = None,
+                 requested_by_default: str = "agent"):
         self._tenant = tenant_id
         self._master = master
         self._log = EventLog(Path(data_dir) / f"orchestration-{tenant_id}.jsonl")
         self._default_by = requested_by_default
+        # 可空是刻意的：模板层可独立用于「无内核」的工作流演练；此时到货事实
+        # 只留编排记录，响应里如实写 `kernel.skipped=no_kernel`，不伪造库存与分录。
+        self._kernel = kernel
 
     # ---- 事件档 ----
 
@@ -360,7 +377,8 @@ class ProcurementOrchestrator:
         arrival = self.record_arrival_notice(po_ref, norm, expected_day=expected_day,
                                              requested_by=responded_by)
         return {"feedback_ref": ref, "po_ref": po_ref,
-                "arrival_ref": arrival["ref"], "lines": norm}
+                "arrival_ref": arrival["ref"], "lines": norm,
+                "kernel": arrival.get("kernel")}
 
     # ---- 4) 到货预告 ----
 
@@ -382,8 +400,96 @@ class ProcurementOrchestrator:
                                   "lines": [dict(l) for l in lines]},
                       "requested_by": requested_by or self._default_by,
                       "note": "到货预告（供应商门户/页面集回流）"})
+        # 编排记录先落盘：它是工作流真相（这单到货申报确实发生了）。事件层随后补，
+        # 逐行幂等（stable_id = ref:行号），补失败也只会让这一行的 kernel 段报错，
+        # 不会留下「有事件无单据」或「有单据却谎称有事件」两种残局。
+        facts = self._emit_arrival_facts(ref, po_ref, lines,
+                                         requested_by or self._default_by)
         return {"ref": ref, "record": "arrival_notice", "po_ref": po_ref,
-                "lines": len(lines)}
+                "lines": len(lines), "kernel": facts}
+
+    # ---- 事件层：到货事实 → 对象数量面 → 过账（establish-erp-event-kernel 7.1）----
+
+    def _emit_arrival_facts(self, ref: str, po_ref: str,
+                            lines: list[dict[str, Any]],
+                            requested_by: str) -> dict[str, Any]:
+        """把到货预告逐行落成 `goods_received` 事件，投影库存并触发过账。
+
+        三个口径决定（都写在这里，因为它们是「事实怎么进库」的关键）：
+
+        1. **一行一事件，键是 `ref:行号`**：同一单同商品两行是两笔事实，不能用行内容
+           做幂等键；键绑在到货预告 ref 上，重放同一 ref 由内核按
+           (租户, 车道, stable_id) 去重，不会重复计数。
+        2. **库位/批次/单位缺省写 `__unknown__`**：SP 到货预告不带库位（库位在入库
+           任务才定），写空串会被内核读成「没有」并拒收必填字段；显式未知才是
+           「此刻不知道」。库存按未知库位维度累计，读方能看到维度而不是看见一个假的库位。
+        3. **过账权仍在核心**：金额与科目由内核的生效过账规则派生；无规则、或缺规则
+           引用的载荷字段（到货预告通常没有成本金额）时，内核挂待补清单并抛
+           `POSTING_RULE_MISSING`。这里如实记 `posted=False` 与原因，**不伪造已过账**。
+        """
+        if self._kernel is None:
+            return {"ok": False, "skipped": "no_kernel", "lines": [],
+                    "reason": "未注入 KernelClient：到货事实未落事件层，"
+                              "库存数量面与分录都不会有这一笔"}
+        out: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        for idx, raw in enumerate(lines, start=1):
+            line = dict(raw)
+            sku = str(line.get("product_code") or line.get("product")
+                      or line.get("productId") or "").strip()
+            if not sku:
+                errors.append({"line": idx, "code": "INVALID_ARGUMENT",
+                               "message": f"到货行缺商品编码：{line!r}"})
+                continue
+            qty = _dec(line.get("qty"), f"到货数量（第 {idx} 行）")
+            unit = str(line.get("unit") or "").strip() or UNKNOWN
+            warehouse = str(line.get("warehouse") or "").strip() or UNKNOWN
+            lot = str(line.get("lot") or "").strip() or UNKNOWN
+            stable_id = f"{ref}:{idx}"
+            payload = {"sku": sku, "quantity": _fmt(qty), "unit": unit,
+                       "warehouse": warehouse, "lot": lot, "po_ref": po_ref}
+            # 金额类可选字段只在到货行真的带了才写：没带就是「不知道金额」，
+            # 过账规则引用 payload.cost 时内核会如实挂待补（不猜金额），
+            # 而不是拿 0 顶上把账记平。
+            for opt in ("cost", "currency"):
+                if line.get(opt) not in (None, ""):
+                    payload[opt] = str(line[opt])
+            try:
+                event = self._kernel.ingest_event(
+                    "goods_received", stable_id, datetime.now(timezone.utc), payload,
+                    source_ref=ref,
+                    provenance={"source": "supplier-arrival-notice",
+                                "arrival_ref": ref, "po_ref": po_ref,
+                                "requested_by": requested_by})
+            except Exception as exc:  # noqa: BLE001 — 协议边界：内存错误码不做类型依赖
+                errors.append(_kernel_error(idx, "ingest_event", exc))
+                continue
+            balance = None
+            try:
+                balance = self._kernel.project_event(
+                    event["id"], "sku", sku, _fmt(qty), unit,
+                    {"warehouse": warehouse, "lot": lot})
+            except Exception as exc:  # noqa: BLE001
+                errors.append(_kernel_error(idx, "project_event", exc))
+            posting: dict[str, Any]
+            try:
+                posting = dict(self._kernel.post_event(event["id"]))
+            except Exception as exc:  # noqa: BLE001
+                posting = {"posted": False, "reason": "rule_missing_or_incomplete",
+                           **_kernel_error(idx, "post_event", exc)}
+            out.append({"line": idx, "stable_id": stable_id,
+                        "event_id": event["id"], "event_status": event.get("status"),
+                        "duplicate": event.get("duplicate", False),
+                        "quantity": _fmt(qty), "unit": unit,
+                        "dimension": {"warehouse": warehouse, "lot": lot},
+                        "balance": (balance or {}).get("quantity"),
+                        "posted": posting.get("posted", False),
+                        "txn_id": posting.get("txn_id"),
+                        "posting_reason": posting.get("reason"),
+                        "posting_code": posting.get("code"),
+                        "posting_error": posting.get("message")})
+        return {"ok": not errors, "lines": out, "errors": errors}
+
 
     # ---- 5) 入库任务（执行归外部 WMS）----
 

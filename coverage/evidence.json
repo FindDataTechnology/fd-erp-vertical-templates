@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 32,
     "placeholder_routes": 20,
-    "routes": 65
+    "routes": 66
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -49,7 +49,7 @@
   "routes": [
     {
       "function": "cp_dock_slots",
-      "line": 1020,
+      "line": 1046,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/dock-slots",
       "placeholder": true,
@@ -57,7 +57,7 @@
     },
     {
       "function": "cp_freight_statements",
-      "line": 1142,
+      "line": 1168,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements",
       "placeholder": true,
@@ -65,7 +65,7 @@
     },
     {
       "function": "cp_freight_detail",
-      "line": 1152,
+      "line": 1178,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}",
       "placeholder": true,
@@ -73,7 +73,7 @@
     },
     {
       "function": "cp_freight_confirm",
-      "line": 1159,
+      "line": 1185,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm",
       "placeholder": true,
@@ -81,7 +81,7 @@
     },
     {
       "function": "cp_waybills",
-      "line": 951,
+      "line": 977,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills",
       "placeholder": false,
@@ -89,7 +89,7 @@
     },
     {
       "function": "cp_waybill_detail",
-      "line": 975,
+      "line": 1001,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}",
       "placeholder": false,
@@ -97,7 +97,7 @@
     },
     {
       "function": "cp_waybill_accept",
-      "line": 1001,
+      "line": 1027,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/accept",
       "placeholder": false,
@@ -105,7 +105,7 @@
     },
     {
       "function": "cp_dock_reserve",
-      "line": 1029,
+      "line": 1055,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/dock-reservation",
       "placeholder": false,
@@ -113,7 +113,7 @@
     },
     {
       "function": "cp_waybill_events",
-      "line": 1105,
+      "line": 1131,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/events",
       "placeholder": false,
@@ -121,7 +121,7 @@
     },
     {
       "function": "cp_pickup_checkin",
-      "line": 1061,
+      "line": 1087,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pickup-checkin",
       "placeholder": false,
@@ -129,7 +129,7 @@
     },
     {
       "function": "cp_pod_report",
-      "line": 1078,
+      "line": 1104,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pod",
       "placeholder": false,
@@ -137,7 +137,7 @@
     },
     {
       "function": "cp_workspace",
-      "line": 917,
+      "line": 943,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/workspace",
       "placeholder": false,
@@ -288,8 +288,16 @@
       "source": "faces.py"
     },
     {
+      "function": "sp_inventory",
+      "line": 782,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/sp/inventory",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "sp_invoice_list",
-      "line": 823,
+      "line": 849,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -297,7 +305,7 @@
     },
     {
       "function": "sp_invoice_upload",
-      "line": 815,
+      "line": 841,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -337,7 +345,7 @@
     },
     {
       "function": "sp_settlements",
-      "line": 831,
+      "line": 857,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/settlements",
       "placeholder": true,
@@ -345,7 +353,7 @@
     },
     {
       "function": "sp_statements",
-      "line": 789,
+      "line": 815,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements",
       "placeholder": true,
@@ -353,7 +361,7 @@
     },
     {
       "function": "sp_statement_detail",
-      "line": 796,
+      "line": 822,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}",
       "placeholder": true,
@@ -361,7 +369,7 @@
     },
     {
       "function": "sp_statement_confirm",
-      "line": 801,
+      "line": 827,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}/confirm",
       "placeholder": true,
