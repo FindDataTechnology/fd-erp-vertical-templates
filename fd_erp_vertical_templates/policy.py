@@ -71,14 +71,14 @@ KEYS: dict[str, dict[str, Any]] = {
         "values": ("department", "project", "channel", "cost-center"),
         "default": "cost-center",
         "impact": "影响预算表的键与超支判定口径；与成本核算共用 cost-center 可省重复录入",
-        "implemented": False,
+        "implemented": True,
     },
     "budget_period": {
         "domain": "budget",
         "values": ("monthly", "quarterly"),
         "default": "monthly",
         "impact": "影响预算分解与考核粒度；季度考核时月度对比报表需要插值",
-        "implemented": False,
+        "implemented": True,
     },
     "budget_control": {
         "domain": "budget",
@@ -86,7 +86,7 @@ KEYS: dict[str, dict[str, Any]] = {
         "default": "warn-only",
         "impact": "影响超预算时系统是拦、放行标记还是事后审计；硬拦需要预算先给足，"
                   "否则正常业务会被卡住",
-        "implemented": False,
+        "implemented": True,
     },
     # ---- 固定资产 ----
     "depreciation_method": {

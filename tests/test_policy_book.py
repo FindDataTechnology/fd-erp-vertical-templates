@@ -145,24 +145,24 @@ def test_unknown_before_request_id_is_not_found(book):
 # ---- 4) 未实现引擎的口径：登记但明确不生效 ----
 
 def test_unimplemented_engine_keys_are_recorded_only(book):
-    # 折旧引擎已随 add-fixed-assets-lane 交付，故改用仍无消费者的预算控制键做对照
-    prop = book.propose({"budget_control": "hard-block"})
-    assert prop["recordedOnly"] == ["budget_control"]
+    # 折旧与预算引擎都已交付，故改用仍无消费者的合并主体模型做对照
+    prop = book.propose({"entity_model": "tenant-per-entity"})
+    assert prop["recordedOnly"] == ["entity_model"]
     assert "仅登记" in prop["note"]          # 提案自己就说清「还没消费者」
     book.confirm(prop["requestId"])
     now = book.current()
-    assert now["values"]["budget_control"] == "hard-block"
-    assert now["keys"]["budget_control"]["enforced"] is False
+    assert now["values"]["entity_model"] == "tenant-per-entity"
+    assert now["keys"]["entity_model"]["enforced"] is False
     assert now["keys"]["cost_method"]["enforced"] is True
     assert now["counts"]["recordedOnly"] >= 1
 
 
 def test_implemented_flags_match_reality(book):
     for key in ("cost_method", "provisional_basis", "variance_policy", "close_grain",
-                "depreciation_method", "asset_ledger_owner"):
+                "depreciation_method", "asset_ledger_owner",
+                "budget_dimension", "budget_period", "budget_control"):
         assert book.explain(key)["implemented"] is True, key
-    for key in ("budget_dimension", "budget_period", "budget_control",
-                "entity_model", "elimination_scope", "fx_translation"):
+    for key in ("entity_model", "elimination_scope", "fx_translation"):
         assert book.explain(key)["implemented"] is False, key
 
 
