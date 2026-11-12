@@ -61,6 +61,10 @@ def _fmt(value: Decimal) -> str:
     return str(value.quantize(Q6, rounding=ROUND_HALF_UP))
 
 
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _period_of(occurred_at: str, grain: str) -> str:
     """业务时点 → 期间键（月=YYYY-MM，周=ISO 周 YYYY-Www）。"""
     raw = str(occurred_at or "").strip()
@@ -103,6 +107,9 @@ class CostEngine:
         self._policy = policy
         self._base = base_currency
         self._std_log = EventLog(Path(data_dir) / f"standard-costs-{tenant_id}.jsonl")
+        #: 结转记录（期间 → 已提交金额）。内核按 stable_id 幂等，这层记录用来回答
+        #: 「这期结转过多少、这次算出来又是多少」——金额变了要拒，不能静默改大改小。
+        self._cogs_log = EventLog(Path(data_dir) / f"cogs-{tenant_id}.jsonl")
 
     # ---- 标准成本登记（provisional_basis=standard 时用）----
 
@@ -253,7 +260,12 @@ class CostEngine:
                 out = self._kernel.query_events(
                     event_type=event_type, status="accepted", limit=500,
                     after_event_id=after) or {}
-                page = [r for r in (out.get("events") or out.get("data") or [])
+                # 内核 query_events 的真实返回是 `{"items": [...], "completeness": ...}`；
+                # 早先只认 `events`/`data`，于是对着真内核**永远看不见任何事件**——
+                # 单测替身恰好返回 `events`，假绿了整整一轮。四种写法都认，宁可宽容读取，
+                # 也不让一个键名把整条成本链静默清空。
+                page = [r for r in (out.get("items") or out.get("events")
+                                    or out.get("data") or [])
                         if isinstance(r, dict)]
                 declared = out.get("declared_total")
                 if isinstance(declared, int):
@@ -373,6 +385,107 @@ class CostEngine:
         return {"sku": code, "warehouse": wh, "lot": lot_v, "qty": _fmt(need),
                 "method": cfg["cost_method"], "unitCost": _fmt(cost / need),
                 "amount": _fmt(cost), "layers": consumed}
+
+    # ---- 成本结转（出库成本 → 营业成本）----
+
+    def post_cogs(self, period: str, *, partial: bool = False,
+                  submitted_by: str = "cost-engine") -> dict[str, Any]:
+        """把某期间已计价的出库成本汇成一张**待确认** proposal（借营业成本 / 贷存货）。
+
+        - 金额直接取 `replay()` 的 issues：同一批事实、同一方法，不另算一遍；
+        - **成本未知的出库默认整期拒绝**：结转一个偏小的营业成本会让毛利虚高，而报表上看不出来。
+          `partial=True` 只结已计价的，但必须自报其名（标 `partial` + 列出跳过项）；
+        - 期间已结转过且金额变了 → 拒绝：期间结账后新增出库属于跨期调整，要走作废/冲正。
+        """
+        cfg = self._policy.current()["values"]
+        grain = cfg["close_grain"]
+        key = str(period or "").strip()
+        if not key:
+            raise TemplateError("INVALID_ARGUMENT", "结转须给期间（按口径 close_grain 的键）")
+
+        snap = self.replay()
+        costed = 0
+        total = Decimal(0)
+        uncosted: list[dict[str, Any]] = []
+        for rec in snap["issues"]:
+            if _period_of(rec["occurredAt"], grain) != key:
+                continue
+            if rec["cost"] is None:
+                uncosted.append({"eventId": rec.get("eventId"), "sku": rec["sku"],
+                                 "qty": rec["qty"],
+                                 "warehouse": rec.get("warehouse"),
+                                 "lot": rec.get("lot")})
+                continue
+            costed += 1
+            total += _dec(rec["cost"], "出库成本")
+
+        if uncosted and not partial:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"{key} 有 {len(uncosted)} 笔成本未知的出库，不能结转——"
+                f"结转偏小的营业成本会让毛利虚高且看不出来（要只结已计价的，显式给 partial=True）",
+                detail={"period": key, "uncosted": uncosted})
+
+        if total <= 0:
+            out = {"period": key, "grain": grain, "proposal": None,
+                   "total": _fmt(Decimal(0)), "issues": costed,
+                   "skipped": uncosted, "partial": bool(uncosted),
+                   "note": "本期没有已计价的出库成本，未生成分录"}
+            if uncosted:
+                # 早退也要自报其名：全部跳过 ≠ 本期没有出库
+                out["warning"] = (f"部分结转：{len(uncosted)} 笔成本未知的出库未计入，"
+                                  f"本期结转金额为 0——这不是「本期没出库」")
+            return out
+
+        prior = self._cogs_prior(key)
+        if prior is not None and _dec(prior, "已结转金额") != total:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"{key} 已结转 {prior}，本次算出来 {_fmt(total)}——期间结账后新增出库属于"
+                f"跨期调整，请先作废/冲正上期结转再重结（不允许静默改金额）",
+                detail={"period": key, "posted": prior, "current": _fmt(total)})
+        if prior is not None:
+            return {"period": key, "proposal": None, "total": _fmt(total),
+                    "issues": costed, "skipped": uncosted,
+                    "partial": bool(uncosted), "duplicate": True,
+                    "note": "该期间已按同一金额结转过（幂等，不重复提交）"}
+
+        lines = [
+            {"account_code": "5000", "direction": "debit",
+             "amount": _fmt(total), "currency": self._base},
+            {"account_code": "1200", "direction": "credit",
+             "amount": _fmt(total), "currency": self._base},
+        ]
+        stable_id = f"cogs:{key}"
+        proposal = self._kernel.submit_proposal(
+            stable_id, lines, source_ref=f"cogs:{key}", kind="journal",
+            lane_title=f"{key} 出库成本结转", submitted_by=submitted_by)
+        self._cogs_log.append({"period": key, "grain": grain, "total": _fmt(total),
+                               "issues": costed, "partial": bool(uncosted),
+                               "skipped": uncosted, "stableId": stable_id,
+                               "proposal": proposal,
+                               "policy": {"cost_method": cfg["cost_method"]},
+                               "submitted_by": submitted_by,
+                               "recorded_at": _now()})
+        out = {"period": key, "grain": grain, "proposal": proposal,
+               "stableId": stable_id, "total": _fmt(total), "issues": costed,
+               "skipped": uncosted, "partial": bool(uncosted),
+               "duplicate": bool(proposal and proposal.get("duplicate")),
+               "method": cfg["cost_method"],
+               "caliber_note": "结转只生成待确认 proposal（借 5000 营业成本 / 贷 1200 存货）；"
+                               "过门后由内核落账"}
+        if uncosted:
+            out["warning"] = (f"部分结转：{len(uncosted)} 笔成本未知的出库未计入，"
+                              f"营业成本会偏小——请补齐成本后重结或冲正")
+        return out
+
+    def _cogs_prior(self, period: str) -> str | None:
+        """该期间已结转的金额（本层记录；内核侧另有 stable_id 幂等）。"""
+        hit = None
+        for rec in self._cogs_log.events():
+            if str(rec.get("period")) == period:
+                hit = rec
+        return None if hit is None else str(hit.get("total"))
 
     # ---- 期末结账 ----
 

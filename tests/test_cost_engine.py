@@ -11,6 +11,8 @@
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from fd_erp_vertical_templates.cost import CostEngine
@@ -34,7 +36,10 @@ class _StubKernel:
                 if (event_type is None or e["event_type"] == event_type)
                 and (status is None or e["status"] == status)
                 and e["id"] > after_event_id]
-        return {"events": rows[:limit], "declared_total": len(rows)}
+        # **按内核真实形状**返回 `items` + `completeness`（不是方便自己的 `events`）：
+        # 替身与生产形状不一致时，测试全绿而线上一条事件也读不到——本轮实测栽过这一次。
+        return {"items": rows[:limit],
+                "completeness": {"declared_total": len(rows)}}
 
 
 def _ev(eid, kind, qty, *, cost=None, lot=None, when=DAY, sku="P-1", status="accepted"):
@@ -253,3 +258,113 @@ def test_close_reports_uncosted_issues_separately(tmp_path):
     assert report["issues"]["count"] == 2
     assert report["issues"]["cost"] == "0.000000"     # 没有可计价的出库
     assert report["issues"]["uncosted"] == 2          # 但明确报「未计价」
+
+
+# ---- 5) 成本结转（出库成本 → 营业成本）----
+
+class _ProposalKernel(_StubKernel):
+    """在事件源之外再提供 submit_proposal（同 stable_id 幂等）。"""
+
+    def __init__(self, events, *, status="pending"):
+        super().__init__(events)
+        self.status = status
+        self.calls: list[dict] = []
+        self._seen: dict[str, dict] = {}
+
+    def submit_proposal(self, stable_id, lines, source_ref=None, kind="journal",
+                        lane_title=None, submitted_by="agent", **_kw):
+        self.calls.append({"stable_id": stable_id, "lines": lines,
+                           "sourceRef": source_ref, "submittedBy": submitted_by})
+        if stable_id in self._seen:
+            return {**self._seen[stable_id], "duplicate": True}
+        out = {"proposal_id": len(self._seen) + 1, "stable_id": stable_id,
+               "status": self.status, "duplicate": False}
+        self._seen[stable_id] = out
+        return dict(out)
+
+
+def _cogs_engine(tmp_path, events, *, grain="monthly", method="weighted-average"):
+    book = PolicyBook(TENANT, tmp_path / "data")
+    want = {"close_grain": grain, "cost_method": method}
+    changes = {k: v for k, v in want.items()
+               if book.current()["values"][k] != v}
+    if changes:
+        book.confirm(book.propose(changes)["requestId"])
+    kernel = _ProposalKernel(events)
+    return CostEngine(TENANT, tmp_path / "data", kernel, book), kernel
+
+
+def test_post_cogs_posts_one_pending_proposal(tmp_path):
+    events = [_ev(1, "goods_received", 10, cost=10),
+              _ev(2, "goods_issued", 3),
+              _ev(3, "goods_issued", 2)]
+    engine, kernel = _cogs_engine(tmp_path, events)
+    out = engine.post_cogs("2026-11")
+    assert out["total"] == "50.000000"          # (3+2) × 10
+    assert out["stableId"] == "cogs:2026-11"
+    assert out["proposal"]["status"] == "pending"
+    lines = kernel.calls[0]["lines"]
+    debits = sum(Decimal(l["amount"]) for l in lines if l["direction"] == "debit")
+    credits = sum(Decimal(l["amount"]) for l in lines if l["direction"] == "credit")
+    assert debits == credits == Decimal("50")
+    assert {l["account_code"] for l in lines} == {"5000", "1200"}
+
+
+def test_post_cogs_is_idempotent_for_the_same_amount(tmp_path):
+    events = [_ev(1, "goods_received", 10, cost=10), _ev(2, "goods_issued", 3)]
+    engine, kernel = _cogs_engine(tmp_path, events)
+    first = engine.post_cogs("2026-11")
+    again = engine.post_cogs("2026-11")
+    assert first["duplicate"] is False and again["duplicate"] is True
+    assert len(kernel.calls) == 1               # 第二次没再打内核
+
+
+def test_post_cogs_refuses_uncosted_issues_by_default(tmp_path):
+    events = [_ev(1, "goods_received", 10, cost=10),
+              _ev(2, "goods_issued", 3),
+              _ev(3, "goods_issued", 2)]        # 只入 10、先出 3（有成本）再出 2（有成本）
+    engine, kernel = _cogs_engine(tmp_path, events)
+    engine.replay()  # 预热
+    # 造一笔成本未知的出库：库存耗尽后出库 → cost 为 None（gap=insufficient_layers）
+    engine2, kernel2 = _cogs_engine(
+        tmp_path / "b",
+        [_ev(1, "goods_received", 1, cost=10), _ev(2, "goods_issued", 5)])
+    with pytest.raises(TemplateError) as ei:
+        engine2.post_cogs("2026-11")
+    assert ei.value.code == "INVALID_ARGUMENT"
+    assert ei.value.detail["uncosted"], ei.value.detail
+    assert "毛利虚高" in ei.value.message
+    assert kernel2.calls == []                  # 一张 proposal 都不出
+
+
+def test_post_cogs_partial_must_say_it_is_partial(tmp_path):
+    engine, kernel = _cogs_engine(
+        tmp_path, [_ev(1, "goods_received", 1, cost=10), _ev(2, "goods_issued", 5)])
+    out = engine.post_cogs("2026-11", partial=True)
+    assert out["partial"] is True
+    assert out["skipped"]
+    assert "部分结转" in out["warning"]
+    # 已计价部分是 0（整笔无法定价）→ 不打内核
+    if out["total"] == "0.000000":
+        assert kernel.calls == []
+
+
+def test_post_cogs_refuses_when_amount_changes_after_close(tmp_path):
+    engine, kernel = _cogs_engine(tmp_path, [_ev(1, "goods_received", 10, cost=10),
+                                            _ev(2, "goods_issued", 3)])
+    engine.post_cogs("2026-11")
+    # 期间结账后新增出库：同一份档里补一笔出库事件
+    kernel._events.append(_ev(4, "goods_issued", 2))
+    kernel._events.sort(key=lambda e: e["id"])
+    with pytest.raises(TemplateError) as ei:
+        engine.post_cogs("2026-11")
+    assert ei.value.detail["posted"] == "30.000000"
+    assert ei.value.detail["current"] == "50.000000"
+    assert "跨期调整" in ei.value.message
+
+
+def test_post_cogs_with_no_costed_issues_posts_nothing(tmp_path):
+    engine, kernel = _cogs_engine(tmp_path, [_ev(1, "goods_received", 10, cost=10)])
+    out = engine.post_cogs("2026-11")
+    assert out["proposal"] is None and out["total"] == "0.000000"
+    assert kernel.calls == []

@@ -306,6 +306,12 @@ class InventoryLane:
                     for opt in ("cost", "currency", "po_ref", "serial"):
                         if line.get(opt) not in (None, ""):
                             payload[opt] = str(line[opt])
+                    # `cost` 是**单位成本**（成本引擎按它建层），过账规则要的是**行金额**。
+                    # 只给单位成本会让规则算出 100 而不是 10×100=1000——这类错不报错，只错数，
+                    # 所以两个都写进事实：单位成本给计价，行金额给过账。
+                    if payload.get("cost"):
+                        payload["total_cost"] = _fmt(
+                            _dec(payload["cost"], "单位成本") * abs(qty))
                 try:
                     out = self._kernel.submit_event(
                         event_type, stable_id, business_at, payload,
@@ -390,11 +396,15 @@ class InventoryLane:
 
     @staticmethod
     def _sku(line: dict[str, Any], idx: int) -> str:
+        # 入参四种写法都认：本模块的**输出**用 `sku`（与成本引擎同词），
+        # 上游主数据/前端历史上用 product_code / product / productId。
+        # 只认一种会让「同一件东西」在进与出两处叫不同名字——那类错不报错，只错数。
         sku = str(line.get("product_code") or line.get("product")
-                  or line.get("productId") or "").strip()
+                  or line.get("productId") or line.get("sku") or "").strip()
         if not sku:
             raise TemplateError("INVALID_ARGUMENT",
-                                f"第 {idx} 行缺商品编码（product_code/product/productId）")
+                                "第 %d 行缺商品编码（product_code/product/productId/sku）"
+                                % idx)
         return sku
 
     def _available(self, sku: str, warehouse: str, lot: str) -> Decimal:
