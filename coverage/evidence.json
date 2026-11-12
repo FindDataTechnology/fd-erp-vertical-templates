@@ -5,7 +5,7 @@
       "/healthz"
     ],
     "mcp_tools": 32,
-    "placeholder_routes": 13,
+    "placeholder_routes": 11,
     "routes": 66
   },
   "mcp_tools": [
@@ -145,7 +145,7 @@
     },
     {
       "function": "list_pagesets",
-      "line": 271,
+      "line": 289,
       "method": "GET",
       "path": "/erp/supply-chain/v1/pagesets",
       "placeholder": false,
@@ -385,7 +385,7 @@
     },
     {
       "function": "list_aftersales",
-      "line": 756,
+      "line": 794,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
       "placeholder": false,
@@ -393,7 +393,7 @@
     },
     {
       "function": "create_aftersale",
-      "line": 734,
+      "line": 772,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
       "placeholder": false,
@@ -401,7 +401,7 @@
     },
     {
       "function": "aftersale_detail",
-      "line": 770,
+      "line": 808,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests/{request_id}",
       "placeholder": false,
@@ -409,7 +409,7 @@
     },
     {
       "function": "get_cart",
-      "line": 367,
+      "line": 385,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/cart",
       "placeholder": false,
@@ -417,7 +417,7 @@
     },
     {
       "function": "add_cart_line",
-      "line": 372,
+      "line": 390,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/cart/lines",
       "placeholder": false,
@@ -425,7 +425,7 @@
     },
     {
       "function": "remove_cart_line",
-      "line": 393,
+      "line": 411,
       "method": "DELETE",
       "path": "/erp/supply-chain/v1/ue/cart/lines/{line_id}",
       "placeholder": false,
@@ -433,7 +433,7 @@
     },
     {
       "function": "price_preview",
-      "line": 400,
+      "line": 418,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/cart/price-preview",
       "placeholder": false,
@@ -441,23 +441,23 @@
     },
     {
       "function": "list_invoice_requests",
-      "line": 712,
+      "line": 735,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/invoice-requests",
-      "placeholder": true,
+      "placeholder": false,
       "source": "app.py"
     },
     {
       "function": "create_invoice_request",
-      "line": 719,
+      "line": 754,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/invoice-requests",
-      "placeholder": true,
+      "placeholder": false,
       "source": "app.py"
     },
     {
       "function": "list_orders",
-      "line": 490,
+      "line": 508,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders",
       "placeholder": false,
@@ -465,7 +465,7 @@
     },
     {
       "function": "create_order",
-      "line": 437,
+      "line": 455,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/orders",
       "placeholder": false,
@@ -473,7 +473,7 @@
     },
     {
       "function": "order_detail",
-      "line": 543,
+      "line": 561,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}",
       "placeholder": false,
@@ -481,7 +481,7 @@
     },
     {
       "function": "order_fulfillment",
-      "line": 562,
+      "line": 580,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}/fulfillment",
       "placeholder": false,
@@ -489,7 +489,7 @@
     },
     {
       "function": "trigger_fulfillment",
-      "line": 592,
+      "line": 610,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/orders/{order_id}/fulfillment",
       "placeholder": false,
@@ -497,7 +497,7 @@
     },
     {
       "function": "list_categories",
-      "line": 319,
+      "line": 337,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/product-categories",
       "placeholder": false,
@@ -505,7 +505,7 @@
     },
     {
       "function": "list_products",
-      "line": 279,
+      "line": 297,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/products",
       "placeholder": false,
@@ -513,7 +513,7 @@
     },
     {
       "function": "product_detail",
-      "line": 341,
+      "line": 359,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/products/{product_id}",
       "placeholder": false,
@@ -521,7 +521,7 @@
     },
     {
       "function": "create_reconciliation",
-      "line": 677,
+      "line": 695,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/reconciliations",
       "placeholder": false,
@@ -529,7 +529,7 @@
     },
     {
       "function": "get_reconciliation",
-      "line": 700,
+      "line": 718,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/reconciliations/{task_id}",
       "placeholder": false,
@@ -537,7 +537,7 @@
     },
     {
       "function": "list_statements",
-      "line": 630,
+      "line": 648,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/statements",
       "placeholder": false,
@@ -545,7 +545,7 @@
     },
     {
       "function": "statement_detail",
-      "line": 641,
+      "line": 659,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/statements/{statement_id}",
       "placeholder": false,
@@ -553,7 +553,7 @@
     },
     {
       "function": "confirm_statement",
-      "line": 647,
+      "line": 665,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/statements/{statement_id}/confirm",
       "placeholder": false,
@@ -561,7 +561,7 @@
     },
     {
       "function": "health",
-      "line": 248,
+      "line": 266,
       "method": "GET",
       "path": "/health",
       "placeholder": false,
@@ -569,7 +569,7 @@
     },
     {
       "function": "health",
-      "line": 249,
+      "line": 267,
       "method": "GET",
       "path": "/healthz",
       "placeholder": false,

@@ -667,7 +667,7 @@
       "surface": "ue"
     },
     {
-      "classification": "模式复用",
+      "classification": "直接命中",
       "domain": "开票申请",
       "evidence": [
         {
@@ -684,7 +684,6 @@
         }
       ],
       "id": "FP-A22470015A",
-      "note": "端点 501 占位（契约在、实现未就绪）：GET /erp/supply-chain/v1/ue/invoice-requests、POST /erp/supply-chain/v1/ue/invoice-requests",
       "row_status": "覆盖",
       "subdomain": "ue-invoice-apply",
       "surface": "ue"

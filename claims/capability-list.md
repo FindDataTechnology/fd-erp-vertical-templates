@@ -1,6 +1,6 @@
 # ERP 对外能力清单（数据派生）
 
-> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 13 条），不认文档里手写的旧数。
+> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 11 条），不认文档里手写的旧数。
 
 ## 一、已交付（有证据）
 
@@ -37,7 +37,7 @@
 - **事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py；mcp_tool:run_reconciliation
 
-## 二、规划中（13 条，全部来自挂账清单）
+## 二、规划中（11 条，全部来自挂账清单）
 
 | 能力面 | 域 | 端点 | 规划车道 |
 | --- | --- | --- | --- |
@@ -52,8 +52,6 @@
 | supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements` | 金蝶 provider 往来面拉取（任务 3.1）→ 账本内核计算应付 → 单据级对账单派生 + 确认门（内核自平核对 proposal，同 UE 契约） |
 | supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements/{statement_id}` | 同 GET /sp/statements |
 | supply-chain.sp | statements | `POST /erp/supply-chain/v1/sp/statements/{statement_id}/confirm` | 金额同源到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道 |
-| supply-chain.ue | invoice-requests | `GET /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
-| supply-chain.ue | invoice-requests | `POST /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
 
 ## 三、当前不可用（缺口登记 6 条）
 

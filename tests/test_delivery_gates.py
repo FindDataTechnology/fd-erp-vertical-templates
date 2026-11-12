@@ -302,7 +302,11 @@ def test_unregistered_501_endpoint_is_red(tmp_path, claim_gate):
         assert "PLANNED_SURFACE_UNREGISTERED" in codes
         missing = [v for v in result["violations"]
                    if v["code"] == "PLANNED_SURFACE_UNREGISTERED"]
-        assert any(dropped["path"] in v["message"] for v in missing)
+        # 消息里的路径是**归一化**过的（`{statement_id}` → `{}`）：拿原始路径做子串
+        # 匹配会在「被弹出的端点带路径参数」时假红。带参数的端点正是常态——
+        # 这条用例以前碰巧弹出的是无参端点（`POST /ue/invoice-requests`），
+        # 该端点落地后这个巧合消失，断言必须按归一化口径比。
+        assert any(claim_gate._norm(dropped["path"]) in v["message"] for v in missing)
     finally:
         mirror["endpoints"].append(dropped)          # 登记回来
 

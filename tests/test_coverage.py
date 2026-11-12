@@ -154,7 +154,9 @@ def test_classification_is_evidence_derived():
     assert classify("endpoint", "GET /erp/supply-chain/v1/ue/products") == cov.CLASS_DIRECT
     assert classify("mcp_tool", "submit_proposal") == cov.CLASS_DIRECT
     # 501 占位端点 / 只有模板资产或测试名 → 模式复用
-    assert classify("endpoint", "POST /erp/supply-chain/v1/ue/invoice-requests") == cov.CLASS_PATTERN
+    # 例子里必须用**此刻仍是** 501 的端点：拿已实现的端点当占位范例，会在能力落地
+    # 那天变成「实现让测试变红」（UE 开票两条就是这么变红的，已换成 SP 发票面）。
+    assert classify("endpoint", "POST /erp/supply-chain/v1/sp/invoices") == cov.CLASS_PATTERN
     assert classify("template_asset",
                     "templates/supply-chain/pagesets/ue-commerce/manifest.json#page/ue-home") \
         == cov.CLASS_PATTERN
@@ -172,7 +174,7 @@ def test_claimed_classification_must_match_evidence():
                    classification=cov.CLASS_DIRECT,
                    evidence=(cov.EvidenceRef(
                        cov.EVIDENCE_ENDPOINT,
-                       "POST /erp/supply-chain/v1/ue/invoice-requests"),))
+                       "POST /erp/supply-chain/v1/sp/invoices"),))
     with pytest.raises(TemplateError) as ei:
         cov.validate_matrix(cov.CoverageMatrix(vertical="supply-chain", points=[point]),
                             evidence=index, customer_markers=())

@@ -278,10 +278,9 @@
     "by_capability": {
       "supply-chain.cp": 4,
       "supply-chain.se": 1,
-      "supply-chain.sp": 6,
-      "supply-chain.ue": 2
+      "supply-chain.sp": 6
     },
-    "count": 13
+    "count": 11
   },
   "role_bindings": [
     {

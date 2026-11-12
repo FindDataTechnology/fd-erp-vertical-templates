@@ -1154,3 +1154,188 @@ class CrmOrchestrator:
                    if ev.get("record") == "visit"
                    and (ev.get("payload") or {}).get("owner_staff") == staff
                    and (ev.get("payload") or {}).get("visited_day") == day)
+
+
+# ---- 开票申请车道（add-invoice-request-lane）--------------------------------
+#
+# 与售后/CRM 的车道不同，这条不走本地编排档：`invoice_requested` 是**已注册的
+# 事件类型**（requires_posting=false，描述就是「只记事件，票据本体走客户渠道」），
+# 而契约说的「进后台审核车道」正是内核的拟稿车道（submit_event → pending）加
+# 确认门（decide_event，唯一改变事件状态的人工入口）。绕开它写 JSONL，等于
+# 宣布一个已登记的类型没人用；用 ingest_event 直接接受，等于自动通过审核。
+
+INVOICE_REQUEST_EVENT = "invoice_requested"
+INVOICE_REQUEST_STATUSES = ("pending", "accepted", "rejected")
+_TAX_ID_MAX = 32
+_TAX_ID_MIN = 6
+_TITLE_MAX = 200
+_REF_MAX = 200
+
+
+class InvoiceRequestLane:
+    """UE 客户侧开票申请的受理与查询（design D1-D5）。
+
+    状态不落本地（D2）：列表 = 内核投影 + 应用侧按客户过滤。任何本地状态副本
+    都会与确认门分叉——「账本降投影」这条纪律对申请同样成立。
+    """
+
+    def __init__(self, tenant_id: str, client: KernelClient):
+        self._tenant = tenant_id
+        self._client = client
+
+    # ---- 读投影 ----
+
+    def _customer_events(self, customer_id: str, *, limit: int = 500
+                         ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """该客户的申请事件（含已驳回）+ 内核给回的完整性声明。
+
+        内核查询工具没有 payload 检索参数，只能在应用侧过滤——不为一个 WHERE
+        去扩跨仓协议（design D2）。
+        """
+        out = self._client.query_events(event_type=INVOICE_REQUEST_EVENT,
+                                       lane="draft", limit=limit) or {}
+        items = [e for e in (out.get("items") or [])
+                 if str((e.get("payload") or {}).get("customer_id") or "") == customer_id]
+        return items, dict(out.get("completeness") or {})
+
+    @staticmethod
+    def _seq_of(ref: str, customer_id: str) -> int:
+        prefix = f"IR-{customer_id}-"
+        if not str(ref or "").startswith(prefix):
+            return 0
+        tail = str(ref)[len(prefix):]
+        return int(tail) if tail.isdigit() else 0
+
+    def next_ref(self, customer_id: str) -> str:
+        """申请号 IR-<客户>-000001：序号取该客户已有申请的最大值 +1。
+
+        驳回的申请也占号——重用的号会让「上个月被驳回的那条」与「这个月这条」
+        在电话里指向同一串字符（design D3）。
+        """
+        events, _ = self._customer_events(customer_id)
+        biggest = max((self._seq_of(e.get("stable_id"), customer_id) for e in events),
+                      default=0)
+        return f"IR-{customer_id}-{biggest + 1:06d}"
+
+    # ---- 校验（D4）----
+
+    @staticmethod
+    def _validate(customer_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """只做形态校验，不校验税号算法、不校验单据引用归属（design D4）。"""
+        title = str(payload.get("title") or "").strip()
+        if not title:
+            raise TemplateError("INVALID_ARGUMENT", "发票抬头（title）必填")
+        if len(title) > _TITLE_MAX:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"发票抬头超长（上限 {_TITLE_MAX} 字）")
+        raw_tax = str(payload.get("taxId") or payload.get("tax_id") or "")
+        tax = "".join(raw_tax.split()).upper()
+        if not tax:
+            raise TemplateError("INVALID_ARGUMENT", "税号（taxId）必填")
+        if not (_TAX_ID_MIN <= len(tax) <= _TAX_ID_MAX):
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"税号长度须在 {_TAX_ID_MIN}-{_TAX_ID_MAX} 之间")
+        # 显式字符集：`str.isalnum()` 会把汉字也判成字母，用它等于没校验。
+        # 短横线放行：部分辖区（如带分组前缀的 VAT 号）就是带 `-` 的形态。
+        allowed = set("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-")
+        if any(ch not in allowed for ch in tax):
+            raise TemplateError("INVALID_ARGUMENT", "税号只能是数字、大写字母与短横线")
+        order_id = str(payload.get("orderId") or payload.get("order_id") or "").strip()
+        statement_id = str(payload.get("statementId")
+                           or payload.get("statement_id") or "").strip()
+        if not order_id and not statement_id:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                "开票申请须给出对账单或订单引用（statementId / orderId 至少一个）——"
+                "没有单据的申请无法审核")
+        if len(order_id) > _REF_MAX or len(statement_id) > _REF_MAX:
+            raise TemplateError("INVALID_ARGUMENT", f"单据引用超长（上限 {_REF_MAX}）")
+        return {"title": title, "tax": tax,
+                "order_id": order_id, "statement_ref": statement_id}
+
+    # ---- 受理 ----
+
+    def submit_request(self, customer_id: str, payload: dict[str, Any]
+                       ) -> dict[str, Any]:
+        """受理开票申请：校验 → 编号 → 拟稿车道写入（pending）。
+
+        **不采信调用方金额**：请求体里的 amount 一律丢弃，审核时按订单/对账单推定。
+        单据金额是账务口径，不能由申请方填（design D4）。
+        """
+        cust = str(customer_id or "").strip()
+        if not cust:
+            raise TemplateError("INVALID_ARGUMENT", "缺客户身份（申请必须归属到客户）")
+        clean = self._validate(cust, payload)
+
+        delivery = str(payload.get("delivery") or "").strip()
+        ref = self.next_ref(cust)
+        body: dict[str, Any] = {
+            "invoice_ref": ref,
+            "customer_id": cust,
+            "title": clean["title"],
+            "tax_id": clean["tax"],
+        }
+        if clean["order_id"]:
+            body["order_id"] = clean["order_id"]
+        if clean["statement_ref"]:
+            body["statement_ref"] = clean["statement_ref"]
+        if delivery:
+            body["delivery"] = delivery   # 没给就不写这个键，服务端不补默认
+
+        out = self._client.submit_event(
+            event_type=INVOICE_REQUEST_EVENT, stable_id=ref,
+            occurred_at=datetime.now(timezone.utc).isoformat(),
+            payload=body, source_ref=ref)
+        return {
+            "requestId": ref,
+            "status": (out or {}).get("status") or "pending",
+            "submitted_at": (out or {}).get("occurred_at"),
+            "note": ("已受理，进后台审核车道；票据本体仍由客户既有开票渠道出具"
+                     "（本服务不代开票、不生成票据文件）"),
+        }
+
+    # ---- 查询（D2）----
+
+    def requests_of(self, customer_id: str, *, status: str | None = None,
+                    date_from: str | None = None, date_to: str | None = None
+                    ) -> dict[str, Any]:
+        """本人申请列表：状态取内核投影，按提交时点倒序。
+
+        **不分页**：统一壳（`envelope.paginate`）负责窗口、上限与续读标记。
+        分两层各截一次，`total` 与 `rows_returned` 必然对不上。
+        """
+        want = str(status or "").strip()
+        if want and want not in INVOICE_REQUEST_STATUSES:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"status 须为 {'/'.join(INVOICE_REQUEST_STATUSES)}")
+        events, completeness = self._customer_events(customer_id)
+        rows: list[dict[str, Any]] = []
+        for ev in events:
+            pay = ev.get("payload") or {}
+            day = str(ev.get("occurred_at") or "")[:10]
+            if want and ev.get("status") != want:
+                continue
+            if date_from and day < str(date_from)[:10]:
+                continue
+            if date_to and day > str(date_to)[:10]:
+                continue
+            rows.append({
+                "requestId": ev.get("stable_id"),
+                "status": ev.get("status"),
+                "title": pay.get("title"),
+                "taxId": pay.get("tax_id"),
+                "orderId": pay.get("order_id"),
+                "statementId": pay.get("statement_ref"),
+                "delivery": pay.get("delivery"),
+                "submitted_at": ev.get("occurred_at"),
+                "decided_at": ev.get("decided_at"),
+            })
+        rows.sort(key=lambda r: str(r.get("submitted_at") or ""), reverse=True)
+        out: dict[str, Any] = {"rows": rows, "total": len(rows)}
+        if completeness.get("truncated"):
+            # 截断就说不完整：不允许让「没拉全」看起来像「就这么几条」。
+            out["completeness"] = completeness
+            out["note"] = (f"内核只回传了前 {completeness.get('returned')} 条"
+                           f"（声明 {completeness.get('declared_total')} 条），"
+                           "列表可能不全；请带状态或期间收窄后再查")
+        return out

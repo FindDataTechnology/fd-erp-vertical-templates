@@ -2,12 +2,11 @@
  "schema": "erp-planned-surfaces-mirror/v1",
  "note": "挂账清单镜像（task 4.3）：真源是兄弟仓 fd-erp-vertical-api/planned-surfaces.json（AST 派生）。本镜像去掉源码行号（行号漂移不是缺口变化）；`claim_gate render --update-planned` 重新生成，`claim_gate check` 逐端点对拍。",
  "source": "/Users/chengsishi/finddata/fd-erp-vertical-api/planned-surfaces.json",
- "count": 13,
+ "count": 11,
  "by_capability": {
   "supply-chain.cp": 4,
   "supply-chain.se": 1,
-  "supply-chain.sp": 6,
-  "supply-chain.ue": 2
+  "supply-chain.sp": 6
  },
  "endpoints": [
   {
@@ -108,24 +107,6 @@
    "http_status": 501,
    "error_code": "NOT_IMPLEMENTED",
    "planned_lane": "金额同源到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道"
-  },
-  {
-   "method": "GET",
-   "path": "/erp/supply-chain/v1/ue/invoice-requests",
-   "capability": "supply-chain.ue",
-   "domain": "invoice-requests",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "后台审核车道 + 金蝶/线下开票通道"
-  },
-  {
-   "method": "POST",
-   "path": "/erp/supply-chain/v1/ue/invoice-requests",
-   "capability": "supply-chain.ue",
-   "domain": "invoice-requests",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "后台审核车道 + 金蝶/线下开票通道"
   }
  ]
 }

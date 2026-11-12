@@ -160,6 +160,25 @@ class KernelClient(Protocol):
         `POSTING_RULE_MISSING`（调用方据此如实报「未过账」，不得伪造已过账）。"""
         ...
 
+    # ---- 拟稿车道与事件查询（add-invoice-request-lane）----
+    #
+    # 与 ingest_event 的区别只说一句：ingest 是「外部系统报来的事实，写入即接受」，
+    # submit 是「我方替调用方拟的稿，落 pending，等确认门拍板」。后者是唯一能让
+    # 「申请」这种需要审核的东西进事件层的入口——直接用 ingest 等于自动通过审核。
+
+    def submit_event(self, event_type: str, stable_id: str, occurred_at: Any,
+                     payload: dict[str, Any],
+                     source_ref: str | None = None) -> dict[str, Any]:
+        """拟稿车道写入（lane=draft，落 pending，不参与投影、不过账直到确认）。"""
+        ...
+
+    def query_events(self, event_type: str | None = None,
+                     lane: str | None = None, status: str | None = None,
+                     limit: int = 100, after_event_id: int = 0) -> dict[str, Any]:
+        """查事件（带完整性声明）。`producer` 不暴露：模板层不关心板块归属。"""
+        ...
+
+
 class McpKernelClient:
     """生产实现：经 MCP 工具面调用内核（http/sse transport）。
 
@@ -325,3 +344,18 @@ class McpKernelClient:
 
     def post_event(self, event_id):
         return self._call("post_event", {"event_id": event_id})
+
+    # ---- 拟稿车道与事件查询（add-invoice-request-lane）----
+
+    def submit_event(self, event_type, stable_id, occurred_at, payload,
+                     source_ref=None):
+        return self._call("submit_event", {
+            "event_type": event_type, "stable_id": stable_id,
+            "occurred_at": occurred_at, "payload": payload,
+            "source_ref": source_ref})
+
+    def query_events(self, event_type=None, lane=None, status=None,
+                     limit=100, after_event_id=0):
+        return self._call("query_events", {
+            "event_type": event_type, "lane": lane, "status": status,
+            "limit": limit, "after_event_id": after_event_id})
