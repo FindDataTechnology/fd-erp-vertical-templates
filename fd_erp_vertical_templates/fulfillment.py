@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,9 @@ from .errors import TemplateError
 from .eventlog import EventLog
 from .masterdata import MasterData
 from .wms_sync import WmsSnapshotAdapter
+
+#: 内核的「未知」哨兵：字段确实不可知时必须显式写它，不能省字段（省了与「没有」不可分）。
+UNKNOWN = "__unknown__"
 
 FULFILL_SCHEMA = "erp-supply-fulfillment/v1"
 
@@ -84,11 +88,20 @@ class FulfillmentOrchestrator:
     """交付编排：直发/仓内两路径 + 运单回流留痕 + 全单物流视图。"""
 
     def __init__(self, tenant_id: str, data_dir: str | Path, master: MasterData,
-                 wms: WmsSnapshotAdapter, logistics: LogisticsAdapter):
+                 wms: WmsSnapshotAdapter, logistics: LogisticsAdapter,
+                 kernel: Any | None = None, emit_events: bool | None = None):
         self._tenant = tenant_id
         self._master = master
         self._wms = wms
         self._logistics = logistics
+        #: 内核客户端（可选）。不注入时本层与事件层零耦合（既有单元测试与纯编排场景）。
+        self._kernel = kernel
+        #: 过渡期双写开关（change: add-carrier-freight-dimension D5）：
+        #: `None` = 按「是否注入内核」自动判别（直接构造本类的场景保持原语义）；
+        #: `False` = 只写本地归档（部署侧默认状态，既有写面一个字节不变）；
+        #: `True` = 本地归档照写，同时把交付事实写进事件层，两份逐日对账。
+        self._emit_events = (kernel is not None) if emit_events is None \
+            else bool(emit_events)
         self._log = EventLog(Path(data_dir) / f"fulfillment-{tenant_id}.jsonl")
         # 履约移交记录由订单编排写入编排档（移交点跨模块只读回查）
         self._handoff_log = EventLog(Path(data_dir)
@@ -364,18 +377,25 @@ class FulfillmentOrchestrator:
     def record_pickup_checkin(self, waybill_ref: str, *, location: dict | None = None,
                               image_refs: list[str] | None = None,
                               scan_code: str = "",
-                              responded_by: str = "carrier-portal"
+                              responded_by: str = "carrier-portal",
+                              occurred_at: str | None = None
                               ) -> dict[str, Any]:
-        """提货打卡回执（CP 回流）：回执驱动在途状态。
+        """提货打卡回执（CP 回流）：回执驱动在途状态。**同时把出库事实写进事件层**。
 
         采集纪律：定位/影像均为可选采集（privacy-by-default），采集项在
         隐私声明过审后启用；本层只存引用，不收文件体/不存精确轨迹。
+
+        `occurred_at` 是提货业务时点（补录要能表达真实发生时点），缺省取当前 UTC。
         """
         wb = self._waybill(waybill_ref)
         if str(wb.get("status") or "") != "open":
             raise TemplateError("WORKFLOW_STATE",
                                 f"运单当前态不可提货打卡（{wb.get('status')}）："
                                 f"{waybill_ref}")
+        # 先写事件层、再写本地归档：事件写入幂等，失败就整笔失败（不留「本地有、事件无」
+        # 的半截事实）；顺序反过来则会先留下一条本地记录、事件却没写成。
+        business_at = str(occurred_at or datetime.now(timezone.utc).isoformat())
+        emitted = self._emit_issued(wb, occurred_at=business_at)
         ref = _ref("PC", f"{self._tenant}|{waybill_ref}|{uuid.uuid4().hex}")
         self._append({"record": "pickup_checkin", "ref": ref,
                       "event": "created", "status": "recorded",
@@ -384,12 +404,61 @@ class FulfillmentOrchestrator:
                                   "location": dict(location) if location else None,
                                   "image_refs": [str(i) for i in (image_refs or [])],
                                   "scan_code": str(scan_code or ""),
+                                  "occurred_at": business_at,
+                                  "emitted_events": emitted,
                                   "responded_by": responded_by},
                       "requested_by": responded_by,
                       "note": "提货打卡回执（CP 回流）：驱动在途状态；"
                               "定位/影像为可选采集（隐私声明过审后启用）"})
         return {"ref": ref, "status": "recorded",
-                "waybill_no": wb["payload"].get("waybill_no")}
+                "waybill_no": wb["payload"].get("waybill_no"),
+                "emitted_events": len(emitted)}
+
+    def _emit_issued(self, wb: dict[str, Any], *, occurred_at: str
+                     ) -> list[dict[str, Any]]:
+        """提货即出库发运：把交付事实写进内核事件层（拟稿车道 `goods_issued`）。
+
+        **为什么必须进事件层**：运费要按承运商归集，而费用行的溯源来自计费时传入的
+        `refs`；交付事实只停在本层 JSONL 里，内核就永远没有「带承运商的事实」可计费
+        （change: add-carrier-freight-dimension D2）。本地归档从此是投影，不是事实源。
+
+        纪律：
+        - 复用 `goods_issued`（语义就是出库发运），**不新增事件类型、不改迁移**；
+        - `stable_id` 按「运单+商品+仓库」定，重复打卡幂等（内核同键返回首次结果）；
+        - `unit` 本层没有单位主数据 → 显式写 `__unknown__`（未知必须写明，不能省字段）；
+        - 未注入内核、或双写开关关时不写：纯编排/单测场景不需要事件层。
+        """
+        if self._kernel is None or not self._emit_events:
+            return []
+        waybill_no = str((wb.get("payload") or {}).get("waybill_no") or "").strip()
+        carrier = str((wb.get("payload") or {}).get("carrier") or "").strip()
+        plan_ref = str((wb.get("payload") or {}).get("plan_ref") or "").strip()
+        if not waybill_no:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"运单缺运单号，无法写交付事件：{wb.get('ref')}")
+        plan = self._latest(plan_ref)
+        lines = (plan.get("payload") or {}).get("lines") or []
+        emitted: list[dict[str, Any]] = []
+        for ln in lines:
+            sku = str(ln.get("product_code") or "").strip()
+            if not sku:
+                continue
+            allocations = ln.get("allocations") or []
+            # 仓内：按分配逐仓写（数量面按仓库投影，拆仓不能合并成一条）；
+            # 直发：仓库未知，显式写哨兵。
+            parts = ([(str(a.get("warehouse") or UNKNOWN), str(a.get("qty"))) for a in allocations]
+                     if allocations else [(UNKNOWN, str(ln.get("qty") or "0"))])
+            for warehouse, qty in parts:
+                payload = {"sku": sku, "quantity": qty, "unit": UNKNOWN,
+                           "warehouse": warehouse, "waybill": waybill_no,
+                           "carrier": carrier or UNKNOWN}
+                stable = f"{waybill_no}:{sku}:{warehouse}:issued"
+                out = self._kernel.submit_event(
+                    "goods_issued", stable_id=stable, occurred_at=occurred_at,
+                    payload=payload, source_ref=waybill_no)
+                emitted.append({"stable_id": stable,
+                                "duplicate": bool((out or {}).get("duplicate"))})
+        return emitted
 
     def record_carrier_pod(self, waybill_ref: str, *, documents: list[str] | None = None,
                            exception_note: str = "",

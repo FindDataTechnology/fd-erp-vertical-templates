@@ -2,9 +2,9 @@
  "schema": "erp-planned-surfaces-mirror/v1",
  "note": "挂账清单镜像（task 4.3）：真源是兄弟仓 fd-erp-vertical-api/planned-surfaces.json（AST 派生）。本镜像去掉源码行号（行号漂移不是缺口变化）；`claim_gate render --update-planned` 重新生成，`claim_gate check` 逐端点对拍。",
  "source": "/Users/chengsishi/finddata/fd-erp-vertical-api/planned-surfaces.json",
- "count": 11,
+ "count": 8,
  "by_capability": {
-  "supply-chain.cp": 4,
+  "supply-chain.cp": 1,
   "supply-chain.se": 1,
   "supply-chain.sp": 6
  },
@@ -17,33 +17,6 @@
    "http_status": 501,
    "error_code": "NOT_IMPLEMENTED",
    "planned_lane": "仓库作业编排月台资源建模（时段目录 + 占用计算）"
-  },
-  {
-   "method": "GET",
-   "path": "/erp/supply-chain/v1/cp/freight-statements",
-   "capability": "supply-chain.cp",
-   "domain": "freight-statements",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "计费 read 工具面（fee_details 按承运商归集 + 规则/事件/单据/原始作业四层溯源）→ 运费单派生；确认门届时=内核自平核对 proposal（同 UE 对账契约）"
-  },
-  {
-   "method": "GET",
-   "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}",
-   "capability": "supply-chain.cp",
-   "domain": "freight-statements",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "同 GET /cp/freight-statements"
-  },
-  {
-   "method": "POST",
-   "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm",
-   "capability": "supply-chain.cp",
-   "domain": "freight-statements",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "运费单 read 面到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道"
   },
   {
    "method": "POST",
