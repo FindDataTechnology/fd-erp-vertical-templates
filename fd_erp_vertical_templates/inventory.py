@@ -300,7 +300,10 @@ class InventoryLane:
                 payload = {"sku": sku, "quantity": _fmt(abs(qty)), "unit": unit,
                            "warehouse": dim_wh or UNKNOWN, "lot": lot}
                 if kind == "receipt":
-                    for opt in ("po_ref", "serial"):  # 可选字段只在真有值时写
+                    # 可选字段只在真有值时写：成本随事实走（不另存成本表），
+                    # 没带就是「不知道成本」——由计价口径决定该批能否暂估，
+                    # 绝不在这里补 0（补零会一路污染结存金额与毛利）。
+                    for opt in ("cost", "currency", "po_ref", "serial"):
                         if line.get(opt) not in (None, ""):
                             payload[opt] = str(line[opt])
                 try:

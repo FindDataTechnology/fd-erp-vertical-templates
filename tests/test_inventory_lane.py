@@ -127,6 +127,20 @@ def test_receipt_writes_draft_facts_with_unknown_sentinels(lane):
     assert "po_ref" not in first["payload"]              # 没采购单就不写这字段
 
 
+def test_receipt_carries_cost_into_the_fact(tmp_path):
+    """成本随事实走：入库行带 cost/currency 就进载荷；不带就不写——绝不补 0。"""
+    kernel = _StubKernel()
+    lane = InventoryLane(TENANT, tmp_path / "d", kernel)
+    lane.receive(ref="IR-C1", warehouse=WH, occurred_at=DAY, lines=[
+        {"product_code": "P-1", "qty": "2", "cost": "12.5", "currency": "CNY"},
+        {"product_code": "P-2", "qty": "1"}])
+    ev = _by_stable(kernel)
+    assert ev["IR-C1:1:in"]["payload"]["cost"] == "12.5"
+    assert ev["IR-C1:1:in"]["payload"]["currency"] == "CNY"
+    assert "cost" not in ev["IR-C1:2:in"]["payload"]      # 没带成本不写、不补零
+    assert "currency" not in ev["IR-C1:2:in"]["payload"]
+
+
 def test_receipt_is_idempotent_by_ref(lane):
     lane.receive(ref="IR-2", warehouse=WH, occurred_at=DAY,
                  lines=[{"product_code": "P-1", "qty": "1"}])
