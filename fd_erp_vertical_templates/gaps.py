@@ -156,6 +156,14 @@ def _load_status(status: str | Path | dict[str, Any] | None) -> dict[str, Any] |
         return None
 
 
+#: 这些目录里的 .py 不是「本仓的生产者」——venv 里的第三方包、node_modules、
+#: 构建产物与 git 内部目录。2026-11-13 实测：三处 event_type_producer 判据按仓根
+#: rglob，其中 fd-erp-vertical-templates 自己的 .venv 就贡献了三千多个 .py，
+#: 单次评估 14.7s，多个门/用例各调一次就把整轮测试拖到分钟级。
+_NOT_PRODUCER_DIRS = {".venv", "venv", "node_modules", "__pycache__",
+                      ".git", "build", "dist", "site-packages", ".tox", ".mypy_cache"}
+
+
 def _evaluate(detect: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     kind = str(detect.get("kind") or "")
     if kind == "catalog_provider":
@@ -232,6 +240,8 @@ def _evaluate(detect: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
                 missing.append(root.name)
                 continue
             for f in root.rglob("*.py"):
+                if _NOT_PRODUCER_DIRS & set(f.parts):
+                    continue
                 if "migrations" in f.parts or "tests" in f.parts:
                     continue
                 try:
