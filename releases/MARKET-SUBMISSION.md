@@ -255,7 +255,7 @@ Cross-border e-commerce reconciliation fleet (template)
 **description**
 
 ```
-Reconciliation fleet for cross-border e-commerce: the watcher post runs order-payment-inventory three-way reconciliation per store (kernel run_reconciliation plus the template's recon driver report); the reconciler post classifies each of the four discrepancy classes and explains in-transit or signed-off gaps by citing the logistics fleet's observations and supply corrections by citing the compliance fleet; the decider post sits at the owner seat and rules on escalated discrepancies (the confirm gate is the only write path). It reuses the existing cross-border observation fleets (monitoring, logistics, compliance) as the evidence base instead of building a parallel data path. Zero writes to the platform side; conclusions are written back only through the kernel's proposal lane.
+Reconciliation fleet for cross-border e-commerce: the watcher post runs order-payment-inventory three-way reconciliation per store (kernel run_reconciliation plus the template's recon driver report); the reconciler post classifies each of the four discrepancy classes and explains in-transit or signed-off gaps by citing the logistics fleet's observations and supply corrections by citing the compliance fleet; the decider post sits at the owner seat and rules on escalated discrepancies (agent drafts post only through the confirm gate). It reuses the existing cross-border observation fleets (monitoring, logistics, compliance) as the evidence base instead of building a parallel data path. Zero writes to the platform side; conclusions are written back only through the kernel's proposal lane.
 ```
 
 **tags**
