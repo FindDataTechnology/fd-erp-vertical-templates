@@ -57,6 +57,7 @@ class KernelClient(Protocol):
     def query_entries(self, account_code: str | None = None,
                       txn_id: str | None = None,
                       tenant_id: str | None = None,
+                      dimensions: dict[str, str] | None = None,
                       offset: int = 0, limit: int = 100) -> dict[str, Any]:
         ...
 
@@ -233,12 +234,13 @@ class McpKernelClient:
     def submit_proposal(self, stable_id, lines, source_ref=None, kind="journal",
                         reversal_of=None, lane_fleet=None, lane_post=None,
                         lane_title=None, lane_target=None, tenant_id=None,
-                        submitted_by="agent"):
+                        dimensions=None, submitted_by="agent"):
         return self._call("submit_proposal", {
             "stable_id": stable_id, "lines": lines, "source_ref": source_ref,
             "kind": kind, "reversal_of": reversal_of, "lane_fleet": lane_fleet,
             "lane_post": lane_post, "lane_title": lane_title,
-            "lane_target": lane_target, "submitted_by": submitted_by,
+            "lane_target": lane_target, "dimensions": dimensions,
+            "submitted_by": submitted_by,
         })
 
     def list_proposals(self, status=None, tenant_id=None, offset=0, limit=100):
@@ -261,9 +263,10 @@ class McpKernelClient:
         return self._call("query_balance", {"account_code": account_code})
 
     def query_entries(self, account_code=None, txn_id=None, tenant_id=None,
-                      offset=0, limit=100):
+                      dimensions=None, offset=0, limit=100):
         return self._call("query_entries", {
             "account_code": account_code, "txn_id": txn_id,
+            "dimensions": dimensions,
             "offset": offset, "limit": limit})
 
     def run_reconciliation(self, left_source, right_source, retry_task_id=None,

@@ -46,6 +46,17 @@ from .policy import PolicyBook
 Q6 = Decimal("0.000001")
 BUDGET_SCHEMA = "fd-erp-vertical-templates/budget/v1"
 
+#: 口径值 → 内核维度键。两套词表**不靠字符串巧合对齐**：口径册按 kebab-case 命名
+#: （`cost-center`），内核维度键按 snake_case 且是封闭 schema（`cost_center`）。
+#: 显式映射写在这里，错位就在这一处、看得见；如果直接当字符串传，实际值会永远为 0
+#: 而报表上只显示「这期没花钱」——最容易被当成业务事实的假绿。
+DIMENSION_KEY_MAP = {
+    "department": "department",
+    "project": "project",
+    "channel": "channel",
+    "cost-center": "cost_center",
+}
+
 CONTROL_MODES = ("hard-block", "warn-only", "post-audit")
 GRAINS = ("monthly", "quarterly")
 #: 程序身份：预算额度是「打算花多少」的政策数字，程序不得自设。
@@ -104,6 +115,18 @@ def period_range(period: str, grain: str) -> tuple[date, date]:
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
     return start, end
+
+
+def kernel_dimension_key(policy_key: str) -> str:
+    """口径里的维度值 → 内核维度键（未登记即拒，不猜）。"""
+    key = DIMENSION_KEY_MAP.get(str(policy_key or "").strip())
+    if key is None:
+        raise TemplateError(
+            "INVALID_ARGUMENT",
+            f"口径维度 {policy_key!r} 没有对应的内核维度键",
+            detail={"allowed": list(DIMENSION_KEY_MAP),
+                    "policy_key": policy_key})
+    return key
 
 
 def _check_period(period: Any, grain: str) -> str:
@@ -372,13 +395,16 @@ class BudgetBook:
 
         rows: list[dict[str, Any]] = []
         totals = {"budget": Decimal(0), "committed": Decimal(0),
-                  "remaining": Decimal(0), "actual": Decimal(0)}
+                  "remaining": Decimal(0), "actual": Decimal(0),
+                  "unattributedActual": Decimal(0)}
         for account in sorted(accounts):
             budget = self._budget(dim_value, account, pkey)
             budget_v = Decimal(0) if budget is None else _dec(budget["amount"], "预算金额")
             committed = self._committed(dim_value, account, pkey)
             remaining = budget_v - committed
-            actual, count = self._actual(account, pkey, grain)
+            actual, count, unattributed = self._actual(
+                account, pkey, grain,
+                dimensions={kernel_dimension_key(key): dim_value})
             rows.append({
                 "accountCode": account,
                 "budget": _fmt(budget_v) if budget is not None else None,
@@ -388,6 +414,7 @@ class BudgetBook:
                                 else str((committed / budget_v).quantize(
                                     Decimal("0.0001"), rounding=ROUND_HALF_UP))),
                 "actual": _fmt(actual), "actualEntries": count,
+                "unattributedActual": _fmt(unattributed),
                 "overBudget": remaining < 0,
                 "budgetRegistered": budget is not None,
             })
@@ -395,23 +422,35 @@ class BudgetBook:
             totals["committed"] += committed
             totals["remaining"] += remaining
             totals["actual"] += actual
+            totals["unattributedActual"] += unattributed
         return {
-            "dimension": key, "dimensionValue": dim_value, "period": pkey,
+            "dimension": key, "kernelDimensionKey": kernel_dimension_key(key),
+            "dimensionValue": dim_value, "period": pkey,
             "grain": grain, "control": cfg["budget_control"], "rows": rows,
             "totals": {k: _fmt(v) for k, v in totals.items()},
-            "caliber_note": "承诺由本车道按维度记；实际来自内核已落账分录、按科目汇总，"
-                            "**不区分维度**（内核分录没有维度列）——两者不可直接相减，故分列",
+            "caliber_note": "承诺由本车道按维度记；实际来自内核已落账分录，**按同一维度汇总**"
+                            "（内核分录自 add-ledger-dimensions 起带维度）。"
+                            "`unattributedActual` 是同科目同期**未标注维度**的净额——"
+                            "它不属于任何维度，别把它悄悄漏掉",
         }
 
-    def _actual(self, account_code: str, period: str, grain: str
-                ) -> tuple[Decimal, int]:
-        """该科目该期间已落账净额（借 − 贷，按本位币），只读内核分录。"""
+    def _actual(self, account_code: str, period: str, grain: str,
+                *, dimensions: dict[str, str] | None = None
+                ) -> tuple[Decimal, int, Decimal]:
+        """该科目该期间已落账净额（借 − 贷，按本位币），只读内核分录。
+
+        给 `dimensions` 时按维度过滤（内核 jsonb 包含语义）；同时把**同科目同期未标注
+        维度**的净额一并算出来——否则「这个部门花了多少」会把没标维度的部分静默漏掉，
+        而漏掉的数字在报表上看起来只是「偏小」。
+        """
         start, end = period_range(period, grain)
         total = Decimal(0)
         seen = 0
+        unattributed = Decimal(0)
         offset = 0
         while True:
             out = self._kernel.query_entries(account_code=account_code,
+                                             dimensions=dimensions,
                                              offset=offset, limit=200) or {}
             rows = [r for r in (out.get("entries") or out.get("data") or [])
                     if isinstance(r, dict)]
@@ -422,12 +461,39 @@ class BudgetBook:
                 if when is None or not (start <= when < end):
                     continue
                 amount = _dec(row.get("amount_base") or row.get("amount"), "分录金额")
-                total += amount if row.get("direction") == "debit" else -amount
+                signed = amount if row.get("direction") == "debit" else -amount
+                total += signed
                 seen += 1
             offset += len(rows)
             if len(rows) < 200:
                 break
-        return total, seen
+        if dimensions:
+            unattributed = self._unattributed(account_code, start, end)
+        return total, seen, unattributed
+
+    def _unattributed(self, account_code: str, start: date, end: date) -> Decimal:
+        """同科目同期「没有标注维度」的净额（独立一次读取，不与维度过滤混在一起）。"""
+        total = Decimal(0)
+        offset = 0
+        while True:
+            out = self._kernel.query_entries(account_code=account_code,
+                                             offset=offset, limit=200) or {}
+            rows = [r for r in (out.get("entries") or out.get("data") or [])
+                    if isinstance(r, dict)]
+            if not rows:
+                break
+            for row in rows:
+                if row.get("dimensions"):
+                    continue                     # 有维度的归它自己，不重复计
+                when = _entry_date(row.get("posted_at"))
+                if when is None or not (start <= when < end):
+                    continue
+                amount = _dec(row.get("amount_base") or row.get("amount"), "分录金额")
+                total += amount if row.get("direction") == "debit" else -amount
+            offset += len(rows)
+            if len(rows) < 200:
+                break
+        return total
 
     def budgets(self, period: Any | None = None) -> list[dict[str, Any]]:
         """已登记的预算清单（生效版本）。"""

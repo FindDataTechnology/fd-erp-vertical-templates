@@ -16,7 +16,8 @@ from decimal import Decimal
 
 import pytest
 
-from fd_erp_vertical_templates.budget import BudgetBook, period_key, period_range
+from fd_erp_vertical_templates.budget import (BudgetBook, kernel_dimension_key,
+                                              period_key, period_range)
 from fd_erp_vertical_templates.errors import TemplateError
 from fd_erp_vertical_templates.policy import PolicyBook
 
@@ -32,9 +33,14 @@ class _StubKernel:
         self._entries = list(entries or [])
 
     def query_entries(self, account_code=None, txn_id=None, tenant_id=None,
-                      offset=0, limit=100, **_kw):
+                      dimensions=None, offset=0, limit=100, **_kw):
         rows = [e for e in self._entries
                 if account_code is None or e["account_code"] == account_code]
+        if dimensions:
+            # 与内核 jsonb 包含语义同口径：给几个键就要求全部命中
+            rows = [e for e in rows
+                    if all((e.get("dimensions") or {}).get(k) == v
+                           for k, v in dimensions.items())]
         return {"entries": rows[offset:offset + limit]}
 
 
@@ -50,9 +56,10 @@ def _book(tmp_path, *, dimension="department", period="monthly",
     return BudgetBook(TENANT, tmp_path / "data", _StubKernel(entries), policy)
 
 
-def _entry(account, direction, amount, posted_at):
+def _entry(account, direction, amount, posted_at, dimensions=None):
     return {"account_code": account, "direction": direction,
-            "amount": amount, "amount_base": amount, "posted_at": posted_at}
+            "amount": amount, "amount_base": amount, "posted_at": posted_at,
+            "dimensions": dimensions or {}}
 
 
 # ---- 1) 期间键与粒度 ----
@@ -239,20 +246,42 @@ def test_status_shows_budget_committed_and_utilization(tmp_path):
     assert status["totals"]["remaining"] == "7000.000000"
 
 
+DIM = {"department": DEPT}
+
+
 def test_status_actual_comes_from_kernel_entries_in_period(tmp_path):
     entries = [
-        _entry(ACC, "debit", "2500", "2026-11-10 09:00:00+08:00"),
-        _entry(ACC, "debit", "500", "2026-11-30 23:00:00+08:00"),
-        _entry(ACC, "credit", "1000", "2026-11-15 09:00:00+08:00"),
-        _entry(ACC, "debit", "999", "2026-12-01 00:00:00+08:00"),   # 期间外
-        _entry("4000", "credit", "777", "2026-11-15 09:00:00+08:00"),  # 别的科目
+        _entry(ACC, "debit", "2500", "2026-11-10 09:00:00+08:00", DIM),
+        _entry(ACC, "debit", "500", "2026-11-30 23:00:00+08:00", DIM),
+        _entry(ACC, "credit", "1000", "2026-11-15 09:00:00+08:00", DIM),
+        _entry(ACC, "debit", "999", "2026-12-01 00:00:00+08:00", DIM),  # 期间外
+        _entry("4000", "credit", "777", "2026-11-15 09:00:00+08:00", DIM),  # 别的科目
     ]
     book = _book(tmp_path, entries=entries)
     book.set_budget(DEPT, ACC, "2026-11", 10000)
-    row = book.status(DEPT, "2026-11")["rows"][0]
+    status = book.status(DEPT, "2026-11")
+    row = status["rows"][0]
     assert row["actual"] == "2000.000000"      # 2500 + 500 − 1000
     assert row["actualEntries"] == 3
-    assert "不区分维度" in book.status(DEPT, "2026-11")["caliber_note"]
+    assert row["unattributedActual"] == "0.000000"
+    assert "按同一维度汇总" in status["caliber_note"]
+
+
+def test_unattributed_actual_is_reported_separately(tmp_path):
+    """没标维度的发生额不许被静默漏掉：单列出来，且不计入任何维度。"""
+    entries = [
+        _entry(ACC, "debit", "700", "2026-11-10 09:00:00+08:00", DIM),
+        _entry(ACC, "debit", "300", "2026-11-11 09:00:00+08:00"),        # 未标注
+        _entry(ACC, "credit", "100", "2026-11-12 09:00:00+08:00"),       # 未标注
+    ]
+    book = _book(tmp_path, entries=entries)
+    book.set_budget(DEPT, ACC, "2026-11", 10000)
+    status = book.status(DEPT, "2026-11")
+    row = status["rows"][0]
+    assert row["actual"] == "700.000000"                 # 只算本维度
+    assert row["unattributedActual"] == "200.000000"     # 300 − 100
+    assert status["totals"]["unattributedActual"] == "200.000000"
+    assert "别把它悄悄漏掉" in status["caliber_note"]
 
 
 def test_status_without_entries_reports_zero_not_an_error(tmp_path):
@@ -286,3 +315,32 @@ def test_budget_dimension_switch_rejects_old_key_semantics(tmp_path):
     book.set_budget("CC-1", ACC, "2026-11", 1000)
     rows = book.budgets("2026-11")
     assert rows[0]["dimension"] == "cost-center"
+
+
+# ---- 6) 口径词表 → 内核维度键的映射 ----
+
+def test_policy_dimension_values_map_to_kernel_keys():
+    """口径用 kebab-case、内核维度键用 snake_case：必须显式映射，不能靠字符串巧合。
+
+    这条是实打实的缺陷回归：不映射时 `cost-center` 传给内核永远匹配不到，
+    actual 恒为 0——而报表上只会显示「这期没花钱」。
+    """
+    assert kernel_dimension_key("cost-center") == "cost_center"
+    assert kernel_dimension_key("department") == "department"
+    assert kernel_dimension_key("project") == "project"
+    assert kernel_dimension_key("channel") == "channel"
+    with pytest.raises(TemplateError) as ei:
+        kernel_dimension_key("dept")
+    assert ei.value.detail["allowed"]
+
+
+def test_status_filters_with_the_kernel_key(tmp_path):
+    """默认口径是 cost-center；带 cost_center 维度的分录必须被算进来。"""
+    entries = [_entry(ACC, "debit", "800", "2026-11-10 09:00:00+08:00",
+                      {"cost_center": "CC-1"})]
+    book = _book(tmp_path, entries=entries, dimension="cost-center")  # 册内默认
+    book.set_budget("CC-1", ACC, "2026-11", 10000)
+    status = book.status("CC-1", "2026-11")
+    assert status["dimension"] == "cost-center"
+    assert status["kernelDimensionKey"] == "cost_center"
+    assert status["rows"][0]["actual"] == "800.000000"
