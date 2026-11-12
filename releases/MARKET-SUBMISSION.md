@@ -10,7 +10,7 @@
 |---|---|---|---|
 | connector-pack | v1.5.4 | `connector-pack/pack.json` | 5/5/5/5 |
 | account-mapping-pack | v1.1.3 | `account-mapping/pack.json` | 4/4/4/4 |
-| recon-fleet | v1.1.3 | `recon-fleet/template.json` | 4/4/4/4 |
+| recon-fleet | v1.1.4 | `recon-fleet/template.json` | 4/4/4/4 |
 
 ## connector-pack · v1.5.4
 
@@ -220,7 +220,7 @@ Pack de mapping de comptes pour le modèle de réconciliation e-commerce transfr
 ERP / e-commerce transfrontalière / mapping de comptes / couche de présentation
 ```
 
-## recon-fleet · v1.1.3
+## recon-fleet · v1.1.4
 
 > 对账舰队模板：巡检/核对/拍板三岗
 

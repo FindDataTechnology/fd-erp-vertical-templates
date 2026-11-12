@@ -9,7 +9,7 @@
 | connector-pack | v1.5.4 | draft v1.5.4 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
 | report-preset | v1.1.3 | draft v1.1.3 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
 | account-mapping-pack | v1.1.3 | draft v1.1.3 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
-| recon-fleet | v1.1.3 | draft v1.1.3 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
+| recon-fleet | v1.1.4 | draft v1.1.4 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
 
 ## 口径
 
