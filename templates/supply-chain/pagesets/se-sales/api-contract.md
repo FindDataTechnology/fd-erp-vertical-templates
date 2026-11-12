@@ -50,7 +50,7 @@
 | GET | `/erp/supply-chain/v1/se/statements` | 状态 | 名下客户对账单状态总览 | `statement.confirm.proxy` |
 | POST | `/erp/supply-chain/v1/se/statements/{statementId}/push` | 渠道（端内消息） | 推送回执；客户确认仍走 UE 端确认门，SE 端不可代拍 | `statement.confirm.proxy` |
 
-## 6. 开票审核域（功能点：开票审核；确认门）
+## 6. 开票审核域（spec: erp-invoice-audit-queue；确认门）
 
 > 权限列用 `alert.handle`：该 grant 在本端守的是「对一条 pending 的客户请求作处置」，开票审核
 > 是同一动作类型。未新开 `invoice.audit`，避免同一语义出现两个权限码（既有先例：契约外对账
@@ -72,7 +72,7 @@
 | 代客下单 | se-order-proxy / se-order-track / se-customer-detail | 覆盖 |
 | CRM 线索拜访 | se-customer-list / se-lead-visit / se-customer-detail | 覆盖 |
 | 预警处置（拍板席位移动呈现） | se-alert-inbox / se-alert-handle | 覆盖 |
-| 开票审核（开票申请逐条拍板） | se-invoice-audit | 覆盖 |
+| 开票审核（spec: erp-invoice-audit-queue，开票申请逐条拍板） | se-invoice-audit | 覆盖 |
 | AI 助手入口（spec 附加） | se-ai-assistant | 覆盖 |
 
 锚点蓝图 SE 17 功能点按上述 3 个功能域聚合核对：**3/3 域覆盖，0 域待一期裁剪**；逐点映射待锚点清单资产化后回填（挂账）。

@@ -294,6 +294,29 @@
       "surface": "se"
     },
     {
+      "anchor": false,
+      "classification": "直接命中",
+      "domain": "开票审核",
+      "evidence": [
+        {
+          "ref": "GET /erp/supply-chain/v1/se/invoice-requests",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/se/invoice-requests/{requestId}/decide",
+          "type": "endpoint"
+        },
+        {
+          "ref": "templates/supply-chain/pagesets/se-sales/manifest.json#page/se-invoice-audit",
+          "type": "template_asset"
+        }
+      ],
+      "id": "FP-1BD5262A1F",
+      "row_status": "覆盖",
+      "subdomain": "se-invoice-audit",
+      "surface": "se"
+    },
+    {
       "classification": "直接命中",
       "domain": "预警处置",
       "evidence": [
@@ -645,11 +668,19 @@
       "domain": "对账单确认",
       "evidence": [
         {
+          "ref": "GET /erp/supply-chain/v1/ue/reconciliations/{taskId}",
+          "type": "endpoint"
+        },
+        {
           "ref": "GET /erp/supply-chain/v1/ue/statements",
           "type": "endpoint"
         },
         {
           "ref": "GET /erp/supply-chain/v1/ue/statements/{statementId}",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/reconciliations",
           "type": "endpoint"
         },
         {
@@ -698,6 +729,10 @@
         },
         {
           "ref": "GET /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment",
+          "type": "endpoint"
+        },
+        {
+          "ref": "POST /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment",
           "type": "endpoint"
         },
         {

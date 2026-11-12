@@ -147,6 +147,17 @@
       "notes": "向客户推送对账单并跟踪确认状态；SE 端不代替客户拍板"
     },
     {
+      "id": "se-invoice-audit",
+      "title": "开票审核",
+      "covers": ["开票审核（spec：开票审核队列）"],
+      "apis": [
+        "GET /erp/supply-chain/v1/se/invoice-requests",
+        "POST /erp/supply-chain/v1/se/invoice-requests/{requestId}/decide"
+      ],
+      "confirmGate": true,
+      "notes": "本人名下客户的开票申请逐条拍板；状态唯一出口是内核确认门，本页不存状态"
+    },
+    {
       "id": "se-ai-assistant",
       "title": "AI 助手",
       "covers": ["AI 助手入口（spec：AI 助手入口）"],

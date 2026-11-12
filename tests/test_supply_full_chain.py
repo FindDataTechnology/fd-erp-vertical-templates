@@ -27,8 +27,12 @@ from fd_erp_vertical_templates.orchestration import (
 from fd_erp_vertical_templates.pricing import PricingRuleBook
 from fd_erp_vertical_templates.recon.kingdee import DemoKingdeeGateway, SettlementRecon
 from fd_erp_vertical_templates.wms_sync import DemoWmsAdapter
+from datetime import datetime, timezone
 
-DAY = "2026-11-07"
+#: 夹具业务日（单据日期、事件 occurred_at 等）。**不能写死成具体某天**：结账腿按
+#: `journal_entries.posted_at`（插入时 now()）切账期，写死日期会让「凭证面收取」在
+#: 第二天收到空集（2026-11-12 实测：全链 e2e 的 voucher_count 断言 5 → 0）。
+DAY = datetime.now(timezone.utc).date().isoformat()
 
 
 def _post(kernel, tenant: str, stable_id: str, lines: list[dict],

@@ -16,15 +16,40 @@ from fd_erp_vertical_templates.boundary import audit_template
 from fd_erp_vertical_templates.errors import TemplateError
 from fd_erp_vertical_templates.recon.kingdee import (
     DemoKingdeeGateway, SettlementRecon)
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-DAY = "2026-11-07"
 
 
-def _voucher(stable_id: str, amount: str, *, day: str = DAY,
+def _today() -> str:
+    """夹具用的账期：UTC 当日（与内核 `posted_at` 同一时区口径）。
+
+    **不能写死成某个具体日期**：`journal_entries.posted_at` 是插入时 `DEFAULT now()`，
+    写死日期会让「按账期收取凭证」在第二天收到空集，整组断言静默变空（2026-11-12 实测
+    6 条红，而它们在前一天是绿的）。夹具数据用当日，与账本实际记账日同源。
+    """
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _period(kernel, tenant: str) -> str:
+    """对账用的账期：直接取**内核实际记账日**，不猜时钟。
+
+    夹具日与记账日在跨 UTC 零点那几秒可能不同，所以凡是要和账本对齐的地方一律读账本，
+    而不是复用 `_today()`。
+    """
+    rows = (kernel.query_entries(tenant_id=tenant) or {}).get("entries") or []
+    assert rows, "还没有分录，无法确定账期——先记账再取账期"
+    return str(rows[-1]["posted_at"])[:10]
+
+
+DAY = _today()
+
+
+def _voucher(stable_id: str, amount: str, *, day: str | None = None,
              currency: str = "CNY", status: str = "posted",
              voucher_no: str | None = None) -> dict:
+    day = day or _today()
     return {"stable_id": stable_id, "voucher_no": voucher_no or stable_id,
             "amount": amount, "currency": currency, "status": status,
             "occurred_at": f"{day}T10:00:00", "source_ref": f"ledger:{stable_id}",

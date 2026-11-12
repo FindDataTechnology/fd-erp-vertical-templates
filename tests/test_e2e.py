@@ -162,7 +162,9 @@ def test_crossborder_full_chain(kernel, reset_db, seed_fx, monkeypatch):
     pack = load_mapping_pack(REPO / "templates" / "crossborder"
                              / "account-mapping" / "pack.json")
     view = apply_mapping(balances, pack)
-    assert view["mapping_version"] == "1.0.0"
+    # 视图必须如实回带**所用映射版本**；不写死字面量（映射 pack 会升版，写死就成
+    # 一升版就红的假红——2026-11-12 实测：pack 到 1.1.2 而这里还钉着 1.0.0）。
+    assert view["mapping_version"] == pack["version"]
     row_keys = {r["row_key"] for r in view["rows"]}
     assert {"revenue", "working-capital"} <= row_keys
 

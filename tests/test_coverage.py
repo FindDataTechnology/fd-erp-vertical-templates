@@ -525,7 +525,7 @@ def test_supply_chain_domain_counts_are_7_3_4_4():
     non_anchor = {(p.surface, p.domain) for p in matrix.points if not p.anchor}
     assert non_anchor == {("ue", "AI 助手入口"), ("se", "AI 助手入口"),
                           ("sp", "AI 助手入口"), ("cp", "AI 助手入口"),
-                          ("cp", "对账")}
+                          ("cp", "对账"), ("se", "开票审核")}
 
 
 def test_declaration_check_passes_for_supply_chain_template():

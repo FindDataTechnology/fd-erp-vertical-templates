@@ -123,9 +123,10 @@
       "covers": ["查单"],
       "apis": [
         "GET /erp/supply-chain/v1/ue/orders/{orderId}",
-        "GET /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment"
+        "GET /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment",
+        "POST /erp/supply-chain/v1/ue/orders/{orderId}/fulfillment"
       ],
-      "notes": "履约路径（直发/仓内）状态与运单轨迹，同源交付编排面"
+      "notes": "履约路径（直发/仓内）状态与运单轨迹，同源交付编排面；无移交记录时触发履约编排如实 409，不伪造计划"
     },
     {
       "id": "ue-statement-confirm",
@@ -134,7 +135,9 @@
       "apis": [
         "GET /erp/supply-chain/v1/ue/statements",
         "GET /erp/supply-chain/v1/ue/statements/{statementId}",
-        "POST /erp/supply-chain/v1/ue/statements/{statementId}/confirm"
+        "POST /erp/supply-chain/v1/ue/statements/{statementId}/confirm",
+        "POST /erp/supply-chain/v1/ue/reconciliations",
+        "GET /erp/supply-chain/v1/ue/reconciliations/{taskId}"
       ],
       "confirmGate": true,
       "notes": "确认/异议提交为确认门动作；对账单数据与金蝶往来面同源（连接器拉取，中台计算）"
