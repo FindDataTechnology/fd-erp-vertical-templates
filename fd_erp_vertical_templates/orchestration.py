@@ -1185,18 +1185,24 @@ class InvoiceRequestLane:
 
     # ---- 读投影 ----
 
-    def _customer_events(self, customer_id: str, *, limit: int = 500
-                         ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        """该客户的申请事件（含已驳回）+ 内核给回的完整性声明。
+    def _events_for(self, customer_ids: set[str], *, limit: int = 500
+                    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """给定客户集合的申请事件（含已驳回）+ 内核给回的完整性声明。
 
         内核查询工具没有 payload 检索参数，只能在应用侧过滤——不为一个 WHERE
-        去扩跨仓协议（design D2）。
+        去扩跨仓协议（design D2）。**一处过滤**：单客户与多客户共用这条路径，
+        免得「客户列表」与「业务员待审列表」各写一套口径。
         """
         out = self._client.query_events(event_type=INVOICE_REQUEST_EVENT,
                                        lane="draft", limit=limit) or {}
         items = [e for e in (out.get("items") or [])
-                 if str((e.get("payload") or {}).get("customer_id") or "") == customer_id]
+                 if str((e.get("payload") or {}).get("customer_id") or "") in customer_ids]
         return items, dict(out.get("completeness") or {})
+
+    def _customer_events(self, customer_id: str, *, limit: int = 500
+                         ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """单客户的申请事件（薄封装，见 `_events_for`）。"""
+        return self._events_for({str(customer_id)}, limit=limit)
 
     @staticmethod
     def _seq_of(ref: str, customer_id: str) -> int:
@@ -1296,10 +1302,11 @@ class InvoiceRequestLane:
 
     # ---- 查询（D2）----
 
-    def requests_of(self, customer_id: str, *, status: str | None = None,
-                    date_from: str | None = None, date_to: str | None = None
-                    ) -> dict[str, Any]:
-        """本人申请列表：状态取内核投影，按提交时点倒序。
+    def requests_for_customers(self, customer_ids: Any, *,
+                               status: str | None = None,
+                               date_from: str | None = None,
+                               date_to: str | None = None) -> dict[str, Any]:
+        """给定客户集合的申请列表：状态取内核投影，按提交时点倒序。
 
         **不分页**：统一壳（`envelope.paginate`）负责窗口、上限与续读标记。
         分两层各截一次，`total` 与 `rows_returned` 必然对不上。
@@ -1308,7 +1315,10 @@ class InvoiceRequestLane:
         if want and want not in INVOICE_REQUEST_STATUSES:
             raise TemplateError("INVALID_ARGUMENT",
                                 f"status 须为 {'/'.join(INVOICE_REQUEST_STATUSES)}")
-        events, completeness = self._customer_events(customer_id)
+        ids = {str(c) for c in (customer_ids or [])}
+        if not ids:
+            return {"rows": [], "total": 0}
+        events, completeness = self._events_for(ids)
         rows: list[dict[str, Any]] = []
         for ev in events:
             pay = ev.get("payload") or {}
@@ -1321,6 +1331,7 @@ class InvoiceRequestLane:
                 continue
             rows.append({
                 "requestId": ev.get("stable_id"),
+                "customerId": pay.get("customer_id"),
                 "status": ev.get("status"),
                 "title": pay.get("title"),
                 "taxId": pay.get("tax_id"),
@@ -1339,3 +1350,10 @@ class InvoiceRequestLane:
                            f"（声明 {completeness.get('declared_total')} 条），"
                            "列表可能不全；请带状态或期间收窄后再查")
         return out
+
+    def requests_of(self, customer_id: str, *, status: str | None = None,
+                    date_from: str | None = None, date_to: str | None = None
+                    ) -> dict[str, Any]:
+        """单客户的申请列表（薄封装；与业务员待审列表同一真源）。"""
+        return self.requests_for_customers(
+            [customer_id], status=status, date_from=date_from, date_to=date_to)

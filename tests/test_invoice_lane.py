@@ -256,3 +256,26 @@ def test_protocol_declares_the_two_lane_methods():
     names = dir(KernelClient)
     for needed in ("submit_event", "query_events", "ingest_event"):
         assert needed in names, needed
+
+
+# ---- 按客户集合取申请（业务员待审列表的真源）----
+
+def test_requests_for_customers_filters_by_set(lane):
+    lane_obj = lane["lane"]
+    a = lane_obj.submit_request("C-1", dict(BASE))["requestId"]
+    b = lane_obj.submit_request("C-2", dict(BASE))["requestId"]
+    one = lane_obj.requests_for_customers(["C-1"])
+    assert one["total"] == 1 and one["rows"][0]["requestId"] == a
+    assert one["rows"][0]["customerId"] == "C-1", "行内必须带客户，业务员台按客户分组"
+    both = lane_obj.requests_for_customers({"C-1", "C-2"})
+    assert {r["requestId"] for r in both["rows"]} == {a, b}
+    assert lane_obj.requests_for_customers([])["total"] == 0
+    assert lane_obj.requests_for_customers(["C-NONE"])["total"] == 0
+
+
+def test_requests_of_is_a_thin_wrapper(lane):
+    lane_obj = lane["lane"]
+    ref = lane_obj.submit_request("C-1", dict(BASE))["requestId"]
+    lane["kernel"].decide(ref, "accepted")
+    assert lane_obj.requests_of("C-1")["rows"][0]["requestId"] == ref
+    assert lane_obj.requests_of("C-1", status="accepted")["total"] == 1
