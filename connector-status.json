@@ -279,9 +279,9 @@
       "supply-chain.cp": 4,
       "supply-chain.se": 5,
       "supply-chain.sp": 6,
-      "supply-chain.ue": 5
+      "supply-chain.ue": 2
     },
-    "count": 20
+    "count": 17
   },
   "role_bindings": [
     {

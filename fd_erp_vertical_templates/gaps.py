@@ -245,10 +245,26 @@ def _evaluate(detect: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
                     "evidence": f"已找到生产 {event_type} 的代码：{', '.join(sorted(hits)[:3])}"}
         where = "、".join(str(r.relative_to(FINDDATA)) for r in roots if r.exists())
         extra = f"（不在位：{'、'.join(missing)}）" if missing else ""
-        return {"verdict": "open",
-                "evidence": (f"{event_type} 只在类型注册表里，{where} 下无任何生产代码"
-                             f"{extra}——先补载体再谈事实")}
+        # 两种「没有生产者」要分开说，否则读的人会以为类型已经登记了：
+        #   · 类型在注册表里、没人生产 → 先补载体（登记了没人填）
+        #   · 类型连注册表里都没有   → 这件事根本还没立项（连形状都没定）
+        registered = _type_registered(event_type)
+        if registered:
+            detail = f"{event_type} 只在类型注册表里，{where} 下无任何生产代码"
+        else:
+            detail = (f"{event_type} 既未在事件层登记、{where} 下也无任何生产代码"
+                      "——这道车道还没立项")
+        return {"verdict": "open", "evidence": f"{detail}{extra}"}
     return {"verdict": "unverified", "evidence": f"未知 detect.kind：{kind}"}
+
+
+def _type_registered(event_type: str) -> bool:
+    """该类型名是否出现在内核迁移的种子 SQL 里（注册=事实类型的唯一出处）。"""
+    mig = FINDDATA / "fd-erp-ledger-mcp" / "fd_erp_ledger_mcp" / "migrations"
+    if not mig.is_dir():
+        return False
+    return any(event_type in f.read_text(encoding="utf-8", errors="ignore")
+               for f in mig.glob("*.sql"))
 
 
 def render(result: dict[str, Any]) -> str:

@@ -732,3 +732,213 @@ class OrderOrchestrator:
                       "note": "订单取消：信用占用经内核 release_credit 回冲（账本记账）"})
         return {"order_ref": order_ref, "status": "cancelled",
                 "credit_released": release}
+
+
+# ---------------------------------------------------------------------------
+# 售后编排（add-aftersale-lane）
+# ---------------------------------------------------------------------------
+
+#: 售后类型封闭集（契约 §6：退/换/补）。
+AFTERSALE_KINDS = ("return", "exchange", "supplement")
+#: 申请单状态集合。本期只产生 submitted；其余由处置面（运营侧）推进。
+AFTERSALE_STATUSES = ("submitted", "accepted", "processing", "completed", "rejected")
+#: 状态 → 给人看的一句话（详情里如实表达，不编造中间节点）。
+_AFTERSALE_NOTES = {
+    "submitted": "已受理，等待商家处置",
+    "accepted": "商家已接单，等待处置",
+    "processing": "处置中",
+    "completed": "处置完成",
+    "rejected": "已驳回（见驳回原因）",
+}
+
+
+class AfterSalesOrchestrator:
+    """售后申请受理与进度查询（客户侧）。
+
+    边界（design D5）：申请是**流程记录**，不是入库事实。受理路径不写事件层——
+    客户提出申请时货还没回来，此时落 `goods_returned` 等于凭空造一次入库。
+    数量事实属于处置结果，随处置面（运营侧，尚未落地）一起定义。
+    """
+
+    def __init__(self, tenant_id: str, data_dir: str | Path,
+                 master: MasterData, orders: "OrderOrchestrator | None" = None, *,
+                 requested_by_default: str = "ue"):
+        self._tenant = tenant_id
+        self._master = master
+        self._orders = orders
+        self._log = EventLog(Path(data_dir) / f"orchestration-{tenant_id}.jsonl")
+        self._default_by = requested_by_default
+
+    # ---- 事件档（与订单/采购共用一份）----
+
+    def _events(self) -> list[dict[str, Any]]:
+        return self._log.events()
+
+    def _append(self, record: dict[str, Any]) -> None:
+        self._log.append({"schema": ORCH_SCHEMA, "tenant_id": self._tenant,
+                          **record})
+
+    # ---- 订单归属（越域与不存在同码，不泄露存在性）----
+
+    def _own_order(self, order_ref: str, customer_id: str) -> dict[str, Any]:
+        """自有订单合并态；他人订单与不存在的订单抛同一条 NOT_FOUND。"""
+        if self._orders is None:
+            raise TemplateError("UPSTREAM_UNAVAILABLE",
+                                "售后编排未接到订单编排：无法核对订单归属")
+        hits = [e for e in self._orders._events()
+                if e.get("record") == "order" and e.get("ref") == order_ref]
+        if not hits:
+            raise TemplateError("NOT_FOUND", f"订单不存在：{order_ref}")
+        merged = dict(hits[0].get("payload") or {})
+        if merged.get("customer_id") != customer_id:
+            # 同一条错误、同一条文案：不区分「不存在」与「不是你的」。
+            raise TemplateError("NOT_FOUND", f"订单不存在：{order_ref}")
+        for ev in hits[1:]:
+            if ev.get("event") in ("confirmed", "cancelled"):
+                merged.update({k: v for k, v in (ev.get("payload") or {}).items()
+                               if k in ("market_status", "cancelled_at")})
+        merged["status"] = hits[-1].get("status")
+        merged["event"] = hits[-1].get("event")
+        return merged
+
+    # ---- 申请号：可念、同租户内单调 ----
+
+    def _next_ref(self) -> str:
+        n = sum(1 for e in self._events() if e.get("record") == "aftersale") + 1
+        prefix = "".join(ch for ch in self._tenant.upper() if ch.isalnum())[:8] or "TENANT"
+        return f"AS-{prefix}-{n:06d}"
+
+    # ---- 受理 ----
+
+    def request_aftersale(self, customer_id: str, order_ref: str,
+                          lines: list[dict[str, Any]], kind: str, *,
+                          evidence: list[str] | None = None,
+                          requested_by: str | None = None) -> dict[str, Any]:
+        """受理售后申请：类型 → 订单归属 → 行与数量 → 落盘（design D3 的顺序）。
+
+        数量上限按**订单行下单量**判（本期没有「已退多少」的回写口径），
+        因此详情返回该行历史累计申请量，让重复申请可见而不是假装有合计上限。
+        """
+        kind_norm = str(kind or "").strip().lower()
+        if kind_norm not in AFTERSALE_KINDS:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"售后类型须为 {'/'.join(AFTERSALE_KINDS)}，实为 {kind!r}")
+        if not isinstance(lines, list) or not lines:
+            raise TemplateError("INVALID_ARGUMENT", "售后申请须至少给一条订单行")
+
+        order = self._own_order(str(order_ref or "").strip(), customer_id)
+        order_lines: dict[str, Decimal] = {}
+        for ln in order.get("lines") or []:
+            code = str(ln.get("product") or ln.get("product_code") or "").strip()
+            if code:
+                order_lines[code] = _dec(ln.get("qty"), f"订单行 {code} 的下单量")
+
+        norm: list[dict[str, Any]] = []
+        for idx, ln in enumerate(lines, start=1):
+            code = str(ln.get("product") or ln.get("product_code")
+                       or ln.get("productCode") or "").strip()
+            if not code:
+                raise TemplateError("INVALID_ARGUMENT",
+                                    f"第 {idx} 行缺商品编码（product/product_code）")
+            if code not in order_lines:
+                raise TemplateError("INVALID_ARGUMENT",
+                                    f"第 {idx} 行商品 {code} 不在订单 {order_ref} 里")
+            qty = _dec(ln.get("qty"), f"第 {idx} 行数量")
+            if qty <= 0:
+                raise TemplateError("INVALID_ARGUMENT", f"第 {idx} 行数量须 > 0")
+            ordered = order_lines[code]
+            if qty > ordered:
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"第 {idx} 行商品 {code} 申请 {_fmt(qty)} 超过下单量 {_fmt(ordered)}")
+            norm.append({"product": code, "qty": _fmt(qty),
+                         "unit": str(ln.get("unit") or "") or None})
+
+        ref = self._next_ref()
+        submitted_at = datetime.now(timezone.utc).isoformat()
+        self._append({"record": "aftersale", "ref": ref,
+                      "event": "requested", "status": "submitted",
+                      "payload": {"order_ref": str(order_ref).strip(),
+                                  "customer_id": str(customer_id),
+                                  "kind": kind_norm, "lines": norm,
+                                  "evidence": [str(x) for x in (evidence or [])],
+                                  "submitted_at": submitted_at,
+                                  "submitted_day": submitted_at[:10]},
+                      "requested_by": requested_by or self._default_by,
+                      "note": "售后申请受理（流程记录；不是入库事实）"})
+        return {"requestId": ref, "orderId": str(order_ref).strip(),
+                "kind": kind_norm, "lines": norm, "status": "submitted",
+                "status_note": _AFTERSALE_NOTES["submitted"],
+                "submitted_at": submitted_at,
+                "next_action": "等待商家处置面推进（accepted→processing→completed）"}
+
+    # ---- 读面 ----
+
+    def _view(self, ev: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(ev.get("payload") or {})
+        ref = ev.get("ref")
+        status = ev.get("status") or "submitted"
+        lines = [dict(x) for x in payload.get("lines") or []]
+        for ln in lines:
+            ln["applied_total"] = _fmt(self._applied_total(
+                payload.get("order_ref"), ln.get("product")))
+        return {"requestId": ref, "orderId": payload.get("order_ref"),
+                "kind": payload.get("kind"), "lines": lines,
+                "evidence": payload.get("evidence") or [],
+                "status": status,
+                "status_note": _AFTERSALE_NOTES.get(status, status),
+                "submitted_at": payload.get("submitted_at")}
+
+    def _applied_total(self, order_ref: str | None, product: str | None) -> Decimal:
+        """该订单-商品的历史累计申请量（含本次；不含已驳回）。"""
+        total = Decimal(0)
+        for ev in self._events():
+            if ev.get("record") != "aftersale":
+                continue
+            payload = ev.get("payload") or {}
+            if payload.get("order_ref") != order_ref:
+                continue
+            if ev.get("status") == "rejected":
+                continue
+            for ln in payload.get("lines") or []:
+                if ln.get("product") == product:
+                    total += _dec(ln.get("qty"), "申请量")
+        return total
+
+    def aftersale_requests(self, customer_id: str, *, status: str | None = None,
+                           date_from: str | None = None, date_to: str | None = None,
+                           offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        """列表：只返回调用方自己的申请，按提交时刻倒序。"""
+        rows: list[dict[str, Any]] = []
+        for ev in self._events():
+            if ev.get("record") != "aftersale":
+                continue
+            payload = ev.get("payload") or {}
+            if payload.get("customer_id") != customer_id:
+                continue
+            if status and ev.get("status") != status:
+                continue
+            day = str(payload.get("submitted_day") or "")
+            if date_from and day < date_from:
+                continue
+            if date_to and day > date_to:
+                continue
+            rows.append(self._view(ev))
+        rows.sort(key=lambda r: str(r.get("submitted_at") or ""), reverse=True)
+        page = rows[offset: offset + limit]
+        return {"rows": page, "total": len(rows), "offset": offset,
+                "limit": limit, "returned": len(page)}
+
+    def aftersale_of(self, customer_id: str, ref: str) -> dict[str, Any]:
+        """详情：他人单号与不存在单号同一条 NOT_FOUND。"""
+        hit = next((e for e in self._events()
+                    if e.get("record") == "aftersale" and e.get("ref") == ref), None)
+        if hit is None or (hit.get("payload") or {}).get("customer_id") != customer_id:
+            raise TemplateError("NOT_FOUND", f"售后申请不存在：{ref}")
+        view = self._view(hit)
+        view["timeline"] = [{"status": hit.get("status"),
+                             "at": (hit.get("payload") or {}).get("submitted_at"),
+                             "note": _AFTERSALE_NOTES.get(
+                                 str(hit.get("status")), str(hit.get("status")))}]
+        view["next_action"] = "等待商家处置面推进（accepted→processing→completed）"
+        return view

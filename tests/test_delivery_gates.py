@@ -217,7 +217,8 @@ def test_claim_gate_passes_on_current_materials(claim_gate):
     _require(BOARD_DOC, API_PACKAGE, TOOL_SURFACE, FINDDATA / "fd-official-web")
     result = claim_gate.check()
     assert result["ok"] is True, result["violations"]
-    assert result["counts"]["planned"] == 20
+    # 不钉 20：挂账数会随能力落地变小（售后三条已实现）。要守的是「计数=镜像端点数」。
+    assert result["counts"]["planned"] == claim_gate.load_mirror()["count"]
 
 
 def test_unsupported_invoice_claim_is_red(tmp_path, claim_gate):
@@ -275,12 +276,15 @@ def test_negated_admonition_is_not_a_claim(tmp_path, claim_gate):
 
 
 def test_planned_mirror_count_matches_source(claim_gate):
-    """4.3 挂账清单 20 条，与 fd-erp-vertical-api/planned-surfaces.json 一致。"""
+    """4.3 挂账清单与 fd-erp-vertical-api/planned-surfaces.json 逐条一致。
+
+    条数不写死：能力落地会让清单变短（售后三条即如此），写死等于惩罚实现。
+    """
     mirror = claim_gate.load_mirror()
-    assert mirror["count"] == len(mirror["endpoints"]) == 20
+    assert mirror["count"] == len(mirror["endpoints"]) > 0
     if API_PLANNED.is_file():
         source = json.loads(API_PLANNED.read_text(encoding="utf-8"))
-        assert mirror["count"] == source["count"] == 20
+        assert mirror["count"] == source["count"]
         assert mirror["by_capability"] == source["by_capability"]
         assert {(e["method"], e["path"]) for e in mirror["endpoints"]} == \
             {(e["method"], e["path"]) for e in source["endpoints"]}
@@ -311,13 +315,14 @@ def test_unregistered_501_endpoint_is_red(tmp_path, claim_gate):
 
 
 def test_capability_list_splits_delivered_and_planned(claim_gate):
-    """4.4 两段清单：20 条 501 全在「规划中」，不与已交付混排。"""
+    """4.4 两段清单：501 全在「规划中」，不与已交付混排（条数取镜像真值）。"""
     claims = claim_gate.load_claims()
     mirror = claim_gate.load_mirror()
     from fd_erp_vertical_templates.publish import load_record
     text = claim_gate.render_capability_list(claims, mirror, load_record(),
                                              gaps_check())
-    assert "## 一、已交付" in text and "## 二、规划中（20 条" in text
+    assert "## 一、已交付" in text
+    assert f"## 二、规划中（{mirror['count']} 条" in text
 
     delivered = text.split("## 二、规划中", 1)[0]
     planned = text.split("## 二、规划中", 1)[1].split("## 三、", 1)[0]

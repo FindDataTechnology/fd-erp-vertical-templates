@@ -1,6 +1,6 @@
 # ERP 对外能力清单（数据派生）
 
-> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 20 条），不认文档里手写的旧数。
+> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 17 条），不认文档里手写的旧数。
 
 ## 一、已交付（有证据）
 
@@ -37,7 +37,7 @@
 - **事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py；mcp_tool:run_reconciliation
 
-## 二、规划中（20 条，全部来自挂账清单）
+## 二、规划中（17 条，全部来自挂账清单）
 
 | 能力面 | 域 | 端点 | 规划车道 |
 | --- | --- | --- | --- |
@@ -56,16 +56,14 @@
 | supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements` | 金蝶 provider 往来面拉取（任务 3.1）→ 账本内核计算应付 → 单据级对账单派生 + 确认门（内核自平核对 proposal，同 UE 契约） |
 | supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements/{statement_id}` | 同 GET /sp/statements |
 | supply-chain.sp | statements | `POST /erp/supply-chain/v1/sp/statements/{statement_id}/confirm` | 金额同源到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道 |
-| supply-chain.ue | aftersale-requests | `GET /erp/supply-chain/v1/ue/aftersale-requests` | 售后处置车道（待编排层扩展） |
-| supply-chain.ue | aftersale-requests | `POST /erp/supply-chain/v1/ue/aftersale-requests` | 售后处置车道（待编排层扩展） |
-| supply-chain.ue | aftersale-requests | `GET /erp/supply-chain/v1/ue/aftersale-requests/{request_id}` | 售后处置车道（待编排层扩展） |
 | supply-chain.ue | invoice-requests | `GET /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
 | supply-chain.ue | invoice-requests | `POST /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
 
-## 三、当前不可用（缺口登记 5 条）
+## 三、当前不可用（缺口登记 6 条）
 
 - **银联收款渠道（结算流水只读）**：目录无 unionpay provider；模板层只能声明角色/真 id，不得以自建 HTTP 适配补齐（ADR 0002）（责任仓 open-connector-mt）
 - **客户 WMS（库存快照只读，角色绑定 wms）**：目录无任何可映射到角色 wms 的 provider，角色候选集为空 → 安装该角色绑定被阻断（bindings.py）（责任仓 open-connector-mt）
 - **金蝶云星空（凭证/单据同步）**：目录有 kingdee provider，但执行器目录无测试文件（*.test.ts 计数为 0）（责任仓 open-connector-mt）
 - **客服会话事实回流（Chatwoot 会话关闭 → 事件层 marketing.desk.conversation_closed）**：有真实实例（desk.finddatatech.cloud，crm-desk-bridge 只读五件套）与事件类型登记，但没有把它变成事件层事实的适配器：类型只存在于注册表，仓内零生产代码——不接就是「登记了没人填」的形状（责任仓 paas）
 - **渠道订单付款事实回流（Shopify admin / 国内电商只读面 → 事件层 marketing.channel.order_paid）**：连接器目录已有只读面（shopify_admin.orders 等），事件类型也已登记，但没有消费方把付款事实写成事件；本 change 只出契约（类型 + 载荷 + 幂等键约定）（责任仓 open-connector-mt）
+- **售后处置面（运营侧：接单/审核/退货入库/换货出库，推进 accepted→processing→completed/rejected）**：客户侧申请车道已实现（POST/GET/GET 三条 UE 端点），但仓库内没有任何处置写入点：状态只能停在 submitted。契约 §6 要求详情返回处置进度，本期只能如实回「已受理，等待商家处置」（责任仓 fd-erp-vertical-api）

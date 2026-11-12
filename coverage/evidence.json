@@ -5,7 +5,7 @@
       "/healthz"
     ],
     "mcp_tools": 32,
-    "placeholder_routes": 20,
+    "placeholder_routes": 17,
     "routes": 66
   },
   "mcp_tools": [
@@ -385,26 +385,26 @@
     },
     {
       "function": "list_aftersales",
-      "line": 737,
+      "line": 756,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
-      "placeholder": true,
+      "placeholder": false,
       "source": "app.py"
     },
     {
       "function": "create_aftersale",
-      "line": 729,
+      "line": 734,
       "method": "POST",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests",
-      "placeholder": true,
+      "placeholder": false,
       "source": "app.py"
     },
     {
       "function": "aftersale_detail",
-      "line": 743,
+      "line": 770,
       "method": "GET",
       "path": "/erp/supply-chain/v1/ue/aftersale-requests/{request_id}",
-      "placeholder": true,
+      "placeholder": false,
       "source": "app.py"
     },
     {

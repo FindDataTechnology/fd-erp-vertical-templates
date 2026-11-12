@@ -544,7 +544,7 @@
       "surface": "ue"
     },
     {
-      "classification": "模式复用",
+      "classification": "直接命中",
       "domain": "售后",
       "evidence": [
         {
@@ -557,13 +557,12 @@
         }
       ],
       "id": "FP-3417FD3390",
-      "note": "端点 501 占位（契约在、实现未就绪）：POST /erp/supply-chain/v1/ue/aftersale-requests",
       "row_status": "覆盖",
       "subdomain": "ue-aftersale-apply",
       "surface": "ue"
     },
     {
-      "classification": "模式复用",
+      "classification": "直接命中",
       "domain": "售后",
       "evidence": [
         {
@@ -580,7 +579,6 @@
         }
       ],
       "id": "FP-71D59BF175",
-      "note": "端点 501 占位（契约在、实现未就绪）：GET /erp/supply-chain/v1/ue/aftersale-requests、GET /erp/supply-chain/v1/ue/aftersale-requests/{requestId}",
       "row_status": "覆盖",
       "subdomain": "ue-aftersale-detail",
       "surface": "ue"

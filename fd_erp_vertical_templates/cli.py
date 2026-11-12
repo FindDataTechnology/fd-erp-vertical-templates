@@ -391,6 +391,22 @@ def _run_coverage(action: str, args) -> int:
         matrix = cov.build_template_matrix(args.template, index)
         cov.validate_matrix(matrix, evidence=index)
         target = Path(args.out or (cov.DEFAULT_MATRIX_DIR / f"{matrix.vertical}.json"))
+        # 空矩阵不得覆盖非空矩阵：`--template` 写错一个词（裸 `supply-chain` 而不是
+        # `templates/supply-chain`）会派生出一个 0 点的矩阵，而 save 照写不误——
+        # 值钱的那份入库矩阵就被一个「什么都没读到」的结果换掉了。
+        # 2026-11-12 实测发生过一次（35 点 → 0 点），故在此拦。
+        if not matrix.points and target.is_file():
+            try:
+                existing = cov.load_matrix(target)
+            except Exception:  # noqa: BLE001 旧文件不可解析时按「非空」处理，宁拦不写
+                existing = None
+            if existing is not None and existing.points:
+                print(
+                    f"拒绝写入：{target} 现有 {len(existing.points)} 个点，"
+                    f"而 --template {args.template!r} 只派生出 0 个点。"
+                    "先确认模板路径（形如 templates/<vertical>）——空结果不该覆盖真结果。",
+                    file=sys.stderr)
+                return 2
         cov.save_matrix(matrix, target)
         print(json.dumps({"ok": True, "matrix": str(target),
                           "counts": cov.coverage_counts(matrix)},

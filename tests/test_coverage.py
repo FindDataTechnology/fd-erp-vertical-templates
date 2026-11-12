@@ -550,3 +550,31 @@ def test_template_without_pagesets_is_not_checked():
     """crossborder / restaurant-chain 未声明页面集 → 覆盖钩子原样放行。"""
     assert cov.check_template_coverage_declaration(TEMPLATES / "crossborder") == []
     assert cov.check_template_coverage_declaration(TEMPLATES / "restaurant-chain") == []
+
+
+def test_build_refuses_to_overwrite_nonempty_matrix_with_empty_result(tmp_path):
+    """`coverage build --template` 写错路径时不得用空矩阵覆盖真矩阵。
+
+    2026-11-12 实测：把 `templates/supply-chain` 写成 `supply-chain`，派生出 0 个点，
+    `save_matrix` 照写不误，入库那份 35 点的矩阵被换成一个空壳。空结果覆盖真结果
+    是最贵的一类失败——文件还在、格式还对、内容是「什么都没读到」。
+    """
+    import subprocess
+    import sys as _sys
+
+    REPO = Path(__file__).resolve().parent.parent
+
+    # 目标文件用手工造的 `--out`，不碰入库矩阵
+    out = tmp_path / "supply-chain.json"
+    matrix = cov.load_matrix(MATRIX)
+    cov.save_matrix(matrix, out)
+    before = out.read_bytes()
+    assert matrix.points, "前提：入库矩阵非空"
+
+    proc = subprocess.run(
+        [_sys.executable, "-m", "fd_erp_vertical_templates.cli", "coverage",
+         "build", "--template", "supply-chain", "--out", str(out)],
+        capture_output=True, text=True, cwd=str(REPO))
+    code = proc.returncode
+    assert code == 2, f"空结果覆盖非空矩阵必须被拒（退出码 2），实得 {code}：{proc.stderr}"
+    assert out.read_bytes() == before, "拒绝后文件必须一字未动"

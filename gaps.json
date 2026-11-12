@@ -115,6 +115,27 @@
     "fd-erp-ledger-mcp/migrations/0011_marketing_producers.sql（类型已登记，evidence_ref=connector:shopify_admin.orders）",
     "open-connector-mt/catalog/apps（只读 provider 在册）"
    ]
+  },
+  {
+   "id": "aftersale-disposition-lane-missing",
+   "capability": "售后处置面（运营侧：接单/审核/退货入库/换货出库，推进 accepted→processing→completed/rejected）",
+   "responsible_repo": "fd-erp-vertical-api",
+   "blocking": "客户侧申请车道已实现（POST/GET/GET 三条 UE 端点），但仓库内没有任何处置写入点：状态只能停在 submitted。契约 §6 要求详情返回处置进度，本期只能如实回「已受理，等待商家处置」",
+   "status": "open",
+   "detect": {
+    "kind": "event_type_producer",
+    "event_type": "aftersale.disposition_recorded",
+    "search": [
+     "fd-erp-vertical-api",
+     "fd-erp-vertical-templates",
+     "fleet-packs"
+    ]
+   },
+   "fix": "单独立单实现售后处置面：运营侧页面集 + 权限点（aftersale.disposition）＋ 处置结果回写编排档，退货入库届时再决定是否登记 goods_returned 事实类型（需要批次/库位与过账口径）",
+   "evidence": [
+    "fd-erp-vertical-templates/templates/supply-chain/pagesets/ue-commerce/api-contract.md §6（要求处置进度）",
+    "fd-erp-vertical-templates/fd_erp_vertical_templates/orchestration.py#AfterSalesOrchestrator（只有 requested 一个事件）"
+   ]
   }
  ]
 }
