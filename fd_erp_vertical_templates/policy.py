@@ -95,7 +95,7 @@ KEYS: dict[str, dict[str, Any]] = {
         "default": "straight-line",
         "impact": "影响每期折旧额与净值；双倍余额递减要处理最后两年改直线的切换，"
                   "工作量法要采集产量口径",
-        "implemented": False,
+        "implemented": True,
     },
     "asset_ledger_owner": {
         "domain": "fixed-assets",
@@ -103,7 +103,7 @@ KEYS: dict[str, dict[str, Any]] = {
         "default": "platform",
         "impact": "影响台账归属与是否需要碰客户资产系统；只读对账不写客户系统，"
                   "回写则需要客户系统开放写接口与回滚口径",
-        "implemented": False,
+        "implemented": True,
     },
     # ---- 合并报表 ----
     "entity_model": {

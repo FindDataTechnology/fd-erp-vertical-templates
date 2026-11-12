@@ -145,24 +145,24 @@ def test_unknown_before_request_id_is_not_found(book):
 # ---- 4) 未实现引擎的口径：登记但明确不生效 ----
 
 def test_unimplemented_engine_keys_are_recorded_only(book):
-    prop = book.propose({"depreciation_method": "double-declining"})
-    assert prop["recordedOnly"] == ["depreciation_method"]
+    # 折旧引擎已随 add-fixed-assets-lane 交付，故改用仍无消费者的预算控制键做对照
+    prop = book.propose({"budget_control": "hard-block"})
+    assert prop["recordedOnly"] == ["budget_control"]
     assert "仅登记" in prop["note"]          # 提案自己就说清「还没消费者」
     book.confirm(prop["requestId"])
     now = book.current()
-    assert now["values"]["depreciation_method"] == "double-declining"
-    assert now["keys"]["depreciation_method"]["enforced"] is False
+    assert now["values"]["budget_control"] == "hard-block"
+    assert now["keys"]["budget_control"]["enforced"] is False
     assert now["keys"]["cost_method"]["enforced"] is True
     assert now["counts"]["recordedOnly"] >= 1
 
 
 def test_implemented_flags_match_reality(book):
-    assert book.explain("cost_method")["implemented"] is True
-    assert book.explain("provisional_basis")["implemented"] is True
-    assert book.explain("variance_policy")["implemented"] is True
-    assert book.explain("close_grain")["implemented"] is True
-    for key in ("budget_dimension", "depreciation_method",
-                "entity_model", "fx_translation"):
+    for key in ("cost_method", "provisional_basis", "variance_policy", "close_grain",
+                "depreciation_method", "asset_ledger_owner"):
+        assert book.explain(key)["implemented"] is True, key
+    for key in ("budget_dimension", "budget_period", "budget_control",
+                "entity_model", "elimination_scope", "fx_translation"):
         assert book.explain(key)["implemented"] is False, key
 
 
