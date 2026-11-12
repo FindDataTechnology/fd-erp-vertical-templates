@@ -62,8 +62,10 @@
 | supply-chain.ue | invoice-requests | `GET /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
 | supply-chain.ue | invoice-requests | `POST /erp/supply-chain/v1/ue/invoice-requests` | 后台审核车道 + 金蝶/线下开票通道 |
 
-## 三、当前不可用（缺口登记 3 条）
+## 三、当前不可用（缺口登记 5 条）
 
 - **银联收款渠道（结算流水只读）**：目录无 unionpay provider；模板层只能声明角色/真 id，不得以自建 HTTP 适配补齐（ADR 0002）（责任仓 open-connector-mt）
 - **客户 WMS（库存快照只读，角色绑定 wms）**：目录无任何可映射到角色 wms 的 provider，角色候选集为空 → 安装该角色绑定被阻断（bindings.py）（责任仓 open-connector-mt）
 - **金蝶云星空（凭证/单据同步）**：目录有 kingdee provider，但执行器目录无测试文件（*.test.ts 计数为 0）（责任仓 open-connector-mt）
+- **客服会话事实回流（Chatwoot 会话关闭 → 事件层 marketing.desk.conversation_closed）**：有真实实例（desk.finddatatech.cloud，crm-desk-bridge 只读五件套）与事件类型登记，但没有把它变成事件层事实的适配器：类型只存在于注册表，仓内零生产代码——不接就是「登记了没人填」的形状（责任仓 paas）
+- **渠道订单付款事实回流（Shopify admin / 国内电商只读面 → 事件层 marketing.channel.order_paid）**：连接器目录已有只读面（shopify_admin.orders 等），事件类型也已登记，但没有消费方把付款事实写成事件；本 change 只出契约（类型 + 载荷 + 幂等键约定）（责任仓 open-connector-mt）

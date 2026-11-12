@@ -1,6 +1,6 @@
 {
  "schema": "erp-connector-gaps/v1",
- "note": "连接器缺口清单（唯一出处，task 3.8）。四项必填：银联无 provider / 客户 WMS 无 provider / 支付有 provider 而 ERP 未接线 / 金蝶执行器无测试。每项带 detect（机器判据）——跨仓实测已解除而本仓仍写 open 即判红；登记 resolved 而实测未解除同样判红。责任仓：连接器 provider 归 open-connector-mt（独立 openspec 根），ERP 接线归本仓。",
+ "note": "连接器缺口清单（唯一出处，task 3.8）。四项必填：银联无 provider / 客户 WMS 无 provider / 支付有 provider 而 ERP 未接线 / 金蝶执行器无测试。每项带 detect（机器判据）——跨仓实测已解除而本仓仍写 open 即判红；登记 resolved 而实测未解除同样判红。责任仓：连接器 provider 归 open-connector-mt（独立 openspec 根），ERP 接线归本仓。 另含两条营销事实接入缺口（2026-11-12 change fuse-marketing-onto-event-kernel 登记）：类型已在事件层注册、仓内无生产代码，判据 kind=event_type_producer。",
  "updated_at": "2026-11-10",
  "gaps": [
   {
@@ -10,9 +10,14 @@
    "blocking": "目录无 unionpay provider；模板层只能声明角色/真 id，不得以自建 HTTP 适配补齐（ADR 0002）",
    "status": "open",
    "fix": "在 open-connector-mt 按 SDK/definition 流程新增 unionpay provider（auth 用 custom_credential，首版 read 账单下载 + trigger 回调记录），刷新 connector-status.json；anchor 客户有银联需求才立项",
-   "detect": {"kind": "catalog_provider", "provider": "unionpay"},
-   "evidence": ["open-connector-mt/catalog/apps（无 unionpay.json）",
-                "templates/supply-chain/connector-pack/pack.json#connector_bindings payments-merchant"]
+   "detect": {
+    "kind": "catalog_provider",
+    "provider": "unionpay"
+   },
+   "evidence": [
+    "open-connector-mt/catalog/apps（无 unionpay.json）",
+    "templates/supply-chain/connector-pack/pack.json#connector_bindings payments-merchant"
+   ]
   },
   {
    "id": "wms-no-provider",
@@ -21,9 +26,14 @@
    "blocking": "目录无任何可映射到角色 wms 的 provider，角色候选集为空 → 安装该角色绑定被阻断（bindings.py）",
    "status": "open",
    "fix": "品牌由锚点客户确定后按 open-connector-mt 流程新增 provider 与角色映射；骨架契约见 open-connector-mt/docs/（WMS 角色）",
-   "detect": {"kind": "role_candidates", "role": "wms"},
-   "evidence": ["connector-status.json#role_bindings[wms].candidates = []",
-                "templates/supply-chain/connector-pack/pack.json#connector_bindings wms-snapshot"]
+   "detect": {
+    "kind": "role_candidates",
+    "role": "wms"
+   },
+   "evidence": [
+    "connector-status.json#role_bindings[wms].candidates = []",
+    "templates/supply-chain/connector-pack/pack.json#connector_bindings wms-snapshot"
+   ]
   },
   {
    "id": "payments-not-wired",
@@ -33,12 +43,19 @@
    "status": "resolved",
    "resolved_at": "2026-11-09",
    "fix": "已解除。live 面仍缺验收：见 connector-status.json 中 wechatpay/alipay 的 live 态（缺验收记录不得声明已接通）",
-   "detect": {"kind": "erp_runtime_path",
-              "module": "fd_erp_vertical_templates/connectors/payments.py",
-              "providers": ["wechatpay", "alipay"]},
-   "evidence": ["fd_erp_vertical_templates/connectors/payments.py（RuntimeClient + CHANNEL_PROVIDERS）",
-                "scripts/payment_direct_call_gate.py（禁止新增自建直连）",
-                "tests/test_payment_direct_call_gate.py"]
+   "detect": {
+    "kind": "erp_runtime_path",
+    "module": "fd_erp_vertical_templates/connectors/payments.py",
+    "providers": [
+     "wechatpay",
+     "alipay"
+    ]
+   },
+   "evidence": [
+    "fd_erp_vertical_templates/connectors/payments.py（RuntimeClient + CHANNEL_PROVIDERS）",
+    "scripts/payment_direct_call_gate.py（禁止新增自建直连）",
+    "tests/test_payment_direct_call_gate.py"
+   ]
   },
   {
    "id": "kingdee-no-executor-test",
@@ -47,9 +64,57 @@
    "blocking": "目录有 kingdee provider，但执行器目录无测试文件（*.test.ts 计数为 0）",
    "status": "open",
    "fix": "在 open-connector-mt/src/providers/kingdee 补执行器测试（动作面覆盖 query_records/push_records 的 read/write 归因），随后 build_connector_status.py 的 executor_tests 态自动转绿",
-   "detect": {"kind": "executor_tests", "provider": "kingdee", "min": 1},
-   "evidence": ["connector-status.json#integrations[kingdee].states.executor_tests.ok = false",
-                "open-connector-mt/src/providers/kingdee（无 *.test.ts）"]
+   "detect": {
+    "kind": "executor_tests",
+    "provider": "kingdee",
+    "min": 1
+   },
+   "evidence": [
+    "connector-status.json#integrations[kingdee].states.executor_tests.ok = false",
+    "open-connector-mt/src/providers/kingdee（无 *.test.ts）"
+   ]
+  },
+  {
+   "id": "chatwoot-facts-not-wired",
+   "capability": "客服会话事实回流（Chatwoot 会话关闭 → 事件层 marketing.desk.conversation_closed）",
+   "responsible_repo": "paas",
+   "blocking": "有真实实例（desk.finddatatech.cloud，crm-desk-bridge 只读五件套）与事件类型登记，但没有把它变成事件层事实的适配器：类型只存在于注册表，仓内零生产代码——不接就是「登记了没人填」的形状",
+   "status": "open",
+   "fix": "在 paas 侧（或 fd-wire 同形的独立脚本）写只读适配器：按 conversation_ref + closed_at 幂等，写 ingest 车道；凭据走既有 desk 只读面，不进常驻调度。单开一张 change，需要真实实例验收",
+   "detect": {
+    "kind": "event_type_producer",
+    "event_type": "marketing.desk.conversation_closed",
+    "search": [
+     "fd-wire",
+     "paas",
+     "fd-erp-ledger-mcp"
+    ]
+   },
+   "evidence": [
+    "fd-erp-ledger-mcp/migrations/0011_marketing_producers.sql（类型已登记，evidence_ref=chatwoot:conversations）",
+    "paas/openspec/changes/archive/2026-10-22-add-crm-desk-bridge/（只读桥已归档，无事件层写入）"
+   ]
+  },
+  {
+   "id": "channel-order-facts-not-wired",
+   "capability": "渠道订单付款事实回流（Shopify admin / 国内电商只读面 → 事件层 marketing.channel.order_paid）",
+   "responsible_repo": "open-connector-mt",
+   "blocking": "连接器目录已有只读面（shopify_admin.orders 等），事件类型也已登记，但没有消费方把付款事实写成事件；本 change 只出契约（类型 + 载荷 + 幂等键约定）",
+   "status": "open",
+   "fix": "在连接器只读面之上加事件适配器（按 order_ref 幂等、只取 paid 态、金额与币种原文透传），与 fd-wire 适配器同形；需要 live 连接器凭据才能验收",
+   "detect": {
+    "kind": "event_type_producer",
+    "event_type": "marketing.channel.order_paid",
+    "search": [
+     "fd-wire",
+     "open-connector-mt",
+     "fd-erp-ledger-mcp"
+    ]
+   },
+   "evidence": [
+    "fd-erp-ledger-mcp/migrations/0011_marketing_producers.sql（类型已登记，evidence_ref=connector:shopify_admin.orders）",
+    "open-connector-mt/catalog/apps（只读 provider 在册）"
+   ]
   }
  ]
 }

@@ -217,6 +217,37 @@ def _evaluate(detect: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         if direct:
             details.append("仍有自建 HTTP import")
         return {"verdict": "open", "evidence": "；".join(details)}
+    if kind == "event_type_producer":
+        # 「这个事实类型有没有真生产者」：在指定的仓/目录里找**除迁移与注册表之外**
+        # 的代码是否出现过该类型名。只出现在迁移里＝只登记了类型、没人生产事实——
+        # 这正是「先登记类型再找人填数」的形状。
+        event_type = str(detect.get("event_type") or "")
+        roots = [FINDDATA / str(p) for p in detect.get("search") or []]
+        if not roots:
+            return {"verdict": "unverified", "evidence": "detect.search 未指定搜索范围"}
+        hits: list[str] = []
+        missing: list[str] = []
+        for root in roots:
+            if not root.exists():
+                missing.append(root.name)
+                continue
+            for f in root.rglob("*.py"):
+                if "migrations" in f.parts or "tests" in f.parts:
+                    continue
+                try:
+                    text = f.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                if event_type in text:
+                    hits.append(f"{f.relative_to(FINDDATA)}")
+        if hits:
+            return {"verdict": "resolved",
+                    "evidence": f"已找到生产 {event_type} 的代码：{', '.join(sorted(hits)[:3])}"}
+        where = "、".join(str(r.relative_to(FINDDATA)) for r in roots if r.exists())
+        extra = f"（不在位：{'、'.join(missing)}）" if missing else ""
+        return {"verdict": "open",
+                "evidence": (f"{event_type} 只在类型注册表里，{where} 下无任何生产代码"
+                             f"{extra}——先补载体再谈事实")}
     return {"verdict": "unverified", "evidence": f"未知 detect.kind：{kind}"}
 
 

@@ -100,11 +100,17 @@ def test_payment_gate_allowlist_only_runtime_client(tmp_path, payment_gate):
 
 
 def test_gap_register_has_four_required_items():
-    """3.8 四项缺口齐全（单一出处 gaps.json）。"""
+    """3.8 四项缺口齐全（单一出处 gaps.json）。
+
+    `== 4` 曾写成活跃上限，但缺口台账会随新事实源长（2026-11-12 合并营销线时
+    加了 Chatwoot 与渠道订单两条）。上限存在的意义是别把必填项删掉，而这件事
+    由下面的 `set(REQUIRED_GAPS) <= ids` 判；再钉一个总数只会让「如实登记一条
+    新缺口」变成改测试，最后没人敢登记。
+    """
     body = load_gaps()
     ids = {g["id"] for g in body["gaps"]}
     assert set(REQUIRED_GAPS) <= ids
-    assert len(ids) == 4
+    assert len(ids) == len(body["gaps"]), "缺口 id 重复"
     for gap in body["gaps"]:
         assert gap["detect"] and gap["responsible_repo"] and gap["blocking"]
         assert gap["status"] in ("open", "resolved")
