@@ -50,17 +50,29 @@
 | GET | `/erp/supply-chain/v1/se/statements` | 状态 | 名下客户对账单状态总览 | `statement.confirm.proxy` |
 | POST | `/erp/supply-chain/v1/se/statements/{statementId}/push` | 渠道（端内消息） | 推送回执；客户确认仍走 UE 端确认门，SE 端不可代拍 | `statement.confirm.proxy` |
 
-## 6. AI 助手入口
+## 6. 开票审核域（功能点：开票审核；确认门）
+
+> 权限列用 `alert.handle`：该 grant 在本端守的是「对一条 pending 的客户请求作处置」，开票审核
+> 是同一动作类型。未新开 `invoice.audit`，避免同一语义出现两个权限码（既有先例：契约外对账
+> 代理复用 `statement.confirm`）。状态唯一出口是内核确认门 `decide_event`，本服务不存状态。
+
+| 方法 | 路径 | 请求要点 | 响应要点 | 权限 |
+|---|---|---|---|---|
+| GET | `/erp/supply-chain/v1/se/invoice-requests` | `status`（缺省 `pending`；`all` 看全部）、`from`/`to`、分页 | 本人名下客户的开票申请：`requestId`/`customerId`/`title`/`taxId`/`orderId`/`statementId`/`submitted_at`/`status`；他人客户的申请不出现，也不可通过参数读到；拉不全时带完整性声明 | `alert.handle` |
+| POST | `/erp/supply-chain/v1/se/invoice-requests/{requestId}/decide` | `decision: accepted/rejected`、`note`（**驳回必附**） | 拍板回执：经内核确认门写状态并留痕；已拍板再拍返回 `EVENT_STATE`（409，不静默覆盖）；他人客户与不存在同一条 404；内核不可达如实 501 + `planned_lane` | `alert.handle` |
+
+## 7. AI 助手入口
 
 复用底座 chat 面（`pages/chat/index`）与 WS 契约；经营问答/客户口径与页面同源；动作类输出经确认门。无独立 AI 端点。
 
-## 7. 功能点覆盖对账
+## 8. 功能点覆盖对账
 
 | 功能域（tasks 6.3 枚举） | 承载页面 | 状态 |
 |---|---|---|
 | 代客下单 | se-order-proxy / se-order-track / se-customer-detail | 覆盖 |
 | CRM 线索拜访 | se-customer-list / se-lead-visit / se-customer-detail | 覆盖 |
 | 预警处置（拍板席位移动呈现） | se-alert-inbox / se-alert-handle | 覆盖 |
+| 开票审核（开票申请逐条拍板） | se-invoice-audit | 覆盖 |
 | AI 助手入口（spec 附加） | se-ai-assistant | 覆盖 |
 
 锚点蓝图 SE 17 功能点按上述 3 个功能域聚合核对：**3/3 域覆盖，0 域待一期裁剪**；逐点映射待锚点清单资产化后回填（挂账）。

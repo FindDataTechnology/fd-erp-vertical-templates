@@ -30,6 +30,7 @@
 | DELETE | `/erp/supply-chain/v1/ue/cart/lines/{lineId}` | — | 剩余行集 | `catalog.read` |
 | POST | `/erp/supply-chain/v1/ue/cart/price-preview` | 行集 | 试算结果：行价/优惠/合计 + 信用额度预估占用；**纯读，不占用额度** | `catalog.read` |
 | POST | `/erp/supply-chain/v1/ue/orders` | 行集、收货信息、备注 | 订单受理结果：经信用校验（账本额度占用记账）与订单确认；额度不足拒绝并附占用明细；订单进确认车道 | `order.write` |
+| POST | `/erp/supply-chain/v1/ue/orders/{orderId}/fulfillment` | — | 触发履约编排：移交记录 → 履约计划；无移交记录（订单未确认）= 409 `WORKFLOW_STATE`，不伪造计划；已有计划直接回既有视图（幂等） | `order.write` |
 
 确认门语义：`POST /orders` 的受理结果以「提交→服务器确认→拒绝回显→超时兜底」呈现；落账类后续（对账、结算）走账本 proposal 面（confirm/reject 同源）。
 
@@ -48,6 +49,8 @@
 | GET | `/erp/supply-chain/v1/ue/statements` | 期间/状态 | 对账单列表 | `statement.confirm` |
 | GET | `/erp/supply-chain/v1/ue/statements/{statementId}` | — | 对账单明细（单据级勾对）；数据与金蝶往来面同源（金蝶 provider 拉取、中台账本内核计算） | `statement.confirm` |
 | POST | `/erp/supply-chain/v1/ue/statements/{statementId}/confirm` | `decision: confirmed/disputed`、`disputeNote?` | 确认回执；确认经确认门，超时/失败不假报成功；异议进入内部处置车道 | `statement.confirm` |
+| POST | `/erp/supply-chain/v1/ue/reconciliations` | `left_source`/`right_source`（来源引用）、`retry_task_id?` | 202 + `task_id` + `poll_url`：**长任务**，内核后台执行，本响应不等结果；零外部写入（只读滩头） | `statement.confirm` |
+| GET | `/erp/supply-chain/v1/ue/reconciliations/{taskId}` | — | 对账报告：`queued/running/done/failed/interrupted` 与四类差异（双侧原始引用留痕） | `statement.confirm` |
 
 ## 5. 开票域（功能点：开票申请）
 

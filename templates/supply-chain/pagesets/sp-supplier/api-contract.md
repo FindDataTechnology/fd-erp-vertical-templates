@@ -48,13 +48,19 @@
 | POST | `/erp/supply-chain/v1/sp/invoices` | 对账单引用、发票要素（代码/号码/日期/金额/税额）、影像件 | 受理回执：进查验/勾兑车道；通过后经金蝶连接器回写（contract-only，金蝶 provider 通用 action 覆盖面见 `docs/connector-onboarding-supply-chain.md` §1.2） | `invoice.upload` |
 | GET | `/erp/supply-chain/v1/sp/invoices` | 状态 | 上传历史与核验进度 | `invoice.upload` |
 
-## 6. 结算查询域（只读）
+## 6. 库存数量面（只读）
+
+| 方法 | 路径 | 请求要点 | 响应要点 | 权限 |
+|---|---|---|---|---|
+| GET | `/erp/supply-chain/v1/sp/inventory` | `sku`（必填）、`warehouse?`、`lot?` | 本供应商所供商品的对象投影余额（事件派生，带水位与重算校验）；**不是** WMS 快照那份外部库位视图，两者不互相冒充；非本供应商供货的 `sku` 一律 404，不靠「查到了」推断可见性 | `po.read` |
+
+## 7. 结算查询域（只读）
 
 | 方法 | 路径 | 请求要点 | 响应要点 | 权限 |
 |---|---|---|---|---|
 | GET | `/erp/supply-chain/v1/sp/settlements` | 期间/状态 | 结算进度（只读）；不提供任何支付/账户操作 | `statement.read` |
 
-## 7. AI 助手入口
+## 8. AI 助手入口
 
 复用底座 chat 面（`pages/chat/index`）与 WS 契约；单据/对账问答与页面同源；动作类输出经确认门。无独立 AI 端点。
 
