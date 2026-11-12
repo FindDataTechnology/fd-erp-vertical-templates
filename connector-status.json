@@ -276,11 +276,11 @@
   "planned_surfaces": {
     "available": true,
     "by_capability": {
-      "supply-chain.cp": 4,
+      "supply-chain.cp": 1,
       "supply-chain.se": 1,
       "supply-chain.sp": 6
     },
-    "count": 11
+    "count": 8
   },
   "role_bindings": [
     {

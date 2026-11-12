@@ -18,7 +18,7 @@
     },
     {
       "anchor": false,
-      "classification": "模式复用",
+      "classification": "直接命中",
       "domain": "对账",
       "evidence": [
         {
@@ -39,7 +39,6 @@
         }
       ],
       "id": "FP-17BEB36689",
-      "note": "端点 501 占位（契约在、实现未就绪）：GET /erp/supply-chain/v1/cp/freight-statements、GET /erp/supply-chain/v1/cp/freight-statements/{statementId}、POST /erp/supply-chain/v1/cp/freight-statements/{statementId}/confirm",
       "row_status": "覆盖",
       "subdomain": "cp-reconciliation",
       "surface": "cp"

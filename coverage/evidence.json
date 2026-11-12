@@ -5,7 +5,7 @@
       "/healthz"
     ],
     "mcp_tools": 32,
-    "placeholder_routes": 11,
+    "placeholder_routes": 8,
     "routes": 68
   },
   "mcp_tools": [
@@ -57,26 +57,26 @@
     },
     {
       "function": "cp_freight_statements",
-      "line": 1274,
+      "line": 1267,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements",
-      "placeholder": true,
+      "placeholder": false,
       "source": "faces.py"
     },
     {
       "function": "cp_freight_detail",
-      "line": 1285,
+      "line": 1290,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}",
-      "placeholder": true,
+      "placeholder": false,
       "source": "faces.py"
     },
     {
       "function": "cp_freight_confirm",
-      "line": 1292,
+      "line": 1304,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm",
-      "placeholder": true,
+      "placeholder": false,
       "source": "faces.py"
     },
     {
