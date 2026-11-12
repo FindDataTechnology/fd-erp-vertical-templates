@@ -1,6 +1,6 @@
 # ERP 对外能力清单（数据派生）
 
-> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 17 条），不认文档里手写的旧数。
+> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 13 条），不认文档里手写的旧数。
 
 ## 一、已交付（有证据）
 
@@ -37,7 +37,7 @@
 - **事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py；mcp_tool:run_reconciliation
 
-## 二、规划中（17 条，全部来自挂账清单）
+## 二、规划中（13 条，全部来自挂账清单）
 
 | 能力面 | 域 | 端点 | 规划车道 |
 | --- | --- | --- | --- |
@@ -45,11 +45,7 @@
 | supply-chain.cp | freight-statements | `GET /erp/supply-chain/v1/cp/freight-statements` | 计费 read 工具面（fee_details 按承运商归集 + 规则/事件/单据/原始作业四层溯源）→ 运费单派生；确认门届时=内核自平核对 proposal（同 UE 对账契约） |
 | supply-chain.cp | freight-statements | `GET /erp/supply-chain/v1/cp/freight-statements/{statement_id}` | 同 GET /cp/freight-statements |
 | supply-chain.cp | freight-statements | `POST /erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm` | 运费单 read 面到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道 |
-| supply-chain.se | leads | `GET /erp/supply-chain/v1/se/leads` | CRM 线索/拜访事件档（编排层扩展）+ 底座 chat 面线索助手 |
-| supply-chain.se | leads | `POST /erp/supply-chain/v1/se/leads` | CRM 线索/拜访事件档（编排层扩展） |
 | supply-chain.se | statements | `POST /erp/supply-chain/v1/se/statements/{statement_id}/push` | 底座端内消息通道（notify 车道）接入后实施推送留痕；客户确认门=UE /ue/statements/{id}/confirm（内核 proposal 车道） |
-| supply-chain.se | visits | `GET /erp/supply-chain/v1/se/visits` | CRM 拜访事件档（编排层扩展） |
-| supply-chain.se | visits | `POST /erp/supply-chain/v1/se/visits` | CRM 拜访事件档（编排层扩展；定位/影像可选采集随隐私声明过审启用） |
 | supply-chain.sp | invoices | `GET /erp/supply-chain/v1/sp/invoices` | 同 POST /sp/invoices（上传历史与核验进度 read 面） |
 | supply-chain.sp | invoices | `POST /erp/supply-chain/v1/sp/invoices` | 中台文件服务上传契约 + 发票查验/勾兑车道 + 金蝶连接器回写（contract-only） |
 | supply-chain.sp | settlements | `GET /erp/supply-chain/v1/sp/settlements` | 金蝶付款/结算回写 read 面（只读，无任何支付/账户操作） |

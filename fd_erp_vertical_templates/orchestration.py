@@ -942,3 +942,215 @@ class AfterSalesOrchestrator:
                                  str(hit.get("status")), str(hit.get("status")))}]
         view["next_action"] = "等待商家处置面推进（accepted→processing→completed）"
         return view
+
+
+# ---------------------------------------------------------------------------
+# CRM 线索与拜访编排（add-crm-leads-visits）
+# ---------------------------------------------------------------------------
+
+#: 线索状态封闭集。本期只产生 `new`；推进（following/converted/dropped）没有端点，
+#: 也就不假装能产生——状态字段先落库，将来加推进不需要迁移数据。
+CRM_LEAD_STATUSES = ("new", "following", "converted", "dropped")
+
+
+class CrmOrchestrator:
+    """SE 业务员台的线索与拜访车道。
+
+    边界（design D5）：线索/拜访是**编排流程记录**，不是事件层事实。事件层对
+    `lead` 系名字有黑名单（无载体即拒），而「业务员记了一条线索」与「公司获取了
+    一条可计量的销售线索事实」载体、归属、计量口径都不同——本类是前者。
+
+    归属（design D3）：一条记录永远带 `owner_staff`。查询只返回本人的；拜访的
+    客户主体必须在自己名下（`sales_rep` 对得上），线索主体必须是本人录入的。
+    不满足时与「不存在」返回同一条 NOT_FOUND，不泄露存在性。
+    """
+
+    def __init__(self, tenant_id: str, data_dir: str | Path, master: MasterData):
+        self._tenant = tenant_id
+        self._master = master
+        self._log = EventLog(Path(data_dir) / f"orchestration-{tenant_id}.jsonl")
+
+    # ---- 事件档（与订单/采购/售后共用一份）----
+
+    def _events(self) -> list[dict[str, Any]]:
+        return self._log.events()
+
+    def _append(self, record: dict[str, Any]) -> None:
+        self._log.append({"schema": ORCH_SCHEMA, "tenant_id": self._tenant,
+                          **record})
+
+    def _next_ref(self, record: str, prefix: str, staff: str) -> str:
+        n = sum(1 for e in self._events()
+                if e.get("record") == record
+                and (e.get("payload") or {}).get("owner_staff") == staff) + 1
+        tag = "".join(ch for ch in staff.upper() if ch.isalnum()) or "STAFF"
+        return f"{prefix}-{tag}-{n:06d}"
+
+    # ---- 归属校验 ----
+
+    def _own_customer(self, staff: str, customer_id: str) -> dict[str, Any]:
+        """名下客户；他人客户与不存在的客户抛同一条 NOT_FOUND（同文案）。"""
+        snap = self._master.get_entity(str(customer_id or ""))
+        if snap is None or snap.get("kind") != "customer" or \
+                str((snap.get("payload") or {}).get("sales_rep") or "").strip() != staff:
+            raise TemplateError("NOT_FOUND", f"客户不存在：{customer_id}")
+        return snap
+
+    def _own_lead(self, staff: str, lead_ref: str) -> dict[str, Any]:
+        hit = next((e for e in self._events()
+                    if e.get("record") == "lead" and e.get("ref") == lead_ref), None)
+        if hit is None or \
+                (hit.get("payload") or {}).get("owner_staff") != staff:
+            raise TemplateError("NOT_FOUND", f"线索不存在：{lead_ref}")
+        return hit
+
+    # ---- 线索 ----
+
+    def create_lead(self, staff: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """建线索：`name` 必填；状态只接受 `new`（推进没有车道，不假装有）。"""
+        if not str(staff or "").strip():
+            raise TemplateError("INVALID_ARGUMENT", "缺业务员工号（线索必须归属到人）")
+        name = str((payload or {}).get("name") or "").strip()
+        if not name:
+            raise TemplateError("INVALID_ARGUMENT", "线索名称必填（name）")
+        status = str((payload or {}).get("status") or "new").strip() or "new"
+        if status not in CRM_LEAD_STATUSES:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"线索状态须为 {'/'.join(CRM_LEAD_STATUSES)}，实为 {status!r}")
+        if status != "new":
+            # 只有建线索这一个动作；推进要改状态，而改状态需要一条有页面的车道。
+            # 允许直接建一条 following 线索，等于让调用方跳过那次真实拜访。
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"新建线索只能是 new（本期无线索状态推进车道）：{status}")
+
+        ref = self._next_ref("lead", "LD", staff)
+        created_at = datetime.now(timezone.utc).isoformat()
+        rec = {"name": name, "owner_staff": str(staff),
+               "created_at": created_at,
+               "created_day": created_at[:10]}
+        for key in ("phone", "company", "source", "note"):
+            value = str((payload or {}).get(key) or "").strip()
+            if value:
+                rec[key] = value
+        self._append({"record": "lead", "ref": ref, "event": "created",
+                      "status": "new",
+                      "payload": rec,
+                      "requested_by": f"se:{staff}",
+                      "note": "线索录入（流程记录；不写事件层）"})
+        return {"leadId": ref, "status": "new", "name": name,
+                "owner_staff": str(staff), "created_at": created_at}
+
+    def leads_of(self, staff: str, *, status: str | None = None,
+                 offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        """本人线索池，按创建时刻倒序。"""
+        rows: list[dict[str, Any]] = []
+        for ev in self._events():
+            if ev.get("record") != "lead":
+                continue
+            payload = ev.get("payload") or {}
+            if payload.get("owner_staff") != staff:
+                continue
+            if status and ev.get("status") != status:
+                continue
+            rows.append({
+                "leadId": ev.get("ref"), "status": ev.get("status"),
+                "name": payload.get("name"),
+                "phone": payload.get("phone"),
+                "company": payload.get("company"),
+                "source": payload.get("source"),
+                "note": payload.get("note"),
+                "created_at": payload.get("created_at"),
+            })
+        rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        page = rows[offset: offset + limit]
+        return {"rows": page, "total": len(rows), "offset": offset,
+                "limit": limit, "returned": len(page)}
+
+    # ---- 拜访 ----
+
+    def record_visit(self, staff: str, *, customer_id: str | None = None,
+                     lead_ref: str | None = None, note: str = "",
+                     location: str | None = None) -> dict[str, Any]:
+        """拜访登记：纪要必填；客户/线索主体至少一个；定位只存调用方给的引用。
+
+        定位（design D4）：设备侧采集要隐私声明过审，本类不采集、不推断、不补默认值。
+        给了就原样存进 `location_ref`，没给就连这个键都不写——「没有位置」与
+        「位置未知」在数据上必须可区分。
+        """
+        if not str(staff or "").strip():
+            raise TemplateError("INVALID_ARGUMENT", "缺业务员工号（拜访必须归属到人）")
+        body = str(note or "").strip()
+        if not body:
+            raise TemplateError("INVALID_ARGUMENT",
+                                "拜访纪要必填（这次见了谁、谈了什么）")
+        cust = str(customer_id or "").strip()
+        lead = str(lead_ref or "").strip()
+        if not cust and not lead:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                "拜访须给出客户或线索（customerId / leadRef 至少一个）——"
+                "没有对象的拜访无法归因")
+        if cust:
+            self._own_customer(staff, cust)   # 越域即 404
+        if lead:
+            self._own_lead(staff, lead)
+
+        ref = self._next_ref("visit", "VS", staff)
+        visited_at = datetime.now(timezone.utc).isoformat()
+        payload: dict[str, Any] = {"owner_staff": str(staff), "note": body,
+                                  "visited_at": visited_at,
+                                  "visited_day": visited_at[:10]}
+        if cust:
+            payload["customer_id"] = cust
+        if lead:
+            payload["lead_ref"] = lead
+        loc = str(location or "").strip()
+        if loc:
+            payload["location_ref"] = loc   # 原样存引用；不解析、不补默认
+        self._append({"record": "visit", "ref": ref, "event": "created",
+                      "status": "recorded", "payload": payload,
+                      "requested_by": f"se:{staff}",
+                      "note": "拜访登记（流程记录；定位仅存调用方引用）"})
+        out = {"visitId": ref, "status": "recorded", "note": body,
+               "visited_at": visited_at,
+               "customerId": cust or None, "leadRef": lead or None}
+        if loc:
+            out["location"] = loc
+        return out
+
+    def visits_of(self, staff: str, *, date_from: str | None = None,
+                  date_to: str | None = None, offset: int = 0,
+                  limit: int = 50) -> dict[str, Any]:
+        rows: list[dict[str, Any]] = []
+        for ev in self._events():
+            if ev.get("record") != "visit":
+                continue
+            payload = ev.get("payload") or {}
+            if payload.get("owner_staff") != staff:
+                continue
+            day = str(payload.get("visited_day") or "")
+            if date_from and day < date_from:
+                continue
+            if date_to and day > date_to:
+                continue
+            rows.append({
+                "visitId": ev.get("ref"), "status": ev.get("status"),
+                "note": payload.get("note"),
+                "customerId": payload.get("customer_id"),
+                "leadRef": payload.get("lead_ref"),
+                "location": payload.get("location_ref"),
+                "visited_at": payload.get("visited_at"),
+            })
+        rows.sort(key=lambda r: str(r.get("visited_at") or ""), reverse=True)
+        page = rows[offset: offset + limit]
+        return {"rows": page, "total": len(rows), "offset": offset,
+                "limit": limit, "returned": len(page)}
+
+    def today_visit_count(self, staff: str, day: str) -> int:
+        """工作台「今日拜访」：与 visits_of 同一真源，不另算一遍。"""
+        return sum(1 for ev in self._events()
+                   if ev.get("record") == "visit"
+                   and (ev.get("payload") or {}).get("owner_staff") == staff
+                   and (ev.get("payload") or {}).get("visited_day") == day)

@@ -206,7 +206,7 @@
       "surface": "se"
     },
     {
-      "classification": "模式复用",
+      "classification": "直接命中",
       "domain": "CRM 线索拜访",
       "evidence": [
         {
@@ -227,7 +227,6 @@
         }
       ],
       "id": "FP-C5180255DF",
-      "note": "端点 501 占位（契约在、实现未就绪）：GET /erp/supply-chain/v1/se/visits、POST /erp/supply-chain/v1/se/leads、POST /erp/supply-chain/v1/se/visits",
       "row_status": "覆盖",
       "subdomain": "se-lead-visit",
       "surface": "se"

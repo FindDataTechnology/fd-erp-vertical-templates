@@ -277,11 +277,11 @@
     "available": true,
     "by_capability": {
       "supply-chain.cp": 4,
-      "supply-chain.se": 5,
+      "supply-chain.se": 1,
       "supply-chain.sp": 6,
       "supply-chain.ue": 2
     },
-    "count": 17
+    "count": 13
   },
   "role_bindings": [
     {

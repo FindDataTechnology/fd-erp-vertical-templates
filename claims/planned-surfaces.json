@@ -2,10 +2,10 @@
  "schema": "erp-planned-surfaces-mirror/v1",
  "note": "挂账清单镜像（task 4.3）：真源是兄弟仓 fd-erp-vertical-api/planned-surfaces.json（AST 派生）。本镜像去掉源码行号（行号漂移不是缺口变化）；`claim_gate render --update-planned` 重新生成，`claim_gate check` 逐端点对拍。",
  "source": "/Users/chengsishi/finddata/fd-erp-vertical-api/planned-surfaces.json",
- "count": 17,
+ "count": 13,
  "by_capability": {
   "supply-chain.cp": 4,
-  "supply-chain.se": 5,
+  "supply-chain.se": 1,
   "supply-chain.sp": 6,
   "supply-chain.ue": 2
  },
@@ -47,24 +47,6 @@
    "planned_lane": "运费单 read 面到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道"
   },
   {
-   "method": "GET",
-   "path": "/erp/supply-chain/v1/se/leads",
-   "capability": "supply-chain.se",
-   "domain": "leads",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "CRM 线索/拜访事件档（编排层扩展）+ 底座 chat 面线索助手"
-  },
-  {
-   "method": "POST",
-   "path": "/erp/supply-chain/v1/se/leads",
-   "capability": "supply-chain.se",
-   "domain": "leads",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "CRM 线索/拜访事件档（编排层扩展）"
-  },
-  {
    "method": "POST",
    "path": "/erp/supply-chain/v1/se/statements/{statement_id}/push",
    "capability": "supply-chain.se",
@@ -72,24 +54,6 @@
    "http_status": 501,
    "error_code": "NOT_IMPLEMENTED",
    "planned_lane": "底座端内消息通道（notify 车道）接入后实施推送留痕；客户确认门=UE /ue/statements/{id}/confirm（内核 proposal 车道）"
-  },
-  {
-   "method": "GET",
-   "path": "/erp/supply-chain/v1/se/visits",
-   "capability": "supply-chain.se",
-   "domain": "visits",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "CRM 拜访事件档（编排层扩展）"
-  },
-  {
-   "method": "POST",
-   "path": "/erp/supply-chain/v1/se/visits",
-   "capability": "supply-chain.se",
-   "domain": "visits",
-   "http_status": 501,
-   "error_code": "NOT_IMPLEMENTED",
-   "planned_lane": "CRM 拜访事件档（编排层扩展；定位/影像可选采集随隐私声明过审启用）"
   },
   {
    "method": "GET",
