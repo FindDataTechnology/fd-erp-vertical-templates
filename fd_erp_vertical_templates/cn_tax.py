@@ -36,8 +36,21 @@ TAX_ROOT = "2221"
 VAT_PAYABLE = "2221.01"
 OUTPUT_VAT = "2221.01.01"
 INPUT_VAT = "2221.01.02"
+#: 进项税额转出（change: add-cn-red-letter-and-input-transfer-out）。与 `TRANSFER_OUT`
+#: （2221.01.07 转出**未交**增值税）是两件事：前者把不可抵的进项转出去，后者把应交额转到未交户。
+INPUT_TRANSFER_OUT = "2221.01.04"
 TRANSFER_OUT = "2221.01.07"
 VAT_UNPAID = "2221.02"
+
+#: 进项转出的原因封闭集与默认对方科目。对方科目必须是损益类——转出额的实质是
+#: 「这笔进项变成了费用」，记到资产或负债上会让报表口径失真。
+TRANSFER_OUT_REASONS: dict[str, dict[str, str]] = {
+    "collective-welfare": {"zh": "集体福利或个人消费", "account": "5200"},
+    "abnormal-loss": {"zh": "非正常损失", "account": "5711"},
+    "tax-exempt": {"zh": "免税项目", "account": "5000"},
+    "simplified": {"zh": "简易计税项目", "account": "5000"},
+}
+TRANSFER_OUT_PREFIX = "input-transfer-out:"
 
 #: 本版接的税率档（封闭集）。负数档（加计抵减/差额征税）不做。
 RATES = ("13", "9", "6", "5", "3", "0")
@@ -129,8 +142,8 @@ class CnVatLane:
 
     def account_codes(self) -> dict[str, str]:
         codes = {"root": TAX_ROOT, "vatPayable": VAT_PAYABLE, "output": OUTPUT_VAT,
-                 "input": INPUT_VAT, "transferOut": TRANSFER_OUT,
-                 "unpaid": VAT_UNPAID}
+                 "input": INPUT_VAT, "inputTransferOut": INPUT_TRANSFER_OUT,
+                 "transferOut": TRANSFER_OUT, "unpaid": VAT_UNPAID}
         if self._pack is not None:
             missing = [c for c in codes.values() if self._pack.account(c) is None]
             if missing:
@@ -212,24 +225,115 @@ class CnVatLane:
 
     # ---- 账面口径 ----
 
-    def position(self, period: Any) -> dict[str, Any]:
-        """该期间销项/进项发生额与应纳税额（账面口径，不做任何调整）。"""
-        key = _check_period(period)
-        output = Decimal(0)
-        inputs = Decimal(0)
+    def _period_sums(self, period: str) -> dict[str, Decimal]:
+        """本期三个增值税明细科目的净额（贷正借负，与 `_sums` 同一约定）。
+
+        一个期间只读一遍分录：`position()` 与「可转出额」都要这三个数，
+        分两次读会让两者在并发写入时看到不同快照。
+        """
+        out = {OUTPUT_VAT: Decimal(0), INPUT_VAT: Decimal(0),
+               INPUT_TRANSFER_OUT: Decimal(0)}
         for row in read_entries(self._kernel):
-            if entry_period(row) != key:
+            if entry_period(row) != period:
                 continue
             code = str(row.get("account_code") or "")
+            if code not in out:
+                continue
             amount = _dec(row.get("amount_base") or row.get("amount"), "金额")
-            if code == OUTPUT_VAT:
-                output += amount if row.get("direction") == "credit" else -amount
-            elif code == INPUT_VAT:
-                inputs += amount if row.get("direction") == "debit" else -amount
-        payable = output - inputs
+            out[code] += amount if row.get("direction") == "credit" else -amount
+        return out
+
+    def position(self, period: Any) -> dict[str, Any]:
+        """该期间销项/进项/进项转出与应纳税额（账面口径，不做任何调整）。
+
+        应纳 = 销项 − 进项 **+ 进项转出**。漏掉最后一项，用于集体福利或发生非正常损失的
+        那部分进项就白抵了，而附加税以应纳为基数——少缴会一路传导。
+        """
+        key = _check_period(period)
+        sums = self._period_sums(key)
+        output = sums[OUTPUT_VAT]
+        inputs = -sums[INPUT_VAT]
+        transferred = sums[INPUT_TRANSFER_OUT]
+        payable = output - inputs + transferred
         return {"period": key, "outputVat": _fmt(output), "inputVat": _fmt(inputs),
-                "payable": _fmt(payable),
+                "inputTransferOut": _fmt(transferred), "payable": _fmt(payable),
                 "creditCarryForward": _fmt(-payable) if payable < 0 else "0.00"}
+
+    # ---- 进项税额转出 ----
+
+    def transferable_input(self, period: Any) -> dict[str, Any]:
+        """本期还能转出多少：已抵扣进项 − 已转出。负值不出现（转出超过进项时按 0 报）。"""
+        key = _check_period(period)
+        sums = self._period_sums(key)
+        inputs = -sums[INPUT_VAT]
+        transferred = sums[INPUT_TRANSFER_OUT]
+        remaining = inputs - transferred
+        return {"period": key, "inputVat": _fmt(inputs),
+                "transferred": _fmt(transferred),
+                "remaining": _fmt(remaining if remaining > 0 else Decimal(0)),
+                "overTransferred": (_fmt(-remaining) if remaining < 0 else "0.00")}
+
+    def transfer_input_out(self, period: Any, *, reason: Any, amount: Any, ref: Any,
+                           cost_account: Any = None, booked_on: Any = None,
+                           submitted_by: str = "vat-engine") -> dict[str, Any]:
+        """把已抵扣进项按用途转出：借 <损益科目> / 贷 2221.01.04。
+
+        `reason` 是封闭集；对方科目默认按原因取，可覆盖但必须是损益类。
+        转出额不超过本期可转出额——超出说明"转的不是本期已抵的进项"，期间或金额错了。
+        """
+        key = _check_period(period)
+        tag = str(ref or "").strip()
+        if not tag:
+            raise TemplateError("INVALID_ARGUMENT",
+                                "单据号 ref 不能为空（幂等键就是它）")
+        reason_key = str(reason or "").strip()
+        if reason_key not in TRANSFER_OUT_REASONS:
+            allowed = "、".join(k + "（" + v["zh"] + "）"
+                                for k, v in TRANSFER_OUT_REASONS.items())
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"转出原因 {reason!r} 不在封闭集内：{allowed}",
+                detail={"allowed": list(TRANSFER_OUT_REASONS)})
+        value = _dec(amount, "转出税额")
+        if value <= 0:
+            raise TemplateError("INVALID_ARGUMENT", f"转出税额须大于零：{amount!r}")
+        from .statements import CHART
+        account = str(cost_account or TRANSFER_OUT_REASONS[reason_key]["account"]).strip()
+        kind = CHART.get(account, (None, None))[1]
+        if kind not in ("revenue", "expense"):
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"对方科目 {account} 不是损益类：进项转出的实质是这笔进项变成费用，"
+                "记到资产/负债上会让报表口径失真",
+                detail={"allowed":
+                        [c for c, (_l, k) in CHART.items() if k in ("revenue", "expense")]})
+        room = Decimal(self.transferable_input(key)["remaining"])
+        if value > room:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"转出 {_fmt(value)} 超过本期可转出额 {_fmt(room)}："
+                "只能转本期已抵扣的进项，超出说明期间或金额错了",
+                detail={"period": key, "remaining": _fmt(room),
+                        "requested": _fmt(value)})
+        day = _check_day(booked_on or key, "业务日期")
+        stable_id = f"{TRANSFER_OUT_PREFIX}{tag}"
+        proposal = self._kernel.submit_proposal(
+            stable_id,
+            [{"account_code": account, "direction": "debit",
+              "amount": _fmt(value), "currency": self._base},
+             {"account_code": INPUT_TRANSFER_OUT, "direction": "credit",
+              "amount": _fmt(value), "currency": self._base}],
+            source_ref=stable_id, kind="journal",
+            lane_title=f"{tag} 进项税额转出（{TRANSFER_OUT_REASONS[reason_key]['zh']}）",
+            booked_on=day, submitted_by=submitted_by)
+        return {"period": key, "ref": tag, "reason": reason_key,
+                "reasonZh": TRANSFER_OUT_REASONS[reason_key]["zh"],
+                "costAccount": account, "amount": _fmt(value),
+                "stableId": stable_id, "proposal": proposal, "bookedOn": day,
+                "remainingAfter": _fmt(room - value),
+                "duplicate": bool(proposal and proposal.get("duplicate")),
+                "caliberNote": "已抵扣进项改为不可抵扣用途时转出（增加应纳增值税）；"
+                               "应纳 = 销项 − 进项 + 转出"}
 
     # ---- 月末结转 ----
 
@@ -265,4 +369,5 @@ class CnVatLane:
 
 
 __all__ = ["CnVatLane", "split_tax", "RATES", "OUTPUT_VAT", "INPUT_VAT",
-           "TRANSFER_OUT", "VAT_UNPAID", "TAX_ROOT"]
+           "INPUT_TRANSFER_OUT", "TRANSFER_OUT", "VAT_UNPAID", "TAX_ROOT",
+           "TRANSFER_OUT_REASONS"]

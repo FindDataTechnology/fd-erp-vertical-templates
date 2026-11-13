@@ -35,6 +35,7 @@ _PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 #: 增值税两个明细科目（与 cn_tax 同源；这里只读账，不写账）。
 OUTPUT_VAT = "2221.01.01"
 INPUT_VAT = "2221.01.02"
+INPUT_TRANSFER_OUT = "2221.01.04"   # 进项税额转出（change: add-cn-red-letter-and-input-transfer-out）
 
 
 def _check_period(value: Any) -> str:
@@ -276,6 +277,7 @@ class CnStatements:
         sales = Decimal(0)
         output = Decimal(0)
         inputs = Decimal(0)
+        transferred = Decimal(0)
         for row in rows:
             code = str(row.get("account_code") or "")
             amount = _dec(row.get("amount_base") or row.get("amount"))
@@ -284,10 +286,15 @@ class CnStatements:
                 output += -net
             elif code == INPUT_VAT:
                 inputs += net
+            elif code == INPUT_TRANSFER_OUT:
+                transferred += -net          # 贷方增加应纳
             elif CHART.get(code, (None, None))[1] == "revenue":
                 sales += -net
+        # 应纳 = 销项 − 进项 + 进项转出。转出那一截不进这条式子，用于集体福利/非正常损失的
+        # 进项就白抵了，而附加税的基数正是应纳——少缴会一路传导到附加税。
         ledger = {"sales": sales, "outputVat": output, "inputVat": inputs,
-                  "payable": output - inputs}
+                  "inputTransferOut": transferred,
+                  "payable": output - inputs + transferred}
         if declared is None:
             declared_values = dict(ledger)
             note = "未提供独立申报数：以下「申报口径」即账面口径，勾稽恒成立，不能当作已核对"
@@ -296,12 +303,15 @@ class CnStatements:
                 "sales": _dec(declared.get("sales")),
                 "outputVat": _dec(declared.get("outputVat")),
                 "inputVat": _dec(declared.get("inputVat")),
+                "inputTransferOut": _dec(declared.get("inputTransferOut", 0)),
             }
             declared_values["payable"] = (declared_values["outputVat"]
-                                          - declared_values["inputVat"])
+                                          - declared_values["inputVat"]
+                                          + declared_values["inputTransferOut"])
             note = "申报口径由调用方提供，与账面逐项对比"
         items = [("sales", "销售额"), ("outputVat", "销项税额"),
-                 ("inputVat", "进项税额"), ("payable", "应纳税额")]
+                 ("inputVat", "进项税额"), ("inputTransferOut", "进项税额转出"),
+                 ("payable", "应纳税额")]
         reconciliation = [{"item": k, "label": label,
                            "ledger": _fmt(ledger[k]),
                            "declared": _fmt(declared_values[k]),

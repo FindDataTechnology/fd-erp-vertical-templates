@@ -22,7 +22,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
-from .cn_tax import INPUT_VAT, RATES, CnVatLane, split_tax
+from .cn_tax import INPUT_VAT, OUTPUT_VAT, RATES, CnVatLane, split_tax
 from .dates import entry_period
 from .errors import TemplateError
 from .eventlog import EventLog
@@ -190,6 +190,152 @@ class CnInvoiceBook:
         return {**self.invoice(row["key"]), "duplicate": False,
                 "caliber_note": "认证是人工事实；不可抵票种认证后仍不可抵"}
 
+    # ---- 红字发票（销售退回与折让） ----
+
+    def _red_total(self, original: dict[str, Any]) -> Decimal:
+        """该蓝字票已被冲减的净额（正数）。"""
+        total = Decimal(0)
+        for row in self.invoices():
+            if row.get("red") and row.get("redOf") == original["number"]:
+                total += abs(Decimal(row["net"]))
+        return total
+
+    def register_red(self, direction: Any, kind: Any, number: Any, net: Any, *,
+                     red_of: Any, reason: Any = None, issued_on: Any = None,
+                     submitted_by: str = "owner") -> dict[str, Any]:
+        """登记红字发票冲减蓝字原票。负数记账，原票不动。
+
+        红字票是**独立票据**（自己的号码与开票日期），不是"删原票"：删了就同时丢掉开票事实
+        和「冲减发生在哪一期」。所以这里按负数金额存，申报矩阵与销项合计自然净额。
+
+        进项红字（供应商退回）本版不做：它要同时冲应付、成本与存货，超出本层能算对的范围，
+        显式挂 `NOT_WIRED`，不静默接受。
+        """
+        side = str(direction or "").strip()
+        if side == "purchase":
+            raise TemplateError(
+                "NOT_WIRED",
+                "进项红字（供应商退回）本版不做：它要同时冲减应付、成本与存货，"
+                "台账层算不对。进项侧的不可抵扣用途请走 "
+                "CnVatLane.transfer_input_out；红字冲回车道待接入",
+                detail={"direction": side, "alternative": "CnVatLane.transfer_input_out"})
+        if side not in DIRECTIONS:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"发票方向须为 sale/purchase：{direction!r}",
+                                detail={"allowed": list(DIRECTIONS)})
+        kind_key = str(kind or "").strip()
+        if kind_key not in INVOICE_KINDS:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"票种 {kind!r} 不在封闭集内：{'、'.join(INVOICE_KINDS)}",
+                detail={"allowed": list(INVOICE_KINDS)})
+        num = str(number or "").strip()
+        if not num:
+            raise TemplateError("INVALID_ARGUMENT", "红字发票号码不能为空")
+        orig_num = str(red_of or "").strip()
+        original = self.invoice(orig_num) if orig_num else None
+        if original is None:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"红字票必须引用已登记的蓝字原票：{red_of!r} 在台账里不存在",
+                detail={"redOf": orig_num})
+        if original.get("red"):
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"{original['number']} 本身是红字票，不能再被冲减",
+                                detail={"redOf": orig_num})
+        if original.get("direction") != side or original["invoiceKind"] != kind_key:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"红字票须与原票同方向同票种：原票是 {original['direction']}/"
+                f"{original['invoiceKind']}，本票是 {side}/{kind_key}",
+                detail={"direction": original["direction"],
+                        "invoiceKind": original["invoiceKind"]})
+        magnitude = _dec(net, "红字金额")
+        if magnitude <= 0:
+            raise TemplateError("INVALID_ARGUMENT", f"红字净额须填正数：{net!r}")
+        already = self._red_total(original)
+        room = Decimal(original["net"]) - already
+        if magnitude > room:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"红字冲减 {_fmt(magnitude)} 超过原票剩余可冲额 {_fmt(room)}："
+                f"原票净额 {original['net']}，已冲 {_fmt(already)}",
+                detail={"original": original["number"],
+                        "originalNet": original["net"],
+                        "alreadyRed": _fmt(already), "remaining": _fmt(room)})
+        parts = split_tax(magnitude, original["rate"], gross=False)
+        day = _check_day(issued_on or date.today().isoformat(), "开票日期")
+        key = f"{side}:{kind_key}:{num}"
+        existing = self.invoice(key)
+        if existing is not None:
+            return {**existing, "duplicate": True,
+                    "caliber_note": "同一红字票号已登记，返回首次记录"}
+        rec = {"kind": "invoice", "key": key, "direction": side,
+               "invoiceKind": kind_key, "kindZh": INVOICE_KINDS[kind_key]["zh"],
+               "number": num, "red": True, "redOf": original["number"],
+               "net": _fmt(-Decimal(parts["net"])),
+               "rate": original["rate"], "tax": _fmt(-Decimal(parts["tax"])),
+               "gross": _fmt(-Decimal(parts["gross"])),
+               "counterparty": original.get("counterparty"),
+               "issuedOn": day, "period": day[:7],
+               "redReason": (str(reason).strip() or None),
+               "deductibleKind": bool(INVOICE_KINDS[kind_key]["deductible"]),
+               "certified": False, "submittedBy": str(submitted_by)}
+        self._log.append(rec)
+        return {**rec, "duplicate": False, "remainingAfter": _fmt(room - magnitude),
+                "caliber_note": "红字票是独立票据、负数记账；原票保留，"
+                                "冲减落在本票所属期间"}
+
+    def post_red(self, ref: Any, invoice_number: Any, amount: Any, *,
+                 revenue_account: str = "4000", settle_account: str = "1100",
+                 booked_on: Any = None,
+                 submitted_by: str = "vat-engine") -> dict[str, Any]:
+        """红字销售票过账：借收入 / 借销项 / 贷应收（与 post_sale 逐行反向）。"""
+        row = self.invoice(invoice_number)
+        if row is None:
+            raise TemplateError("NOT_FOUND",
+                                f"红字发票未登记：{invoice_number!r}",
+                                detail={"number": str(invoice_number)})
+        if not row.get("red"):
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"{row['number']} 不是红字票：冲减只能用红字票过账",
+                                detail={"number": row["number"]})
+        if row.get("usedBy"):
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"红字票 {row['number']} 已被凭证 {row['usedBy']} 使用",
+                                detail={"number": row["number"], "usedBy": row["usedBy"]})
+        parts = split_tax(amount, row["rate"], gross=True)
+        if Decimal(parts["gross"]) != abs(Decimal(row["gross"])):
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"过账金额 {parts['gross']} 与红字票面 {abs(Decimal(row['gross']))} 不一致："
+                "冲减不能按另一个金额做",
+                detail={"invoiceGross": abs(Decimal(row["gross"])),
+                        "postingGross": parts["gross"]})
+        day = _check_day(booked_on or date.today().isoformat(), "业务日期")
+        stable_id = f"vat-red:{row['number']}"
+        lines = [{"account_code": revenue_account, "direction": "debit",
+                  "amount": parts["net"], "currency": self._base},
+                 {"account_code": settle_account, "direction": "credit",
+                  "amount": parts["gross"], "currency": self._base}]
+        if Decimal(parts["tax"]) > 0:
+            lines.insert(1, {"account_code": OUTPUT_VAT, "direction": "debit",
+                             "amount": parts["tax"], "currency": self._base})
+        proposal = self._kernel.submit_proposal(
+            stable_id, lines, source_ref=stable_id, kind="journal",
+            lane_title=f"{row['number']} 销售红字冲减", booked_on=day,
+            submitted_by=submitted_by)
+        if not proposal.get("duplicate"):
+            self._log.append({"kind": "usage", "key": row["key"],
+                              "number": row["number"], "usedBy": stable_id,
+                              "ref": str(ref), "deductible": False})
+        return {"ref": str(ref), "invoice": row["number"], "redOf": row.get("redOf"),
+                "net": parts["net"], "tax": parts["tax"], "gross": parts["gross"],
+                "proposal": proposal, "stableId": stable_id, "bookedOn": day,
+                "duplicate": bool(proposal.get("duplicate")),
+                "caliber_note": "红字冲减出反向分录：借收入、借销项、贷应收；"
+                                "只出待确认提案"}
+
     # ---- 抵扣资格 ----
 
     @staticmethod
@@ -273,12 +419,22 @@ class CnInvoiceBook:
     # ---- 申报口径 ----
 
     def filing_summary(self, period: Any) -> dict[str, Any]:
-        """销项「税率 × 票种」矩阵 + 进项三档（申报表附列资料一的形状）。"""
+        """销项「税率 × 票种」矩阵 + 进项三档（申报表附列资料一的形状）。
+
+        红字票以负数进矩阵并单独计数：矩阵是**净额**，但"开了几张红票、冲了多少"必须看得见——
+        只看净额，一张 100 的蓝票加一张 100 的红票会被读成"本月没开票"。
+        """
         key = _check_period(period)
         matrix: dict[str, dict[str, Decimal]] = {}
+        red_count = 0
+        red_net = red_tax = Decimal(0)
         for row in self.invoices(direction="sale"):
             if row.get("period") != key:
                 continue
+            if row.get("red"):
+                red_count += 1
+                red_net += Decimal(row["net"])
+                red_tax += Decimal(row["tax"])
             bucket = matrix.setdefault(str(row["rate"]), {})
             for kind_key in INVOICE_KINDS:
                 bucket.setdefault(kind_key, Decimal(0))
@@ -292,14 +448,19 @@ class CnInvoiceBook:
                 rows = [r for r in self.invoices(direction="sale")
                         if r.get("period") == key and str(r["rate"]) == rate
                         and r["invoiceKind"] == kind_key]
+                blue = [r for r in rows if not r.get("red")]
                 sales.append({
                     "rate": rate, "invoiceKind": kind_key,
                     "kindZh": INVOICE_KINDS[kind_key]["zh"],
                     "sales": _fmt(sum((Decimal(r["net"]) for r in rows), Decimal(0))),
-                    "tax": _fmt(amount), "count": len(rows)})
+                    "tax": _fmt(amount), "count": len(blue),
+                    "redCount": len(rows) - len(blue)})
         return {"period": key, "salesByRateAndKind": sales,
+                "redLetters": {"count": red_count, "net": _fmt(red_net),
+                               "tax": _fmt(red_tax)},
                 "inputDeduction": self.deduction(key),
-                "caliberNote": "销项按「税率 × 票种」分列（对应申报表附列资料一）；"
+                "caliberNote": "销项按「税率 × 票种」分列（对应申报表附列资料一），"
+                               "红字票以负数净额并单独计数；"
                                "进项按可抵/待认证/不可抵三档"}
 
     def reconcile(self, period: Any) -> dict[str, Any]:

@@ -196,3 +196,102 @@ def test_credit_carry_forward_is_a_noop():
 def test_close_requires_a_valid_period():
     with pytest.raises(TemplateError):
         _lane().close_vat("2026/11")
+
+
+# ---- 6) 进项税额转出（change: add-cn-red-letter-and-input-transfer-out）----
+
+def _with_entries(rows: list[dict], kernel=None) -> CnVatLane:
+    k = kernel or _StubKernel()
+    k.entries = list(rows)
+    return _lane(k)
+
+
+def _row(code, direction, amount, when=PERIOD + "-10"):
+    return {"account_code": code, "direction": direction, "amount": amount,
+            "amount_base": amount, "booked_on": when,
+            "txn_id": f"t-{code}-{direction}-{when}", "line_no": 1}
+
+
+def _month(output="130", inputs="65") -> list[dict]:
+    """销项 130 / 进项 65 → 应纳 65。"""
+    return [_row(OUTPUT_VAT, "credit", output), _row(INPUT_VAT, "debit", inputs)]
+
+
+def test_transfer_out_raises_payable_and_names_the_reason():
+    kernel = _StubKernel()
+    lane = _with_entries(_month(), kernel)
+    out = lane.transfer_input_out(
+        PERIOD, reason="collective-welfare", amount="13", ref="W-1")
+    assert out["reasonZh"] == "集体福利或个人消费"
+    assert out["costAccount"] == "5200"
+    assert _lines(kernel.submitted[0]) == {
+        ("5200", "debit"): "13.00", ("2221.01.04", "credit"): "13.00"}
+    assert out["remainingAfter"] == "52.00"
+
+
+def test_position_includes_the_transfer_out():
+    lane = _with_entries(_month() + [_row("2221.01.04", "credit", "13")])
+    pos = lane.position(PERIOD)
+    assert pos["outputVat"] == "130.00" and pos["inputVat"] == "65.00"
+    assert pos["inputTransferOut"] == "13.00"
+    assert pos["payable"] == "78.00"          # 65 + 13，不是 65
+
+
+def test_transferring_more_than_deducted_is_refused_with_the_room():
+    lane = _with_entries(_month())
+    with pytest.raises(TemplateError) as ei:
+        lane.transfer_input_out(PERIOD, reason="abnormal-loss", amount="100",
+                                ref="W-2")
+    assert ei.value.detail["remaining"] == "65.00"
+    assert "超过本期可转出额" in ei.value.message
+
+
+def test_transfer_out_is_idempotent_per_reference():
+    kernel = _StubKernel()
+    lane = _with_entries(_month(), kernel)
+    first = lane.transfer_input_out(PERIOD, reason="tax-exempt", amount="5",
+                                    ref="W-3")
+    again = lane.transfer_input_out(PERIOD, reason="tax-exempt", amount="5",
+                                    ref="W-3")
+    assert first["duplicate"] is False and again["duplicate"] is True
+    assert len(kernel.submitted) == 1
+
+
+def test_transfer_out_refuses_a_non_profit_and_loss_counterparty():
+    lane = _with_entries(_month())
+    with pytest.raises(TemplateError) as ei:
+        lane.transfer_input_out(PERIOD, reason="abnormal-loss", amount="5",
+                                ref="W-4", cost_account="1200")
+    assert "不是损益类" in ei.value.message
+    assert "5200" in ei.value.detail["allowed"]
+
+
+def test_transfer_out_refuses_an_unknown_reason():
+    lane = _with_entries(_month())
+    with pytest.raises(TemplateError) as ei:
+        lane.transfer_input_out(PERIOD, reason="办公室喝水", amount="5", ref="W-5")
+    assert set(ei.value.detail["allowed"]) == {
+        "collective-welfare", "abnormal-loss", "tax-exempt", "simplified"}
+
+
+def test_transfer_out_consumes_the_room_across_documents():
+    """两张单合计不能超过本期进项：第一张 60、第二张 10 拒（只剩 5）。"""
+    kernel = _StubKernel()
+    lane = _with_entries(_month(), kernel)
+    lane.transfer_input_out(PERIOD, reason="abnormal-loss", amount="60", ref="W-6")
+    kernel.entries.append(_row("2221.01.04", "credit", "60"))
+    with pytest.raises(TemplateError) as ei:
+        lane.transfer_input_out(PERIOD, reason="abnormal-loss", amount="10",
+                                ref="W-7")
+    assert ei.value.detail["remaining"] == "5.00"
+
+
+def test_close_vat_follows_the_new_caliber():
+    """留抵月转出后变成应纳：结转必须按「销项 − 进项 + 转出」出提案。"""
+    kernel = _StubKernel()
+    lane = _with_entries(_month(output="40", inputs="100")
+                         + [_row("2221.01.04", "credit", "70")], kernel)
+    out = lane.close_vat(PERIOD)
+    assert out["payable"] == "10.00"          # 40 − 100 + 70
+    assert _lines(kernel.submitted[0]) == {
+        ("2221.01.07", "debit"): "10.00", ("2221.02", "credit"): "10.00"}

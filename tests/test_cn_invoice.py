@@ -262,3 +262,107 @@ def test_vat_return_carries_the_three_input_tiers(tmp_path):
                                  "nonDeductible": "13.00"}
     assert out["invoiceReconcile"]["consistent"] is False      # 账上还没有进项分录
     assert out["invoiceReconcile"]["difference"] == "-13.00"
+
+
+# ---- 7) 红字发票（change: add-cn-red-letter-and-input-transfer-out）----
+
+def _blue_sale(book, number="A-1", net="100", rate="13"):
+    return book.register("sale", "vat-special", number, net, rate=rate,
+                         issued_on="2026-11-05", counterparty="C-A")
+
+
+def test_a_red_letter_is_a_negative_record_that_keeps_the_original(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    out = book.register_red("sale", "vat-special", "R-1", "30", red_of="A-1",
+                            reason="退货", issued_on="2026-11-20")
+    assert out["red"] is True and out["redOf"] == "A-1"
+    assert (out["net"], out["tax"], out["gross"]) == ("-30.00", "-3.90", "-33.90")
+    assert out["remainingAfter"] == "70.00"
+    assert book.invoice("A-1")["net"] == "100.00"      # 原票不动
+
+
+def test_red_letters_net_out_the_sales_matrix(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    book.register_red("sale", "vat-special", "R-1", "30", red_of="A-1",
+                      issued_on="2026-11-20")
+    out = book.filing_summary(PERIOD)
+    row = next(r for r in out["salesByRateAndKind"] if r["invoiceKind"] == "vat-special")
+    assert (row["sales"], row["tax"]) == ("70.00", "9.10")
+    assert row["count"] == 1 and row["redCount"] == 1
+    assert out["redLetters"] == {"count": 1, "net": "-30.00", "tax": "-3.90"}
+
+
+def test_cumulative_red_cannot_exceed_the_original(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    book.register_red("sale", "vat-special", "R-1", "30", red_of="A-1",
+                      issued_on="2026-11-20")
+    book.register_red("sale", "vat-special", "R-2", "30", red_of="A-1",
+                      issued_on="2026-11-21")
+    with pytest.raises(TemplateError) as ei:
+        book.register_red("sale", "vat-special", "R-3", "50", red_of="A-1",
+                          issued_on="2026-11-22")
+    assert ei.value.detail["remaining"] == "40.00"
+
+
+def test_a_red_letter_needs_an_existing_blue_original(tmp_path):
+    with pytest.raises(TemplateError) as ei:
+        _book(tmp_path).register_red("sale", "vat-special", "R-9", "10",
+                                     red_of="不存在")
+    assert ei.value.detail["redOf"] == "不存在"
+
+
+def test_a_red_letter_must_match_the_original_kind_and_direction(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    with pytest.raises(TemplateError) as ei:
+        book.register_red("sale", "vat-general", "R-2", "10", red_of="A-1")
+    assert "同方向同票种" in ei.value.message
+
+
+def test_purchase_red_letters_are_explicitly_not_wired(tmp_path):
+    """进项红字要同时冲应付、成本与存货：本层算不对，显式挂账而不是默默算错。"""
+    book = _book(tmp_path)
+    _register(book, number="S-9")
+    with pytest.raises(TemplateError) as ei:
+        book.register_red("purchase", "vat-special", "R-P1", "10", red_of="S-9")
+    assert ei.value.code == "NOT_WIRED"
+    assert "transfer_input_out" in ei.value.message
+    # 没有落任何台账记录
+    assert book.invoice("R-P1") is None
+
+
+def test_posting_a_red_letter_is_the_reverse_entry(tmp_path):
+    kernel = _StubKernel()
+    book = _book(tmp_path, kernel)
+    _blue_sale(book)
+    book.register_red("sale", "vat-special", "R-1", "100", red_of="A-1",
+                      issued_on="2026-11-20")
+    out = book.post_red("B-R1", "R-1", "113", booked_on="2026-11-20")
+    assert _lines(kernel.submitted[0]) == {("4000", "debit"): "100.00",
+                                           ("2221.01.01", "debit"): "13.00",
+                                           ("1100", "credit"): "113.00"}
+    assert out["redOf"] == "A-1"
+
+
+def test_posting_a_red_letter_twice_is_refused(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    book.register_red("sale", "vat-special", "R-1", "100", red_of="A-1",
+                      issued_on="2026-11-20")
+    book.post_red("B-R1", "R-1", "113", booked_on="2026-11-20")
+    with pytest.raises(TemplateError) as ei:
+        book.post_red("B-R2", "R-1", "113", booked_on="2026-11-21")
+    assert "已被凭证" in ei.value.message
+
+
+def test_posting_a_red_letter_with_a_different_amount_is_refused(tmp_path):
+    book = _book(tmp_path)
+    _blue_sale(book)
+    book.register_red("sale", "vat-special", "R-1", "100", red_of="A-1",
+                      issued_on="2026-11-20")
+    with pytest.raises(TemplateError) as ei:
+        book.post_red("B-R1", "R-1", "100", booked_on="2026-11-20")
+    assert "不一致" in ei.value.message

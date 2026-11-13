@@ -168,7 +168,8 @@ def test_vat_return_without_a_declaration_says_it_did_not_reconcile():
     assert out["provided"] is False
     assert "未提供独立申报数" in out["caliberNote"]
     assert out["ledger"] == {"sales": "100.00", "outputVat": "13.00",
-                             "inputVat": "13.00", "payable": "0.00"}
+                             "inputVat": "13.00", "inputTransferOut": "0.00",
+                             "payable": "0.00"}
     assert out["consistent"] is True
 
 
