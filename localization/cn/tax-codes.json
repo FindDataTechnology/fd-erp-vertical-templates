@@ -1,0 +1,564 @@
+{
+ "source": "odoo/addons/l10n_cn",
+ "count": 62,
+ "codes": [
+  {
+   "id": "l10n_cn_tax_sales_13_G_S",
+   "name": "13% 货 专票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 货物及加工修理修配劳务 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_13_G_O",
+   "name": "13% 货 其他票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 货物及加工修理修配劳务 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_13_G_N",
+   "name": "13% 货 无票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 货物及加工修理修配劳务 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_13_S_S",
+   "name": "13% 服 专票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 服务、不动产和无形资产 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_13_S_O",
+   "name": "13% 服 其他票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 服务、不动产和无形资产 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_13_S_N",
+   "name": "13% 服 无票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "13",
+   "description": "13%税率 - 服务、不动产和无形资产 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_G_S",
+   "name": "9% 货 专票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 货物及加工修理修配劳务 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_G_O",
+   "name": "9% 货 其他票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 货物及加工修理修配劳务 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_G_N",
+   "name": "9% 货 无票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 货物及加工修理修配劳务 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_S_S",
+   "name": "9% 服 专票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 服务、不动产和无形资产 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_S_O",
+   "name": "9% 服 其他票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 服务、不动产和无形资产 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_9_S_N",
+   "name": "9% 服 无票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "9",
+   "description": "9%税率 - 服务、不动产和无形资产 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_6_S",
+   "name": "6% 专票",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "6",
+   "description": "6%税率 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_6_O",
+   "name": "6% 其他票",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "6",
+   "description": "6%税率 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_6_N",
+   "name": "6% 无票",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "6",
+   "description": "6%税率 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_5_S_S",
+   "name": "5% 服 专票",
+   "rate": "5",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "5",
+   "description": "5%征收率 - 服务、不动产和无形资产 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_5_S_O",
+   "name": "5% 服 其他票",
+   "rate": "5",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "5",
+   "description": "5%征收率 - 服务、不动产和无形资产 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_5_S_N",
+   "name": "5% 服 无票",
+   "rate": "5",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "5",
+   "description": "5%征收率 - 服务、不动产和无形资产 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_G_S",
+   "name": "3% 货 专票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 货物及加工修理修配劳务 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_G_O",
+   "name": "3% 货 其他票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 货物及加工修理修配劳务 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_G_N",
+   "name": "3% 货 无票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 货物及加工修理修配劳务 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_S_S",
+   "name": "3% 服 专票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 服务、不动产和无形资产 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_S_O",
+   "name": "3% 服 其他票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 服务、不动产和无形资产 - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_S_N",
+   "name": "3% 服 无票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "3",
+   "description": "3%征收率 - 服务、不动产和无形资产 - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ECR_G_O",
+   "name": "0% 免抵退 货 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免抵退 - 货物及加工修理修配劳务  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ECR_G_N",
+   "name": "0% 免抵退 货 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免抵退 - 货物及加工修理修配劳务  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ECR_S_O",
+   "name": "0% 免抵退 服 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免抵退 - 服务、不动产和无形资产  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ECR_S_N",
+   "name": "0% 免抵退 服 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免抵退 - 服务、不动产和无形资产  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_E_G_S",
+   "name": "免税 货 专票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "exempt",
+   "description": "免税 - 货物及加工修理修配劳务  - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_E_G_O",
+   "name": "免税 货 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "exempt",
+   "description": "免税 - 货物及加工修理修配劳务  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_E_G_N",
+   "name": "免税 货 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "exempt",
+   "description": "免税 - 货物及加工修理修配劳务  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_E_S_O",
+   "name": "免税 服 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "exempt",
+   "description": "免税 - 服务、不动产和无形资产  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_E_S_N",
+   "name": "免税 服 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "exempt",
+   "description": "免税 - 服务、不动产和无形资产  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ER_G_S",
+   "name": "0% 免退税 货 专票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免退税 - 货物及加工修理修配劳务  - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ER_G_O",
+   "name": "0% 免退税 货 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免退税 - 货物及加工修理修配劳务  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ER_G_N",
+   "name": "0% 免退税 货 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免退税 - 货物及加工修理修配劳务  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ER_S_O",
+   "name": "0% 免退税 服 其他票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免退税 - 服务、不动产和无形资产  - 增值税其他发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_0_ER_S_N",
+   "name": "0% 免退税 服 无票",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "sale",
+   "group": "0",
+   "description": "0% 免退税 - 服务、不动产和无形资产  - 未开具发票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_R_2",
+   "name": "3% 减按 2%",
+   "rate": "",
+   "amountType": "group",
+   "use": "sale",
+   "group": null,
+   "description": "3% 征收率减按 2% - 货物 - 普票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_R_1",
+   "name": "3% 减按 1%",
+   "rate": "",
+   "amountType": "group",
+   "use": "sale",
+   "group": null,
+   "description": "3% 征收率减按 1% - 货物 - 普票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_3_R_1_5",
+   "name": "3% 减按 1.5%",
+   "rate": "",
+   "amountType": "group",
+   "use": "sale",
+   "group": null,
+   "description": "3% 征收率减按 1.5% - 服务 - 普票"
+  },
+  {
+   "id": "l10n_cn_tax_sales_2_R",
+   "name": "2% 减免",
+   "rate": "-2",
+   "amountType": "percent",
+   "use": "none",
+   "group": "3",
+   "description": "2% 减免"
+  },
+  {
+   "id": "l10n_cn_tax_sales_1_5_R",
+   "name": "1.5% 减免",
+   "rate": "-1.5",
+   "amountType": "percent",
+   "use": "none",
+   "group": "3",
+   "description": "1.5% 减免"
+  },
+  {
+   "id": "l10n_cn_tax_sales_1_R",
+   "name": "1% 减免",
+   "rate": "-1",
+   "amountType": "percent",
+   "use": "none",
+   "group": "3",
+   "description": "1% 减免"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_13_I_S",
+   "name": "13% 进项抵扣 专票",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "13",
+   "description": "13%税率 - 进项税抵扣 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_9_I_S",
+   "name": "9% 进项抵扣 专票",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "9",
+   "description": "9%税率 - 进项税抵扣 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_6_I_S",
+   "name": "6% 进项抵扣 专票",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "6",
+   "description": "6%税率 - 进项税抵扣 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_5_I_S",
+   "name": "5% 进项抵扣 专票",
+   "rate": "5",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "5",
+   "description": "5%征收率 - 进项税抵扣 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_3_I_S",
+   "name": "3% 进项抵扣 专票",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "3",
+   "description": "3%征收率 - 进项税抵扣 - 增值税专用发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_13_I_C",
+   "name": "13% 进项抵扣 海关",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "13",
+   "description": "13%税率 - 进项税抵扣 - 海关进口增值税专用缴款书"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_9_I_C",
+   "name": "9% 进项抵扣 海关",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "9",
+   "description": "9%税率 - 进项税抵扣 - 海关进口增值税专用缴款书"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_9_I_A",
+   "name": "9% 进项抵扣 农产品",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "9",
+   "description": "9%税率 - 进项税抵扣 - 农产品收购发票或者销售发票"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_13_I_W",
+   "name": "13% 进项抵扣 代扣代缴",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "13",
+   "description": "13%税率 - 进项税抵扣 - 代扣代缴税收缴款凭证"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_9_I_W",
+   "name": "9% 进项抵扣 代扣代缴",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "9",
+   "description": "9%税率 - 进项税抵扣 - 代扣代缴税收缴款凭证"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_6_I_W",
+   "name": "6% 进项抵扣 代扣代缴",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "6",
+   "description": "6%税率 - 进项税抵扣 - 代扣代缴税收缴款凭证"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_13_I_ND",
+   "name": "13% 进项不可抵扣",
+   "rate": "13",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "13",
+   "description": "13%税率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_9_I_ND",
+   "name": "9% 进项不可抵扣",
+   "rate": "9",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "9",
+   "description": "9%税率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_6_I_ND",
+   "name": "6% 进项不可抵扣",
+   "rate": "6",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "6",
+   "description": "6%税率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_5_I_ND",
+   "name": "5% 进项不可抵扣",
+   "rate": "5",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "5",
+   "description": "5%征收率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_3_I_ND",
+   "name": "3% 进项不可抵扣",
+   "rate": "3",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "3",
+   "description": "3%征收率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_0_I_ND",
+   "name": "0% 进项不可抵扣",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "0",
+   "description": "零税率 - 进项税不可抵扣"
+  },
+  {
+   "id": "l10n_cn_tax_purchase_E_I_ND",
+   "name": "免税 进项不可抵扣",
+   "rate": "0",
+   "amountType": "percent",
+   "use": "purchase",
+   "group": "exempt",
+   "description": "免税 - 进项税不可抵扣"
+  }
+ ]
+}

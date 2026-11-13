@@ -70,6 +70,7 @@ python3 scripts/entry_matrix.py --check                    # 未发布入口不�
 python3 scripts/market_submission.py --check               # 四语齐全 + tags 同长 + 版本新鲜
 python3 scripts/build_connector_status.py --check          # 对接三态证据链与派生文件一致
 python3 scripts/claim_gate.py check                        # 对外声明不得越界（另一线，只读调用）
+python3 scripts/check_cn_localization.py                   # 国别映射覆盖：内核科目→准则科目→报表项目全覆盖，两张 CHART 不分叉
 python3 scripts/release_readiness.py --write               # 刷新 releases/READINESS.md（派生件，非门）
 
 # 测试级（两组都已在 check_all 里）

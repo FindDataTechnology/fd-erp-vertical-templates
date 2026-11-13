@@ -1,0 +1,514 @@
+{
+ "schema": "fd-erp-vertical-templates/localization/cn/statements/v1",
+ "chart": "cn-small-business",
+ "note": "《小企业会计准则》报表项目（会小企 01/02 表）。每个项目由准则科目码规则聚合：codes 是全码或前缀（前缀匹配整棵子树），sign 是该项目的符号。合计行由 subtotal_of 指向前面的明细行，不重复取科目。",
+ "balanceSheet": {
+  "assets": [
+   {
+    "key": "cash",
+    "label": "货币资金",
+    "codes": [
+     "1001",
+     "1002",
+     "1004",
+     "1012"
+    ]
+   },
+   {
+    "key": "short_investment",
+    "label": "短期投资",
+    "codes": [
+     "1101"
+    ]
+   },
+   {
+    "key": "notes_receivable",
+    "label": "应收票据",
+    "codes": [
+     "1121"
+    ]
+   },
+   {
+    "key": "accounts_receivable",
+    "label": "应收账款",
+    "codes": [
+     "1122"
+    ]
+   },
+   {
+    "key": "prepayments",
+    "label": "预付账款",
+    "codes": [
+     "1123"
+    ]
+   },
+   {
+    "key": "dividends_receivable",
+    "label": "应收股利",
+    "codes": [
+     "1131"
+    ]
+   },
+   {
+    "key": "interest_receivable",
+    "label": "应收利息",
+    "codes": [
+     "1132"
+    ]
+   },
+   {
+    "key": "other_receivables",
+    "label": "其他应收款",
+    "codes": [
+     "1221"
+    ]
+   },
+   {
+    "key": "inventory",
+    "label": "存货",
+    "codes": [
+     "1401",
+     "1402",
+     "1403",
+     "1404",
+     "1405",
+     "1407",
+     "1408",
+     "1411",
+     "1421",
+     "4001"
+    ]
+   },
+   {
+    "key": "other_current_assets",
+    "label": "其他流动资产",
+    "codes": [
+     "1231",
+     "1901"
+    ]
+   },
+   {
+    "key": "total_current_assets",
+    "label": "流动资产合计",
+    "subtotal_of": [
+     "cash",
+     "short_investment",
+     "notes_receivable",
+     "accounts_receivable",
+     "prepayments",
+     "dividends_receivable",
+     "interest_receivable",
+     "other_receivables",
+     "inventory",
+     "other_current_assets"
+    ]
+   },
+   {
+    "key": "long_bond_investment",
+    "label": "长期债券投资",
+    "codes": [
+     "1501"
+    ]
+   },
+   {
+    "key": "long_equity_investment",
+    "label": "长期股权投资",
+    "codes": [
+     "1511"
+    ]
+   },
+   {
+    "key": "fixed_assets_cost",
+    "label": "固定资产原价",
+    "codes": [
+     "1601"
+    ]
+   },
+   {
+    "key": "accumulated_depreciation",
+    "label": "减：累计折旧",
+    "codes": [
+     "1602"
+    ],
+    "sign": -1
+   },
+   {
+    "key": "fixed_assets_net",
+    "label": "固定资产账面价值",
+    "subtotal_of": [
+     "fixed_assets_cost",
+     "accumulated_depreciation"
+    ]
+   },
+   {
+    "key": "construction_in_progress",
+    "label": "在建工程",
+    "codes": [
+     "1604"
+    ]
+   },
+   {
+    "key": "construction_materials",
+    "label": "工程物资",
+    "codes": [
+     "1605"
+    ]
+   },
+   {
+    "key": "fixed_assets_disposal",
+    "label": "固定资产清理",
+    "codes": [
+     "1606"
+    ]
+   },
+   {
+    "key": "productive_biology",
+    "label": "生产性生物资产",
+    "codes": [
+     "1621",
+     "1622"
+    ]
+   },
+   {
+    "key": "intangible_assets",
+    "label": "无形资产",
+    "codes": [
+     "1701",
+     "1702"
+    ]
+   },
+   {
+    "key": "development_cost",
+    "label": "开发支出",
+    "codes": [
+     "1802"
+    ]
+   },
+   {
+    "key": "long_prepaid",
+    "label": "长期待摊费用",
+    "codes": [
+     "1801"
+    ]
+   },
+   {
+    "key": "total_noncurrent_assets",
+    "label": "非流动资产合计",
+    "subtotal_of": [
+     "long_bond_investment",
+     "long_equity_investment",
+     "fixed_assets_net",
+     "construction_in_progress",
+     "construction_materials",
+     "fixed_assets_disposal",
+     "productive_biology",
+     "intangible_assets",
+     "development_cost",
+     "long_prepaid"
+    ]
+   },
+   {
+    "key": "total_assets",
+    "label": "资产总计",
+    "subtotal_of": [
+     "total_current_assets",
+     "total_noncurrent_assets"
+    ]
+   }
+  ],
+  "liabilities": [
+   {
+    "key": "short_term_loan",
+    "label": "短期借款",
+    "codes": [
+     "2001"
+    ]
+   },
+   {
+    "key": "notes_payable",
+    "label": "应付票据",
+    "codes": [
+     "2201"
+    ]
+   },
+   {
+    "key": "accounts_payable",
+    "label": "应付账款",
+    "codes": [
+     "2202"
+    ]
+   },
+   {
+    "key": "advance_receipts",
+    "label": "预收账款",
+    "codes": [
+     "2203"
+    ]
+   },
+   {
+    "key": "payroll_payable",
+    "label": "应付职工薪酬",
+    "codes": [
+     "2211"
+    ]
+   },
+   {
+    "key": "taxes_payable",
+    "label": "应交税费",
+    "codes": [
+     "2221"
+    ]
+   },
+   {
+    "key": "interest_payable",
+    "label": "应付利息",
+    "codes": [
+     "2231"
+    ]
+   },
+   {
+    "key": "dividends_payable",
+    "label": "应付利润",
+    "codes": [
+     "2232"
+    ]
+   },
+   {
+    "key": "other_payables",
+    "label": "其他应付款",
+    "codes": [
+     "2241"
+    ]
+   },
+   {
+    "key": "other_current_liabilities",
+    "label": "其他流动负债",
+    "codes": [
+     "2301",
+     "1003"
+    ]
+   },
+   {
+    "key": "total_current_liabilities",
+    "label": "流动负债合计",
+    "subtotal_of": [
+     "short_term_loan",
+     "notes_payable",
+     "accounts_payable",
+     "advance_receipts",
+     "payroll_payable",
+     "taxes_payable",
+     "interest_payable",
+     "dividends_payable",
+     "other_payables",
+     "other_current_liabilities"
+    ]
+   },
+   {
+    "key": "long_term_loan",
+    "label": "长期借款",
+    "codes": [
+     "2501"
+    ]
+   },
+   {
+    "key": "long_term_payables",
+    "label": "长期应付款",
+    "codes": [
+     "2701"
+    ]
+   },
+   {
+    "key": "deferred_income",
+    "label": "递延收益",
+    "codes": [
+     "2401"
+    ]
+   },
+   {
+    "key": "other_noncurrent_liabilities",
+    "label": "其他非流动负债",
+    "codes": [
+     "2801"
+    ]
+   },
+   {
+    "key": "total_noncurrent_liabilities",
+    "label": "非流动负债合计",
+    "subtotal_of": [
+     "long_term_loan",
+     "long_term_payables",
+     "deferred_income",
+     "other_noncurrent_liabilities"
+    ]
+   },
+   {
+    "key": "total_liabilities",
+    "label": "负债合计",
+    "subtotal_of": [
+     "total_current_liabilities",
+     "total_noncurrent_liabilities"
+    ]
+   }
+  ],
+  "equity": [
+   {
+    "key": "paid_in_capital",
+    "label": "实收资本",
+    "codes": [
+     "3001"
+    ]
+   },
+   {
+    "key": "capital_reserve",
+    "label": "资本公积",
+    "codes": [
+     "3002"
+    ]
+   },
+   {
+    "key": "surplus_reserve",
+    "label": "盈余公积",
+    "codes": [
+     "3101"
+    ]
+   },
+   {
+    "key": "retained_earnings",
+    "label": "未分配利润",
+    "codes": [
+     "3103",
+     "3104"
+    ]
+   },
+   {
+    "key": "__unclosed__",
+    "label": "其中：未结转损益",
+    "unclosed": true
+   },
+   {
+    "key": "total_equity",
+    "label": "所有者权益合计",
+    "subtotal_of": [
+     "paid_in_capital",
+     "capital_reserve",
+     "surplus_reserve",
+     "retained_earnings",
+     "__unclosed__"
+    ]
+   },
+   {
+    "key": "total_liabilities_equity",
+    "label": "负债和所有者权益总计",
+    "subtotal_of": [
+     "total_liabilities",
+     "total_equity"
+    ]
+   }
+  ]
+ },
+ "incomeStatement": [
+  {
+   "key": "revenue",
+   "label": "一、营业收入",
+   "codes": [
+    "5001",
+    "5051"
+   ]
+  },
+  {
+   "key": "cost_of_sales",
+   "label": "减：营业成本",
+   "codes": [
+    "5401",
+    "5402"
+   ]
+  },
+  {
+   "key": "taxes_and_surcharges",
+   "label": "税金及附加",
+   "codes": [
+    "5403"
+   ]
+  },
+  {
+   "key": "selling_expenses",
+   "label": "销售费用",
+   "codes": [
+    "5601"
+   ]
+  },
+  {
+   "key": "admin_expenses",
+   "label": "管理费用",
+   "codes": [
+    "5602"
+   ]
+  },
+  {
+   "key": "finance_expenses",
+   "label": "财务费用",
+   "codes": [
+    "5603"
+   ]
+  },
+  {
+   "key": "investment_income",
+   "label": "加：投资收益",
+   "codes": [
+    "5111"
+   ]
+  },
+  {
+   "key": "operating_profit",
+   "label": "二、营业利润",
+   "formula": [
+    "revenue",
+    "-cost_of_sales",
+    "-taxes_and_surcharges",
+    "-selling_expenses",
+    "-admin_expenses",
+    "-finance_expenses",
+    "+investment_income"
+   ]
+  },
+  {
+   "key": "nonoperating_income",
+   "label": "加：营业外收入",
+   "codes": [
+    "5301"
+   ]
+  },
+  {
+   "key": "nonoperating_expense",
+   "label": "减：营业外支出",
+   "codes": [
+    "5711"
+   ]
+  },
+  {
+   "key": "total_profit",
+   "label": "三、利润总额",
+   "formula": [
+    "operating_profit",
+    "+nonoperating_income",
+    "-nonoperating_expense"
+   ]
+  },
+  {
+   "key": "income_tax",
+   "label": "减：所得税费用",
+   "codes": [
+    "5801"
+   ]
+  },
+  {
+   "key": "net_profit",
+   "label": "四、净利润",
+   "formula": [
+    "total_profit",
+    "-income_tax"
+   ]
+  }
+ ]
+}

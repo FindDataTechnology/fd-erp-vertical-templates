@@ -1,0 +1,27 @@
+{
+ "schema": "fd-erp-vertical-templates/localization/cn/v1",
+ "source": "odoo/addons/l10n_cn @ 20.0 (LGPL-3.0)",
+ "fetchedOn": "2026-11-13",
+ "files": {
+  "accounts-small.json": {
+   "sha256": "47630ff60dab325a604534649791bfaa8629cbcb2340430d2ac994dd84f0ab64",
+   "count": 156
+  },
+  "accounts-large.json": {
+   "sha256": "d02a36102bb30cd8068631824619e5eee3f634e7373804178ba7acbcafe66b25",
+   "count": 286
+  },
+  "tax-codes.json": {
+   "sha256": "8d0e9de074a65255829ec1eae3a06b9f438395aea265e9df9c072e02603e278b",
+   "count": 62
+  },
+  "mapping.json": {
+   "sha256": "8855db1e7fb8c84712f5a0dd4b454cf2cd5db3a16fad9a8b517d64b0bf0f958a",
+   "count": null
+  },
+  "statements-small.json": {
+   "sha256": "d51061d08282756bd60b4511b242e91b6a6f9c24f660d220fdf5bfe05a4a093d",
+   "count": null
+  }
+ }
+}
