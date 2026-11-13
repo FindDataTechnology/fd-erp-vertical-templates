@@ -18,6 +18,7 @@ import pytest
 
 from fd_erp_vertical_templates.cn_tax import (CnVatLane, INPUT_VAT, OUTPUT_VAT,
                                              TRANSFER_OUT, VAT_UNPAID, split_tax)
+from fd_erp_vertical_templates.cn_filing import CnFilingLane
 from fd_erp_vertical_templates.errors import TemplateError
 from fd_erp_vertical_templates.localization import CnPack
 
@@ -295,3 +296,72 @@ def test_close_vat_follows_the_new_caliber():
     assert out["payable"] == "10.00"          # 40 − 100 + 70
     assert _lines(kernel.submitted[0]) == {
         ("2221.01.07", "debit"): "10.00", ("2221.02", "credit"): "10.00"}
+
+
+# ---- 7) 上期留抵结转（change: add-cn-vat-credit-carry-forward）----
+
+def test_a_credit_month_carries_the_whole_amount_to_the_next_period():
+    """留抵月：应纳 0、结转 60，且 close_vat 是 noop（不生成提案）。"""
+    kernel = _StubKernel()
+    lane = _with_entries(_month(output="40", inputs="100"), kernel)
+    pos = lane.position(PERIOD)
+    assert pos["payable"] == "0.00"
+    assert pos["openingCredit"] == "0.00"
+    assert pos["creditCarryForward"] == "60.00"
+    out = lane.close_vat(PERIOD)
+    assert out["noop"] is True and kernel.submitted == []
+    assert "上期留抵" in out["caliber_note"]
+
+
+def test_next_month_deducts_the_opening_credit():
+    """上月留抵 60 + 本月销项 130 → 应纳 70，不是 130。"""
+    rows = ([_row(OUTPUT_VAT, "credit", "40", "2026-10-10"),
+             _row(INPUT_VAT, "debit", "100", "2026-10-10")]
+            + [_row(OUTPUT_VAT, "credit", "130", "2026-11-10")])
+    lane = _with_entries(rows)
+    pos = lane.position(PERIOD)
+    assert pos["openingCredit"] == "60.00"
+    assert pos["payable"] == "70.00"
+    assert pos["creditCarryForward"] == "0.00"
+
+
+def test_closing_zeroes_the_subtree_so_the_next_period_starts_clean():
+    """结转分录借记 2221.01.07 同额 ⇒ 子树归零，再下期留抵必须为 0。"""
+    kernel = _StubKernel()
+    rows = ([_row(OUTPUT_VAT, "credit", "40", "2026-10-10"),
+             _row(INPUT_VAT, "debit", "100", "2026-10-10"),
+             _row(OUTPUT_VAT, "credit", "130", "2026-11-10")]
+            + [_row(TRANSFER_OUT, "debit", "70", "2026-11-30"),
+               _row(VAT_UNPAID, "credit", "70", "2026-11-30")])
+    lane = _with_entries(rows, kernel)
+    assert lane.position(PERIOD)["openingCredit"] == "60.00"
+    nxt = lane.position("2026-12")
+    assert nxt["openingCredit"] == "0.00"
+    assert nxt["payable"] == "0.00"
+
+
+def test_a_partially_used_credit_keeps_the_remainder():
+    """上月留抵 60 + 本月销项 30 → 应纳 0，结转 30。"""
+    rows = ([_row(OUTPUT_VAT, "credit", "40", "2026-10-10"),
+             _row(INPUT_VAT, "debit", "100", "2026-10-10")]
+            + [_row(OUTPUT_VAT, "credit", "30", "2026-11-10")])
+    pos = _with_entries(rows).position(PERIOD)
+    assert pos["payable"] == "0.00"
+    assert pos["creditCarryForward"] == "30.00"
+
+
+def test_surcharge_base_follows_the_credit_adjusted_payable():
+    """附加税基数取 position().payable：留抵后 70 → 城建 4.90（按 130 会多缴 4.20）。"""
+    rows = ([_row(OUTPUT_VAT, "credit", "40", "2026-10-10"),
+             _row(INPUT_VAT, "debit", "100", "2026-10-10")]
+            + [_row(OUTPUT_VAT, "credit", "130", "2026-11-10")])
+    kernel = _StubKernel()
+    kernel.entries = rows
+    lane = CnFilingLane(TENANT, "/tmp", kernel,
+                        vat=CnVatLane(TENANT, kernel, pack=CnPack()))
+    lane.register_rates({"city_construction": "7", "education_surcharge": "3",
+                         "local_education_surcharge": "2", "income_tax": "25"},
+                        effective_from="2026-01", source="税法")
+    out = lane.surcharges(PERIOD)
+    assert out["base"] == "70.00"
+    assert out["items"][0]["amount"] == "4.90"

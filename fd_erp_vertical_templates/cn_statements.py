@@ -26,6 +26,7 @@ from typing import Any
 from .dates import entry_period
 from .errors import TemplateError
 from .localization import CnPack
+from .cn_tax import vat_position
 from .statements import CHART
 
 Q2 = Decimal("0.01")
@@ -275,26 +276,21 @@ class CnStatements:
         key = _check_period(period)
         rows = self._rows(key, cumulative=False)
         sales = Decimal(0)
-        output = Decimal(0)
-        inputs = Decimal(0)
-        transferred = Decimal(0)
         for row in rows:
             code = str(row.get("account_code") or "")
+            if CHART.get(code, (None, None))[1] != "revenue":
+                continue
             amount = _dec(row.get("amount_base") or row.get("amount"))
-            net = amount if row.get("direction") == "debit" else -amount
-            if code == OUTPUT_VAT:
-                output += -net
-            elif code == INPUT_VAT:
-                inputs += net
-            elif code == INPUT_TRANSFER_OUT:
-                transferred += -net          # 贷方增加应纳
-            elif CHART.get(code, (None, None))[1] == "revenue":
-                sales += -net
-        # 应纳 = 销项 − 进项 + 进项转出。转出那一截不进这条式子，用于集体福利/非正常损失的
-        # 进项就白抵了，而附加税的基数正是应纳——少缴会一路传导到附加税。
-        ledger = {"sales": sales, "outputVat": output, "inputVat": inputs,
-                  "inputTransferOut": transferred,
-                  "payable": output - inputs + transferred}
+            sales += -amount if row.get("direction") == "debit" else amount
+        # 销项/进项/转出/上期留抵/应纳**只从 vat_position 取**：报表层另写一遍式子，
+        # 今天一致、改一处就漂，而漂了不会报错——只会让「申报口径 vs 计提口径」差一个数。
+        pos = vat_position(self._kernel, key)
+        ledger = {"sales": sales,
+                  "outputVat": Decimal(pos["outputVat"]),
+                  "inputVat": Decimal(pos["inputVat"]),
+                  "inputTransferOut": Decimal(pos["inputTransferOut"]),
+                  "openingCredit": Decimal(pos["openingCredit"]),
+                  "payable": Decimal(pos["payable"])}
         if declared is None:
             declared_values = dict(ledger)
             note = "未提供独立申报数：以下「申报口径」即账面口径，勾稽恒成立，不能当作已核对"
@@ -304,14 +300,16 @@ class CnStatements:
                 "outputVat": _dec(declared.get("outputVat")),
                 "inputVat": _dec(declared.get("inputVat")),
                 "inputTransferOut": _dec(declared.get("inputTransferOut", 0)),
+                "openingCredit": _dec(declared.get("openingCredit", 0)),
             }
             declared_values["payable"] = (declared_values["outputVat"]
                                           - declared_values["inputVat"]
-                                          + declared_values["inputTransferOut"])
+                                          + declared_values["inputTransferOut"]
+                                          - declared_values["openingCredit"])
             note = "申报口径由调用方提供，与账面逐项对比"
         items = [("sales", "销售额"), ("outputVat", "销项税额"),
                  ("inputVat", "进项税额"), ("inputTransferOut", "进项税额转出"),
-                 ("payable", "应纳税额")]
+                 ("openingCredit", "上期留抵"), ("payable", "应纳税额")]
         reconciliation = [{"item": k, "label": label,
                            "ledger": _fmt(ledger[k]),
                            "declared": _fmt(declared_values[k]),

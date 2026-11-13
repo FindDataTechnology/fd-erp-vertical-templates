@@ -169,7 +169,7 @@ def test_vat_return_without_a_declaration_says_it_did_not_reconcile():
     assert "未提供独立申报数" in out["caliberNote"]
     assert out["ledger"] == {"sales": "100.00", "outputVat": "13.00",
                              "inputVat": "13.00", "inputTransferOut": "0.00",
-                             "payable": "0.00"}
+                             "openingCredit": "0.00", "payable": "0.00"}
     assert out["consistent"] is True
 
 
@@ -196,3 +196,24 @@ def test_vat_return_accepts_a_matching_declaration():
 def test_bad_period_is_refused():
     with pytest.raises(TemplateError):
         _book().balance_sheet("2026/11")
+
+
+# ---- 5) 上期留抵与申报口径同源（change: add-cn-vat-credit-carry-forward）----
+
+def test_vat_return_carries_the_opening_credit_and_matches_position():
+    """上月留抵 60、本月销项 130：申报口径的 openingCredit 60 / payable 70，
+    且与计提口径（position）逐值相同——两处各写一遍式子就会漂。"""
+    from fd_erp_vertical_templates.cn_tax import CnVatLane
+    entries = [
+        {**_e("2221.01.01", "credit", "40"), "booked_on": "2026-10-10"},
+        {**_e("2221.01.02", "debit", "100"), "booked_on": "2026-10-10"},
+        {**_e("2221.01.01", "credit", "130"), "booked_on": "2026-11-10"},
+    ]
+    kernel = _StubKernel(entries)
+    book = CnStatements(TENANT, kernel)
+    out = book.vat_return(PERIOD)
+    assert out["ledger"]["openingCredit"] == "60.00"
+    assert out["ledger"]["payable"] == "70.00"
+    pos = CnVatLane(TENANT, kernel).position(PERIOD)
+    assert pos["payable"] == out["ledger"]["payable"]
+    assert pos["openingCredit"] == out["ledger"]["openingCredit"]

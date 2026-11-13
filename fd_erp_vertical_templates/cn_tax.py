@@ -128,6 +128,60 @@ def split_tax(amount: Any, rate: Any, *, gross: bool = False) -> dict[str, str]:
             "basis": "net", "rate": str(rate)}
 
 
+#: `2221.01` 子树前缀：留抵就是这棵子树的借方余额（结转分录会把它打回零）。
+VAT_SUBTREE_PREFIX = VAT_PAYABLE + "."
+
+
+def _signed_amount(row: dict[str, Any]) -> Decimal:
+    """分录行的带符号金额：借为正、贷为负。"""
+    amount = _dec(row.get("amount_base") or row.get("amount"), "金额")
+    return amount if row.get("direction") == "debit" else -amount
+
+
+def vat_position(kernel: Any, period: str) -> dict[str, Any]:
+    """增值税口径的唯一实现（纯读）：计提、申报、附加税基数都从这里取。
+
+    应纳 = 销项 − 进项 + 进项转出 − **上期留抵**。
+
+    上期留抵由账面派生，不另存台账：`2221.01` 子树在**本期之前**的累计借方净额。
+    这依赖一个已存在的恒等式——`close_vat()` 在有应纳的月份借记 `2221.01.07` 同额，
+    结完子净额归零；留抵月不结转，余额自然就是留抵。所以累加全部历史不会重复计数。
+    应纳下限为 0：负应纳不是「退钱」，是留抵，给下游一个负税额会让附加税出现负数计提。
+    """
+    rows = read_entries(kernel)
+    output = inputs = transferred = Decimal(0)
+    opening = Decimal(0)          # 本期之前 2221.01 子树的借 − 贷
+    for row in rows:
+        code = str(row.get("account_code") or "")
+        if not (code == VAT_PAYABLE or code.startswith(VAT_SUBTREE_PREFIX)):
+            continue
+        when = entry_period(row)
+        if when in ("", "unknown") or when >= period:
+            continue
+        opening += _signed_amount(row)
+    for row in rows:
+        when = entry_period(row)
+        if when != period:
+            continue
+        code = str(row.get("account_code") or "")
+        if code == OUTPUT_VAT:
+            output += -_signed_amount(row)
+        elif code == INPUT_VAT:
+            inputs += _signed_amount(row)
+        elif code == INPUT_TRANSFER_OUT:
+            transferred += -_signed_amount(row)
+    opening_credit = opening if opening > 0 else Decimal(0)
+    raw = output - inputs + transferred - opening_credit
+    payable = raw if raw > 0 else Decimal(0)
+    carry = -raw if raw < 0 else Decimal(0)
+    return {"period": period, "outputVat": _fmt(output), "inputVat": _fmt(inputs),
+            "inputTransferOut": _fmt(transferred),
+            "openingCredit": _fmt(opening_credit), "payable": _fmt(payable),
+            "creditCarryForward": _fmt(carry),
+            "caliberNote": "应纳 = 销项 − 进项 + 进项转出 − 上期留抵；"
+                           "留抵由 2221.01 子树本期前累计借方净额派生"}
+
+
 class CnVatLane:
     """增值税计提与月末结转（只出待确认提案）。"""
 
@@ -244,20 +298,8 @@ class CnVatLane:
         return out
 
     def position(self, period: Any) -> dict[str, Any]:
-        """该期间销项/进项/进项转出与应纳税额（账面口径，不做任何调整）。
-
-        应纳 = 销项 − 进项 **+ 进项转出**。漏掉最后一项，用于集体福利或发生非正常损失的
-        那部分进项就白抵了，而附加税以应纳为基数——少缴会一路传导。
-        """
-        key = _check_period(period)
-        sums = self._period_sums(key)
-        output = sums[OUTPUT_VAT]
-        inputs = -sums[INPUT_VAT]
-        transferred = sums[INPUT_TRANSFER_OUT]
-        payable = output - inputs + transferred
-        return {"period": key, "outputVat": _fmt(output), "inputVat": _fmt(inputs),
-                "inputTransferOut": _fmt(transferred), "payable": _fmt(payable),
-                "creditCarryForward": _fmt(-payable) if payable < 0 else "0.00"}
+        """该期间的增值税口径（账面派生）：销项/进项/转出/上期留抵 → 应纳与结转。"""
+        return vat_position(self._kernel, _check_period(period))
 
     # ---- 进项税额转出 ----
 
@@ -349,7 +391,9 @@ class CnVatLane:
         payable = Decimal(pos["payable"])
         if payable <= 0:
             return {"period": key, "noop": True, "amount": "0.00", **pos,
-                    "caliber_note": "本期无应交增值税（销项 ≤ 进项），留抵结转下期，不生成提案"}
+                    "caliber_note": (f"本期应纳为 0（上期留抵 {pos['openingCredit']}、"
+                                     f"本期结转下期 {pos['creditCarryForward']}），"
+                                     "不生成提案；留抵由 2221.01 子树余额承载")}
         amount = _fmt(payable)
         stable_id = f"{CLOSE_PREFIX}{key}"
         proposal = self._kernel.submit_proposal(
@@ -368,6 +412,6 @@ class CnVatLane:
                 "caliber_note": "转出后 2221.01 归零、2221.02 挂待缴数；缴纳是资金动作，本车道不做"}
 
 
-__all__ = ["CnVatLane", "split_tax", "RATES", "OUTPUT_VAT", "INPUT_VAT",
-           "INPUT_TRANSFER_OUT", "TRANSFER_OUT", "VAT_UNPAID", "TAX_ROOT",
-           "TRANSFER_OUT_REASONS"]
+__all__ = ["CnVatLane", "split_tax", "vat_position", "RATES", "OUTPUT_VAT",
+           "INPUT_VAT", "INPUT_TRANSFER_OUT", "TRANSFER_OUT", "VAT_UNPAID",
+           "TAX_ROOT", "TRANSFER_OUT_REASONS"]
