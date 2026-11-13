@@ -264,8 +264,8 @@ class CnStatements:
 
     # ---- 增值税申报口径 ----
 
-    def vat_return(self, period: Any, *, declared: dict[str, Any] | None = None
-                   ) -> dict[str, Any]:
+    def vat_return(self, period: Any, *, declared: dict[str, Any] | None = None,
+                   invoices: Any = None) -> dict[str, Any]:
         """账面口径 vs 申报口径。
 
         `declared` 由申报方/车道给出（销售额、销项税额、进项税额）；不给就按账面视同申报，
@@ -308,7 +308,7 @@ class CnStatements:
                            "difference": _fmt(ledger[k] - declared_values[k])}
                           for k, label in items]
         consistent = all(Decimal(r["difference"]) == 0 for r in reconciliation)
-        return {
+        out = {
             "schema": SCHEMA, "period": key,
             "ledger": {k: _fmt(ledger[k]) for k in ledger},
             "declared": {k: _fmt(declared_values[k]) for k in declared_values},
@@ -317,3 +317,14 @@ class CnStatements:
             "provided": declared is not None,
             "caliberNote": note,
         }
+        # 进项三档来自发票台账（可抵/待认证/不可抵）：账上只有可抵那一档，
+        # 另外两档不进账但决定下期能不能抵，申报时要说清楚。
+        if invoices is not None:
+            tiers = invoices.deduction(key)["tiers"]
+            out["inputTiers"] = {
+                "deductible": tiers["deductible"]["tax"],
+                "pendingCertification": tiers["pendingCertification"]["tax"],
+                "nonDeductible": tiers["nonDeductible"]["tax"],
+            }
+            out["invoiceReconcile"] = invoices.reconcile(key)
+        return out

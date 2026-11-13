@@ -175,28 +175,40 @@ class CnVatLane:
     def post_purchase(self, ref: Any, amount: Any, *, rate: Any = "13",
                       gross: bool = False, settle_account: str = DEFAULT_AP,
                       cost_account: str = DEFAULT_COST, booked_on: Any = None,
+                      deductible: bool = True,
                       submitted_by: str = "vat-engine") -> dict[str, Any]:
-        """采购确认进项：借 成本（净额）+ 借 进项税额 / 贷 应付（含税）。"""
+        """采购确认进项：借 成本（净额）+ 借 进项税额 / 贷 应付（含税）。
+
+        `deductible=False` 时**税额并入成本**，不出进项行：普通发票的税是价款的一部分，
+        不是资产。默认 True 只是为兼容直连调用；正确的判定在发票台账里
+        （`cn_invoice.CnInvoiceBook.purchase` 按票种 + 认证决定），直连调用须自证可抵。
+        """
         tag = str(ref or "").strip()
         if not tag:
             raise TemplateError("INVALID_ARGUMENT", "凭证号 ref 不能为空（幂等键就是它）")
         self.account_codes()
         parts = split_tax(amount, rate, gross=gross)
         day = _check_day(booked_on, "业务日期")
-        lines = [{"account_code": cost_account, "direction": "debit",
-                  "amount": parts["net"], "currency": self._base}]
-        if Decimal(parts["tax"]) > 0:
-            lines.append({"account_code": INPUT_VAT, "direction": "debit",
-                          "amount": parts["tax"], "currency": self._base})
+        if deductible:
+            lines = [{"account_code": cost_account, "direction": "debit",
+                      "amount": parts["net"], "currency": self._base}]
+            if Decimal(parts["tax"]) > 0:
+                lines.append({"account_code": INPUT_VAT, "direction": "debit",
+                              "amount": parts["tax"], "currency": self._base})
+        else:
+            # 不可抵扣：税与净额一起进成本（不挂待抵扣，那会让资产虚增且永远抵不掉）
+            lines = [{"account_code": cost_account, "direction": "debit",
+                      "amount": parts["gross"], "currency": self._base}]
         lines.append({"account_code": settle_account, "direction": "credit",
                       "amount": parts["gross"], "currency": self._base})
         proposal = self._kernel.submit_proposal(
             f"vat-buy:{tag}", lines, source_ref=f"vat-buy:{tag}", kind="journal",
             lane_title=f"{tag} 含税采购", booked_on=day, submitted_by=submitted_by)
-        return {**parts, "ref": tag, "proposal": proposal,
+        return {**parts, "ref": tag, "proposal": proposal, "deductible": deductible,
                 "stableId": f"vat-buy:{tag}", "bookedOn": day,
                 "duplicate": bool(proposal and proposal.get("duplicate")),
-                "caliber_note": "进项税额按可抵扣口径单列；只出待确认提案"}
+                "caliber_note": ("进项税额按可抵扣口径单列；只出待确认提案" if deductible
+                                 else "该票不可抵扣：税额并入成本，不出进项行")}
 
     # ---- 账面口径 ----
 
