@@ -1,19 +1,20 @@
 """月结清单（change: add-month-end-checklist）。
 
-月结是**一串有顺序、有前置条件**的动作：结转出库成本 → 计提折旧 → 计提坏账 → 关账。
+月结是**一串有顺序、有前置条件**的动作：结转出库成本 → 计提折旧 → 计提坏账 →
+结转损益 → 关账。
 散着做的话，漏跑一步没人知道：漏折旧时账本一切正常（只是这期少了一笔费用），漏结转时
 营业成本永远是 0——两个错在报表上都「看起来合理」，通常等到跨期才发现。
 
 本模块把那套凭记忆的顺序变成代码，但**守住确认门**：
 
-- 三步准备只**生成待确认 proposal**，绝不代任何人确认；
+- 准备步骤只**生成待确认 proposal**，绝不代任何人确认；
 - 某一步失败就停，不跳过（跳过会让「少了一笔费用」看起来像「这期本来没有」）；
-- 关账只在「三步都成功 + 期间内没有任何待确认提案」时发生，且关账入口由调用方注入
-  （模板层不实现关账，那是内核/API 的职责）。
+- 关账只在「所有步骤（含结转损益）都成功 + 期间内没有任何待确认提案」时发生，
+  且关账入口由调用方注入（模板层不实现关账，那是内核/API 的职责）。
 
 ## 每一步都是幂等的
 
-三条车道各自按期间幂等（稳定键带期间）。所以「过门后再跑一次」不会重复计提，只会看到
+每条车道各自按期间幂等（稳定键带期间）。所以「过门后再跑一次」不会重复计提，只会看到
 「无需处理」——那正是关账那一刻该有的样子。
 """
 from __future__ import annotations
@@ -49,17 +50,23 @@ def _pending_in_period(kernel: Any, period: str) -> list[dict[str, Any]]:
 
 
 class MonthEndChecklist:
-    """月结清单：前置检查 → 三步准备（只出待确认）→ 无待办才关账。"""
+    """月结清单：前置检查 → 三步准备（只出待确认）→ 结转损益 → 无待办才关账。"""
 
+    #: 准备步骤（顺序即依赖：成本影响费用，费用影响结转）。
     STEPS = ("cogs", "depreciation", "bad_debt")
+    #: 第四步：结转损益。它的基数只认**已落账**分录，所以前序刚出的待确认提案没落账时
+    #: 必须推迟——少结转一笔费用在报表上看起来完全正常，这才是最危险的形态。
+    CLOSING_STEP = "closing"
 
     def __init__(self, tenant_id: str, kernel: Any, *, cost: Any = None,
-                 assets: Any = None, bad_debts: Any = None, closer: Any = None):
+                 assets: Any = None, bad_debts: Any = None,
+                 closing: Any = None, closer: Any = None):
         self._tenant = tenant_id
         self._kernel = kernel
         self._cost = cost
         self._assets = assets
         self._bad_debts = bad_debts
+        self._closing = closing
         #: 关账入口（内核 periods 的绑定）。模板层不实现关账，未注入就如实 NOT_WIRED。
         self._closer = closer
 
@@ -163,6 +170,14 @@ class MonthEndChecklist:
             return {"step": name, "state": "noop" if out.get("noop") else "prepared",
                     "result": out, "proposal": out.get("proposal"),
                     "amount": out.get("delta")}
+        if name == self.CLOSING_STEP:
+            if self._closing is None:
+                return {"step": name, "state": "not_wired",
+                        "detail": "结转车道未装配"}
+            out = self._closing.transfer(period, submitted_by=actor)
+            return {"step": name, "state": "noop" if out.get("noop") else "prepared",
+                    "result": out, "proposal": out.get("proposal"),
+                    "amount": out.get("netProfit")}
         raise TemplateError("INVALID_ARGUMENT", f"未知月结步骤：{name}")
 
     def run(self, period: Any, *, actor: str = "month-end",
@@ -199,11 +214,34 @@ class MonthEndChecklist:
                                         "detail": exc.detail}})
                 break                     # 失败即停：跳过去会让报表少一笔而看着正常
 
-        pending_after = _pending_in_period(self._kernel, key)
+        prep_pending = _pending_in_period(self._kernel, key)
         failed = [s for s in steps if s["state"] == "failed"]
+
+        # 第四步：结转损益。基数只认已落账分录——前三步刚出的待确认提案还没落账时，
+        # 现在结转就会少结转一笔费用（报表上看起来完全正常），所以宁可推迟。
+        if not failed:
+            if prep_pending:
+                steps.append({"step": self.CLOSING_STEP, "state": "deferred",
+                              "detail": "前序步骤刚生成待确认提案，结转须等它们落账后再算",
+                              "blockedBy": sorted({str(p.get("stable_id") or "")
+                                                   for p in prep_pending
+                                                   if p.get("stable_id")})})
+            else:
+                try:
+                    steps.append(self._step(self.CLOSING_STEP, key, actor))
+                except TemplateError as exc:
+                    steps.append({"step": self.CLOSING_STEP, "state": "failed",
+                                  "error": {"code": exc.code, "message": exc.message,
+                                            "detail": exc.detail}})
+                    failed = [s for s in steps if s["state"] == "failed"]
+
+        pending_after = _pending_in_period(self._kernel, key)
         next_actions: list[str] = []
         if failed:
             next_actions.append(f"修好 {failed[0]['step']} 后重跑（{failed[0]['error']['message']}）")
+        deferred = [s for s in steps if s["state"] == "deferred"]
+        if deferred:
+            next_actions.append("人工过确认门后重跑：结转损益必须在费用类提案落账之后再算")
         if pending_after:
             next_actions.append(
                 f"人工过确认门：{len(pending_after)} 张待确认提案全部落账后才能关账")
@@ -231,8 +269,8 @@ class MonthEndChecklist:
             "closeError": close_error,
             "blocked": bool(failed) or bool(pending_after) or close_error is not None,
             "nextActions": next_actions,
-            "caliber_note": "三步只生成待确认 proposal，不代任何人过门；"
-                            "关账前置=期间内没有任何待确认提案",
+            "caliber_note": "各步只生成待确认 proposal，不代任何人过门；结转损益在"
+                            "前序提案落账后才算；关账前置=期间内没有任何待确认提案",
         }
 
     # ---- 一览 ----

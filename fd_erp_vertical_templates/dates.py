@@ -21,6 +21,18 @@ from datetime import date, datetime
 from typing import Any
 
 
+def period_end(period: str) -> str:
+    """`YYYY-MM` 的最后一天（ISO 日期串）。不硬编码 28/30/31，按次月 1 日回退一天。
+
+    期末计提、结转、对账截止日都要「这一期的最后一天」。这个取法原本在四条车道里
+    各写一遍——同一个值四份实现，改一处漏三处的经典形态，所以收到这里。
+    """
+    year, month = int(period[:4]), int(period[5:7])
+    if month == 12:
+        return date(year, 12, 31).isoformat()
+    return date.fromordinal(date(year, month + 1, 1).toordinal() - 1).isoformat()
+
+
 def entry_when(row: Any) -> Any:
     """分录的业务日期原值：`booked_on` 优先，回落 `posted_at`。"""
     if not isinstance(row, dict):

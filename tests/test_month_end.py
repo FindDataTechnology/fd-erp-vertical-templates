@@ -2,12 +2,13 @@
 
 判据（对应 spec `erp-month-end`）：
 
-1. 三步按固定顺序准备，只出待确认 proposal；某步失败即停并点名；
+1. 三步准备按固定顺序执行，只出待确认 proposal；某步失败即停并点名；
 2. 期间已关账 / 有未过门提案时不重复准备；
-3. 关账前置=三步成功且期间内无待确认提案；`closer` 未注入时 `NOT_WIRED`；
-4. `precheck` / `checklist` 只读。
+3. 第四步结转损益：前序刚出待确认提案时 `deferred`，都已落账时才真结转；
+4. 关账前置=所有步骤成功且期间内无待确认提案；`closer` 未注入时 `NOT_WIRED`；
+5. `precheck` / `checklist` 只读。
 
-零 DB：三条车道都用替身（只验编排，不验车道本身）。
+零 DB：四条车道都用替身（只验编排，不验车道本身）。
 """
 from __future__ import annotations
 
@@ -89,11 +90,28 @@ class _StubCloser:
         return {"period": period, "closed": True}
 
 
-def _book(kernel=None, cost=None, assets=None, bad=None, closer=None):
+class _StubClosing:
+    def __init__(self, noop: bool = False, fail: str | None = None):
+        self.noop = noop
+        self.fail = fail
+        self.calls: list[str] = []
+
+    def transfer(self, period, *, submitted_by="period-closing"):
+        self.calls.append(str(period))
+        if self.fail:
+            raise TemplateError("INVALID_ARGUMENT", self.fail)
+        return {"period": period, "noop": self.noop, "netProfit": "2500.00",
+                "proposal": None if self.noop else {"proposal_id": 4},
+                "status": {"state": "not_closed"}}
+
+
+def _book(kernel=None, cost=None, assets=None, bad=None, closing=None,
+          closer=None):
     return MonthEndChecklist(
         TENANT, kernel or _StubKernel(),
         cost=cost or _StubCost(), assets=assets or _StubAssets(),
-        bad_debts=bad or _StubBadDebt(), closer=closer)
+        bad_debts=bad or _StubBadDebt(), closing=closing or _StubClosing(),
+        closer=closer)
 
 
 # ---- 1) precheck 五类 ----
@@ -133,13 +151,36 @@ def test_precheck_warns_when_closer_missing():
 
 # ---- 2) 三步顺序与失败即停 ----
 
-def test_run_prepares_three_steps_in_order():
-    cost, assets, bad = _StubCost(), _StubAssets(), _StubBadDebt()
-    out = _book(cost=cost, assets=assets, bad=bad).run(PERIOD)
-    assert [s["step"] for s in out["steps"]] == ["cogs", "depreciation", "bad_debt"]
-    assert [s["state"] for s in out["steps"]] == ["prepared", "prepared", "prepared"]
+def test_run_prepares_four_steps_in_order():
+    cost, assets, bad, closing = _StubCost(), _StubAssets(), _StubBadDebt(), _StubClosing()
+    out = _book(cost=cost, assets=assets, bad=bad, closing=closing).run(PERIOD)
+    assert [s["step"] for s in out["steps"]] == [
+        "cogs", "depreciation", "bad_debt", "closing"]
+    assert [s["state"] for s in out["steps"]] == ["prepared"] * 4
     assert out["closed"] is False
-    assert cost.calls == assets.calls == bad.calls == [PERIOD]
+    assert cost.calls == assets.calls == bad.calls == closing.calls == [PERIOD]
+
+
+def test_closing_is_deferred_while_prep_proposals_are_still_pending():
+    """前序刚出的待确认提案没落账时，结转必须推迟——否则会少结转一笔费用。"""
+    kernel = _StubKernel()
+
+    class _CostThatLeavesPending(_StubCost):
+        def post_cogs(self, period, *, partial=False, submitted_by="cost-engine"):
+            kernel.pending.append({"stable_id": f"cogs:{period}",
+                                   "booked_on": f"{period}-30"})
+            return {"period": period, "proposal": {"proposal_id": 1, "booked_on": period + "-30"},
+                    "total": "400.00"}
+
+    closing = _StubClosing()
+    out = _book(kernel=kernel, cost=_CostThatLeavesPending(),
+                closing=closing).run(PERIOD)
+    steps = {s["step"]: s for s in out["steps"]}
+    assert steps["closing"]["state"] == "deferred"
+    assert steps["closing"]["blockedBy"] == ["cogs:2026-11"]
+    assert closing.calls == []                       # 真正没有结转
+    assert out["closed"] is False
+    assert any("结转" in a for a in out["nextActions"])
 
 
 def test_failure_stops_the_chain():

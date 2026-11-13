@@ -53,6 +53,22 @@ CONTRA_ASSETS = ("1602", "1231")
 
 DIMENSION_KEYS = ("department", "project", "channel", "cost_center")
 
+#: 损益类科目（change: add-profit-closing）。收入在贷方、成本费用在借方；这两组也是
+#: 期末结转的结平对象——口径只在这里定义一次，结转车道从这里取。
+REVENUE_ACCOUNTS: tuple[str, ...] = ("4000",)
+EXPENSE_ACCOUNTS: tuple[str, ...] = ("5000", "5100", "5200", "6602")
+PROFIT_LOSS_ACCOUNTS: tuple[str, ...] = REVENUE_ACCOUNTS + EXPENSE_ACCOUNTS
+#: 结转分录的 `source_ref` 前缀。它把损益搬进 3100，所以**不进损益口径**（否则已结转
+#: 期间的利润表会显示收入 0、费用 0——那是账做完了，不是这期没赚钱）。
+CLOSING_PREFIX = "close:"
+
+
+def is_closing_entry(entry: Any) -> bool:
+    """结转分录判定（唯一实现：报表排除与结转车道自查都调这里）。"""
+    if not isinstance(entry, dict):
+        return False
+    return str(entry.get("source_ref") or "").startswith(CLOSING_PREFIX)
+
 # ---- 现金流量表（change: add-cash-flow-statement）----
 
 #: 现金口径＝货币资金。只有一个科目，所以内部调拨（现金对现金）在表上净额恒为零：
@@ -222,17 +238,21 @@ class StatementBook:
     # ---- 2) 利润表 ----
 
     def income_statement(self, period: str) -> dict[str, Any]:
-        """按期间给出收入、成本、费用与营业利润。"""
+        """按期间给出收入、成本、费用与营业利润。
+
+        结转分录不进本表：它的作用是把本期损益搬进 3100，计入就会让已结转期间的利润表
+        变成「收入 0、费用 0」——那是账做完了，不是这期没赚钱。
+        """
         key = _check_period(period)
-        sums = self._sums(self._in_period(self._entries(), key))
+        sums = self._sums([e for e in self._in_period(self._entries(), key)
+                           if not is_closing_entry(e)])
 
         def amount(code: str) -> Decimal:
             bucket = sums.get(code)
             if bucket is None:
                 return Decimal(0)
             # 收入在贷方（取反），成本费用在借方（取正）
-            return (bucket["credit"] - bucket["debit"]) if code == "4000" \
-                else (bucket["debit"] - bucket["credit"])
+            return -(bucket["net"]) if code in REVENUE_ACCOUNTS else bucket["net"]
 
         revenue = amount("4000")
         cogs = amount("5000")
@@ -300,10 +320,13 @@ class StatementBook:
                 equity.append({"accountCode": code, "line": line,
                                "amount": _fmt(value)})
 
-        # 未结转损益 = 收入净额 − 成本费用净额（权益的等价物，等结账后才转 3100）
-        revenue = -sums.get("4000", {}).get("net", Decimal(0))
+        # 未结转损益 = 收入净额 − 成本费用净额（权益的等价物，等结账后才转 3100）。
+        # 结转分录已落账时，损益科目的累计净额天然只剩**未结转**的部分，
+        # 所以这里不需要额外过滤——余额本身就是答案。
+        revenue = -sum((sums.get(c, {}).get("net", Decimal(0))
+                        for c in REVENUE_ACCOUNTS), Decimal(0))
         expense = sum((sums.get(c, {}).get("net", Decimal(0))
-                       for c in ("5000", "5100", "5200", "6602")), Decimal(0))
+                       for c in EXPENSE_ACCOUNTS), Decimal(0))
         retained = revenue - expense
         rhs = liability_total + equity_total + retained
         balanced = (asset_total == rhs) and not unclassified
@@ -343,7 +366,9 @@ class StatementBook:
         total = Decimal(0)
         for e in entries:
             code = str(e.get("account_code") or "")
-            if code not in ("5000", "5100", "5200", "6602"):
+            if code not in EXPENSE_ACCOUNTS or is_closing_entry(e):
+                # 结转分录把费用贷方抹平：计入会让维度表出现一笔「负费用」，
+                # 而那不是费用发生额，是账做完了。
                 continue
             amount = _dec(e.get("amount_base") or e.get("amount"))
             signed = amount if e.get("direction") == "debit" else -amount

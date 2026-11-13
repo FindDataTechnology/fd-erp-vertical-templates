@@ -34,6 +34,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
+from .dates import period_end as _period_end
 from .errors import TemplateError
 from .eventlog import EventLog
 from .policy import PolicyBook
@@ -84,14 +85,6 @@ def _check_period(value: Any) -> str:
                             f"期间须为 YYYY-MM：{value!r}",
                             detail={"example": "2026-10"})
     return key
-
-
-def _period_end(period: str) -> str:
-    year, month = int(period[:4]), int(period[5:])
-    if month == 12:
-        return date(year, 12, 31).isoformat()
-    # 次月 1 日的前一天 = 本月最后一天（不硬编码 31/30/28）。
-    return date.fromordinal(date(year, month + 1, 1).toordinal() - 1).isoformat()
 
 
 class BadDebtLane:
