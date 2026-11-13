@@ -48,6 +48,7 @@ CHART: dict[str, tuple[str, str]] = {
     "5100": ("平台及支付费用", "expense"),
     "5200": ("其他经营费用", "expense"),
     "6602": ("信用减值损失", "expense"),
+    "6603": ("汇兑损益", "expense"),
 }
 #: 抵减资产：报表上从资产里扣，不另起一行「负数资产」误导读者。
 CONTRA_ASSETS = ("1602", "1231")
@@ -57,7 +58,7 @@ DIMENSION_KEYS = ("department", "project", "channel", "cost_center")
 #: 损益类科目（change: add-profit-closing）。收入在贷方、成本费用在借方；这两组也是
 #: 期末结转的结平对象——口径只在这里定义一次，结转车道从这里取。
 REVENUE_ACCOUNTS: tuple[str, ...] = ("4000",)
-EXPENSE_ACCOUNTS: tuple[str, ...] = ("5000", "5100", "5200", "6602")
+EXPENSE_ACCOUNTS: tuple[str, ...] = ("5000", "5100", "5200", "6602", "6603")
 PROFIT_LOSS_ACCOUNTS: tuple[str, ...] = REVENUE_ACCOUNTS + EXPENSE_ACCOUNTS
 #: 结转分录的 `source_ref` 前缀。它把损益搬进 3100，所以**不进损益口径**（否则已结转
 #: 期间的利润表会显示收入 0、费用 0——那是账做完了，不是这期没赚钱）。
@@ -251,13 +252,17 @@ class StatementBook:
         # 信用减值损失是期间费用（与平台费/其他经营费用并列），不是营业成本的调整项：
         # 混进 5000 会让毛利口径失真。
         impairment = amount("6602")
-        opex = platform + other + impairment
+        # 汇兑损益单列：它是财务性损益，混进"其他经营费用"会让经营费用口径失真
+        # （change: add-fx-revaluation）。
+        fx = amount("6603")
+        opex = platform + other + impairment + fx
         profit = revenue - cogs - opex
         return {
             "period": key,
             "revenue": _fmt(revenue), "costOfSales": _fmt(cogs),
             "platformFees": _fmt(platform), "otherOpex": _fmt(other),
             "impairmentLoss": _fmt(impairment),
+            "fxGainLoss": _fmt(fx),
             "operatingExpenses": _fmt(opex), "operatingProfit": _fmt(profit),
             "lines": [
                 {"line": "营业收入", "amount": _fmt(revenue)},
@@ -265,6 +270,7 @@ class StatementBook:
                 {"line": "平台及支付费用", "amount": _fmt(platform)},
                 {"line": "其他经营费用", "amount": _fmt(other)},
                 {"line": "信用减值损失", "amount": _fmt(impairment)},
+                {"line": "汇兑损益", "amount": _fmt(fx)},
                 {"line": "营业利润", "amount": _fmt(profit)},
             ],
             "caliber_note": "收入取贷方净额，成本费用取借方净额；不混入资本类科目；"

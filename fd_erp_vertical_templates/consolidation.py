@@ -63,6 +63,7 @@ CHART: dict[str, tuple[str, str]] = {
     "5100": ("平台及支付费用", "expense"),
     "5200": ("其他经营费用", "expense"),
     "6602": ("信用减值损失", "expense"),
+    "6603": ("汇兑损益", "expense"),
 }
 #: 内部往来科目对（应收 ↔ 应付）——抵销的默认对象。
 INTERCOMPANY_PAIRS = (("1100", "2000"),)
