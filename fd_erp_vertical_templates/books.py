@@ -234,4 +234,159 @@ class LedgerBooks:
         return out
 
 
+    # ---- 3) 往来对账单（change: add-party-statement）----
+
+    def party_statement(self, dimension: Any, value: Any, period: Any = None,
+                        *, accounts: list[str] | tuple[str, ...] | None = None,
+                        base_currency: str | None = None) -> dict[str, Any]:
+        """某个往来方（客户/供应商）的往来明细：跨科目串联 + 逐行余额 + 能对回总账。
+
+        归属只认 `dimensions[dimension] == value`：靠科目名或摘要文字猜归属，迟早把两家的
+        往来记到一家头上。指定 `accounts` 时把「该科目未标这个维度」的净额一并算出——
+        否则「每个客户加起来 ≠ 总账余额」，而两张表各自都自洽。
+        """
+        dim = str(dimension or "").strip()
+        if not dim:
+            raise TemplateError("INVALID_ARGUMENT", "对账单须给维度键 dimension")
+        who = str(value or "").strip()
+        if not who:
+            raise TemplateError("INVALID_ARGUMENT", "对账单须给维度值 value")
+        key = _check_period(period) if period not in (None, "") else None
+        picked = [str(code).strip() for code in (accounts or []) if str(code).strip()]
+        earlier, window = self._split(key)
+
+        def matches(entry: dict[str, Any]) -> bool:
+            dims = entry.get("dimensions") or {}
+            return str(dims.get(dim) or "").strip() == who
+
+        opening = Decimal(0)
+        opening_by: dict[str, Decimal] = {}
+        for entry in earlier:
+            if not matches(entry):
+                continue
+            code = _code(entry)
+            if picked and code not in picked:
+                continue
+            opening += _signed(entry)
+            opening_by[code] = opening_by.get(code, Decimal(0)) + _signed(entry)
+
+        rows: list[dict[str, Any]] = []
+        by_account: dict[str, dict[str, Decimal]] = {}
+        # 逐行余额是**按科目**走的：把各科目加在一起恒为零（每笔分录借贷必平），
+        # 那种「余额」看着一路归零，对查账毫无用处。往来余额看的是应收/应付那一列。
+        running_by: dict[str, Decimal] = dict(opening_by)
+        for entry in sorted((e for e in window if matches(e)), key=_sort_key):
+            code = _code(entry)
+            if picked and code not in picked:
+                continue
+            amount = _dec(entry.get("amount_base") or entry.get("amount"))
+            is_debit = entry.get("direction") == "debit"
+            running = running_by.get(code, Decimal(0))
+            running += amount if is_debit else -amount
+            running_by[code] = running
+            slot = by_account.setdefault(code, {"opening": Decimal(0), "debit": Decimal(0),
+                                                "credit": Decimal(0)})
+            slot["opening"] = opening_by.get(code, Decimal(0))
+            if is_debit:
+                slot["debit"] += amount
+            else:
+                slot["credit"] += amount
+            rows.append({
+                "bookedOn": entry.get("booked_on"),
+                "txnId": entry.get("txn_id"),
+                "stableId": entry.get("stable_id"),
+                "sourceRef": entry.get("source_ref"),
+                "accountCode": code,
+                "line": CHART.get(code, (None, None))[0],
+                "summary": str(entry.get("source_ref") or entry.get("stable_id")
+                               or entry.get("txn_id") or ""),
+                "debit": _fmt(amount) if is_debit else "0.00",
+                "credit": "0.00" if is_debit else _fmt(amount),
+                "balance": _fmt(running),
+            })
+
+        # 指定科目里本期完全没出现、但期初有余额的，也要出行（否则对账单「少了那一家」）
+        for code, begin in opening_by.items():
+            if code in by_account:
+                continue
+            if picked and code not in picked:
+                continue
+            by_account[code] = {"opening": begin, "debit": Decimal(0),
+                                "credit": Decimal(0)}
+
+        subtotals = []
+        total_debit = total_credit = Decimal(0)
+        for code in sorted(by_account):
+            slot = by_account[code]
+            closing = slot["opening"] + slot["debit"] - slot["credit"]
+            total_debit += slot["debit"]
+            total_credit += slot["credit"]
+            subtotals.append({
+                "accountCode": code, "account": CHART.get(code, (code, ""))[0],
+                "opening": _fmt(slot["opening"]),
+                "debit": _fmt(slot["debit"]), "credit": _fmt(slot["credit"]),
+                "closing": _fmt(closing), "direction": _direction(closing),
+            })
+        closing = opening + total_debit - total_credit
+
+        out: dict[str, Any] = {
+            "dimension": dim, "dimensionValue": who, "period": key,
+            "opening": _fmt(opening), "rows": rows, "subtotals": subtotals,
+            "totals": {"debit": _fmt(total_debit), "credit": _fmt(total_credit),
+                       "closing": _fmt(closing)},
+            "closingBalance": _fmt(closing), "direction": _direction(closing),
+            "balanced": (opening + total_debit - total_credit) == closing,
+            "caliber_note": "归属只认 dimensions[维度键]；逐行 balance 是**该科目**的余额"
+                            "（各科目相加恒为零，看往来余额请看 subtotals 里应收/应付那一行）；"
+                            "余额统一「借 − 贷」，方向见 direction；"
+                            "closingBalance 是各科目期末合计＝往来净额（结清时为 0）；"
+                            "行序=业务日期→落账时刻→txn→行号",
+        }
+        if not rows:
+            out["note"] = f"{'本期' if key else '建账以来'}该往来方无发生额（期初 {_fmt(opening)}）"
+
+        if not picked:
+            out["reconciled"] = False
+            out["caliber_note"] += "；未指定 accounts，未做总账对账"
+            return out
+
+        # 对回总账：各科目「未标该维度」的净额 + 总账期末
+        unattributed: dict[str, Decimal] = {}
+        ledger: dict[str, Decimal] = {}
+        for code in picked:
+            ledger[code] = sum((_signed(e) for e in earlier + window
+                                if _code(e) == code), Decimal(0))
+            unattributed[code] = sum(
+                (_signed(e) for e in window
+                 if _code(e) == code
+                 and not str((e.get("dimensions") or {}).get(dim) or "").strip()),
+                Decimal(0))
+
+        checks = []
+        consistent = True
+        for code in picked:
+            mine = next((_dec(s["closing"]) for s in subtotals
+                         if s["accountCode"] == code), Decimal(0))
+            gap = ledger[code] - (mine + unattributed[code])
+            if gap != 0:
+                consistent = False
+            checks.append({
+                "accountCode": code, "account": CHART.get(code, (code, ""))[0],
+                "thisParty": _fmt(mine),
+                "unattributed": _fmt(unattributed[code]),
+                "ledgerClosing": _fmt(ledger[code]),
+                "difference": _fmt(gap),
+            })
+        out["reconciliation"] = checks
+        out["reconciled"] = True
+        out["consistent"] = consistent
+        if not consistent:
+            worst = max(checks, key=lambda c: abs(_dec(c["difference"])))
+            out["error"] = (f"对账单与总账对不上：{worst['accountCode']} 差 "
+                            f"{worst['difference']}（本单 {worst['thisParty']} + 未标注 "
+                            f"{worst['unattributed']} ≠ 总账 {worst['ledgerClosing']}）——"
+                            f"先查未标维度的分录，别把差额摊给某个往来方")
+        return out
+
+
 __all__ = ["BOOKS_SCHEMA", "LedgerBooks"]
