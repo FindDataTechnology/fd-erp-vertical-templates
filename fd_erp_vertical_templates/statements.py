@@ -24,6 +24,7 @@ from typing import Any
 
 from .dates import entry_date, entry_period
 from .errors import TemplateError
+from .kernel_rows import read_entries
 
 Q2 = Decimal("0.01")
 STATEMENTS_SCHEMA = "fd-erp-vertical-templates/statements/v1"
@@ -149,20 +150,9 @@ class StatementBook:
     # ---- 分录读取 ----
 
     def _entries(self) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        offset = 0
-        while True:
-            out = self._kernel.query_entries(offset=offset, limit=200) or {}
-            page = [r for r in (out.get("entries") or out.get("items")
-                                or out.get("data") or [])
-                    if isinstance(r, dict)]
-            if not page:
-                break
-            rows.extend(page)
-            offset += len(page)
-            if len(page) < 200:
-                break
-        return rows
+        # 分页读完的实现只有一处（kernel_rows）：各车道各写一份分页，迟早有一处
+        # 「读到 100 条就停」而没人发现。
+        return read_entries(self._kernel)
 
     @staticmethod
     def _upto(entries: list[dict[str, Any]], as_of: str | None,

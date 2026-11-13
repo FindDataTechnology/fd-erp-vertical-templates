@@ -29,6 +29,7 @@ from typing import Any
 
 from .dates import entry_period, period_end
 from .errors import TemplateError
+from .kernel_rows import read_entries, read_proposals
 from .statements import (CLOSING_PREFIX, EXPENSE_ACCOUNTS, PROFIT_LOSS_ACCOUNTS,
                          REVENUE_ACCOUNTS, is_closing_entry)
 
@@ -76,39 +77,11 @@ class PeriodClosing:
     # ---- 取数 ----
 
     def _entries(self) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        offset = 0
-        while True:
-            out = self._kernel.query_entries(offset=offset, limit=200) or {}
-            page = [r for r in (out.get("entries") or out.get("items")
-                                or out.get("data") or [])
-                    if isinstance(r, dict)]
-            if not page:
-                break
-            rows.extend(page)
-            offset += len(page)
-            if len(page) < 200:
-                break
-        return rows
+        return read_entries(self._kernel)
 
     def _proposals(self) -> list[dict[str, Any]]:
         """全量提案（分页）。只取第一页会让「结转已确认」在第 100 条之后被读成未结转。"""
-        rows: list[dict[str, Any]] = []
-        offset = 0
-        while True:
-            out = self._kernel.list_proposals(offset=offset, limit=200) or {}
-            page = [r for r in (out.get("proposals") or out.get("items")
-                                or out.get("data") or [])
-                    if isinstance(r, dict)]
-            if not page:
-                break
-            rows.extend(page)
-            total = out.get("rows_returned")
-            if len(page) < 200 or (total is not None
-                                   and offset + len(page) >= int(total)):
-                break
-            offset += len(page)
-        return rows
+        return read_proposals(self._kernel)
 
     def _attempts(self, period: str) -> list[dict[str, Any]]:
         head = f"{CLOSING_PREFIX}{period}"
