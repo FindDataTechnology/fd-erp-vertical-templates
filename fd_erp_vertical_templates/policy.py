@@ -137,9 +137,11 @@ KEYS: dict[str, dict[str, Any]] = {
         "domain": "consolidation",
         "values": ("closing-rate", "temporal", "none"),
         "default": "none",
-        "impact": "影响外币报表折算与折算差额去向；none 表示单一币种集团，"
-                  "跨币种时会算错总额",
-        "implemented": False,
+        "impact": "影响外币报表折算与折算差额去向：none 表示单一币种集团（外币主体合并即拒，"
+                  "不按 1:1 混入）；closing-rate 按「资产/负债期末、损益平均、权益发生期」折算，"
+                  "差额进权益 CTA 且不落分录；temporal（时态法）要逐笔历史汇率，本版未实现、"
+                  "调用即拒",
+        "implemented": True,
     },
 }
 

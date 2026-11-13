@@ -43,6 +43,20 @@ MONETARY_ACCOUNTS: tuple[str, ...] = ("1000", "1100", "1300", "2000", "2100")
 
 _PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
+#: 汇率两类口径（change: add-fx-translation）：期末用于存量与调汇，期间平均用于损益折算。
+RATE_CLOSING = "closing"
+RATE_AVERAGE = "average"
+RATE_KINDS = (RATE_CLOSING, RATE_AVERAGE)
+
+
+def _check_kind(value: Any) -> str:
+    kind = str(value or "").strip().lower() or RATE_CLOSING
+    if kind not in RATE_KINDS:
+        raise TemplateError("INVALID_ARGUMENT",
+                            f"汇率口径须为 {'/'.join(RATE_KINDS)}：{value!r}",
+                            detail={"allowed": list(RATE_KINDS)})
+    return kind
+
 
 def _check_period(value: Any) -> str:
     key = str(value or "").strip()
@@ -76,15 +90,21 @@ class FxRevaluation:
     # ---- 期末汇率（人工登记，追加式） ----
 
     def register_rates(self, period: Any, rates: dict[str, Any], *,
-                       source: Any, registered_by: str = "cfo") -> dict[str, Any]:
-        """登记某期间的期末汇率；`source` 必须有——无出处的汇率不入账。"""
+                       source: Any, kind: str = RATE_CLOSING,
+                       registered_by: str = "cfo") -> dict[str, Any]:
+        """登记某期间的汇率；`source` 必须有——无出处的汇率不入账。
+
+        `kind` 两类：`closing`（期末，调汇与存量折算用）/ `average`（期间平均，损益折算用）。
+        两者同表追加式、各自独立修订；不传即期末（既有调用点与历史数据不变）。
+        """
         key = _check_period(period)
+        rate_kind = _check_kind(kind)
         note = str(source or "").strip()
         if not note:
             raise TemplateError(
                 "INVALID_ARGUMENT",
-                "期末汇率必须带出处（source）：汇率是外部事实，无出处就无法复核",
-                detail={"period": key})
+                "汇率必须带出处（source）：汇率是外部事实，无出处就无法复核",
+                detail={"period": key, "kind": rate_kind})
         if not isinstance(rates, dict) or not rates:
             raise TemplateError("INVALID_ARGUMENT", "汇率不能为空：{'USD': '7.15'}")
         cleaned: dict[str, str] = {}
@@ -102,20 +122,31 @@ class FxRevaluation:
                 raise TemplateError("INVALID_ARGUMENT",
                                     f"{cur} 汇率须大于零：{raw_rate!r}")
             cleaned[cur] = str(rate)
-        self._log.append({"kind": "rates", "period": key, "rates": cleaned,
-                          "source": note, "registered_by": str(registered_by),
-                          "recorded_at": datetime.now(timezone.utc).isoformat()})
-        return {"period": key, "registered": cleaned, "source": note,
-                "rates": self.rates(key)["rates"],
-                "caliber_note": "追加式修订：同期间同币种以后一次为准，历史留痕"}
+        rec = {"kind": "rates", "period": key, "rates": cleaned,
+               "source": note, "registered_by": str(registered_by),
+               "recorded_at": datetime.now(timezone.utc).isoformat()}
+        if rate_kind != RATE_CLOSING:
+            # 缺省即期末：历史记录不带该键，读侧一律按 closing 理解，故不必回填。
+            rec["rateKind"] = rate_kind
+        self._log.append(rec)
+        return {"period": key, "kind": rate_kind, "registered": cleaned,
+                "source": note, "rates": self.rates(key, kind=rate_kind)["rates"],
+                "caliber_note": "追加式修订：同期间同币种同口径以后一次为准，历史留痕"}
 
-    def rates(self, period: Any) -> dict[str, Any]:
-        """该期间生效的期末汇率（最后一次登记为准）与修订次数。"""
+    def rates(self, period: Any, *, kind: str = RATE_CLOSING) -> dict[str, Any]:
+        """该期间某类口径生效的汇率（最后一次登记为准）与修订次数。
+
+        `average` 缺失时返回空集，**不拿期末汇率冒充**：退回与否由折算方声明
+        （见 `translation.py` 的 `averageFallback`）。
+        """
         key = _check_period(period)
+        rate_kind = _check_kind(kind)
         effective: dict[str, dict[str, Any]] = {}
         revisions = 0
         for rec in self._log.events():
             if rec.get("kind") != "rates" or rec.get("period") != key:
+                continue
+            if str(rec.get("rateKind") or RATE_CLOSING) != rate_kind:
                 continue
             revisions += 1
             for cur, rate in (rec.get("rates") or {}).items():
@@ -123,7 +154,14 @@ class FxRevaluation:
                                        "source": rec.get("source"),
                                        "registeredBy": rec.get("registered_by"),
                                        "registeredAt": rec.get("recorded_at")}
-        return {"period": key, "rates": effective, "revisions": revisions}
+        return {"period": key, "kind": rate_kind, "rates": effective,
+                "revisions": revisions}
+
+    def rate_of(self, period: Any, currency: str, *,
+                kind: str = RATE_CLOSING) -> dict[str, Any] | None:
+        """单币种取率（折算车道的取数口）；无登记即 `None`，由调用方决定拒还是退回。"""
+        cur = str(currency or "").strip().upper()
+        return self.rates(period, kind=kind)["rates"].get(cur)
 
     # ---- 取数与计算 ----
 

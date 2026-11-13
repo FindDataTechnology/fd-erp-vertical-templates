@@ -19,10 +19,19 @@
 抵销分录是**集团层面**的调整，不是某个主体的账。靠 `source_ref` 前缀 `elim:` 识别，
 报告把它单独放进抵销列；这样「主体合计」「抵销」「合并」三列各自可加、可核。
 
-## 为什么外币主体直接拒
+## 为什么外币主体先前直接拒
 
-本版没有折算率数据通路。按 1:1 混入会得到一个看起来精确、实际毫无意义的合并数；
+本版一开始没有折算率数据通路。按 1:1 混入会得到一个看起来精确、实际毫无意义的合并数；
 按某个写死的汇率折更是猜。所以 `NOT_WIRED` 并说清缺什么。
+
+（change: add-fx-translation 起：口径 `fx_translation = closing-rate` 时先折算再抵销，折算差额
+进权益 CTA；口径 `none` 与 `temporal` 仍按上面拒。）
+
+## 为什么折算必须在抵销之前
+
+内部往来取「双方较小者」。一边 USD 1000、一边 CNY 7000，直接比大小是拿两种币种比数字——
+抵销额从根上就是错的，而报表照样能平。所以折算作为 pre-pass：先把每行换成集团本位币，
+再走同一条抵销与平衡管线，不出现第二条口径。
 """
 from __future__ import annotations
 
@@ -37,6 +46,7 @@ from .dates import period_end as _period_end
 from .errors import TemplateError
 from .eventlog import EventLog
 from .policy import PolicyBook
+from .translation import TranslationBook
 
 Q2 = Decimal("0.01")
 ELIM_PREFIX = "elim:"
@@ -99,12 +109,16 @@ class ConsolidationBook:
     """合并工作底稿（分主体取数 + 内部往来抵销 + 平衡断言）。"""
 
     def __init__(self, tenant_id: str, data_dir: str | Path, kernel: Any,
-                 policy: PolicyBook, *, base_currency: str = "CNY"):
+                 policy: PolicyBook, *, base_currency: str = "CNY",
+                 fx: Any = None):
         self._tenant = tenant_id
         self._log = EventLog(Path(data_dir) / f"consolidation-{tenant_id}.jsonl")
         self._kernel = kernel
         self._policy = policy
         self._base = base_currency
+        #: 折算车道与调汇车道共用同一张汇率登记表（`fx` 可缺省：单一币种集团用不到）。
+        self._translation = (TranslationBook(tenant_id, fx, base_currency=base_currency)
+                             if fx is not None else None)
 
     # ---- 主体登记 ----
 
@@ -234,6 +248,75 @@ class ConsolidationBook:
                 "revenue": revenue, "expense": expense,
                 "retained": revenue - expense, "unclassified": unclassified}
 
+    # ---- 折算 pre-pass（change: add-fx-translation） ----
+
+    def _translated_rows(self, period: str, *, cfg: dict[str, Any],
+                         registered: dict[str, dict[str, Any]]
+                         ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """把期间内（含以前）分录折成集团本位币。
+
+        返回已折算的分录与折算摘要（每主体差额 + 差额合计 + 平均汇率退回清单）。
+        `elim:` 分录与未标主体分录不折（它们本来就记在集团本位币）。
+        """
+        rows = [r for r in self._entries()
+                if entry_period(r) in ("", "unknown") or entry_period(r) <= period]
+        mode = str(cfg["values"].get("fx_translation"))
+        by_entity: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            who, col = self._split_source(row)
+            if col == "entity":
+                by_entity.setdefault(who, []).append(row)
+
+        out: list[dict[str, Any]] = [r for r in rows if self._split_source(r)[1] != "entity"]
+        per_entity: dict[str, dict[str, Any]] = {}
+        fallbacks: list[dict[str, Any]] = []
+        total = Decimal(0)
+
+        for who, group in by_entity.items():
+            ent = registered.get(who)
+            func = (str(ent["functionalCurrency"]).strip().upper()
+                    if ent else self._base)
+            if func == self._base:
+                if ent is None and any(
+                        str(r.get("currency") or self._base).upper() != self._base
+                        for r in group):
+                    raise TemplateError(
+                        "NOT_WIRED",
+                        f"主体 {who} 未登记，但账上有非本位币分录：不知道它的记账本位币，"
+                        "无法判断该不该折算——先登记该主体（含记账本位币）",
+                        detail={"entityId": who, "baseCurrency": self._base,
+                                "missing": "主体登记（functional_currency）"})
+                out.extend(group)
+                continue
+            if mode == "none":
+                raise TemplateError(
+                    "NOT_WIRED",
+                    f"主体 {who} 记账本位币 {func} ≠ 集团本位币 {self._base}："
+                    f"口径 fx_translation=none 无折算通路，不按 1:1 混入",
+                    detail={"entityId": who, "baseCurrency": self._base,
+                            "functionalCurrency": func,
+                            "missing": "折算率通路（fx_translation=none）",
+                            "fix": "把口径 fx_translation 置为 closing-rate 并登记该期间汇率"})
+            if mode != "closing-rate":
+                raise TemplateError(
+                    "NOT_WIRED",
+                    f"折算口径 {mode} 本版未实现：时态法要逐笔历史汇率（我们没有逐日汇率）",
+                    detail={"fx_translation": mode, "implemented": ["closing-rate", "none"]})
+            if self._translation is None:
+                raise TemplateError(
+                    "NOT_WIRED",
+                    f"合并车道没有接汇率登记表：外币主体 {who} 无法折算",
+                    detail={"entityId": who, "missing": "FxRevaluation 未注入"})
+            got = self._translation.translate(who, period, group,
+                                              functional_currency=func)
+            out.extend(got["rows"])
+            per_entity[who] = got
+            total += _dec(got["totals"]["translationDifference"])
+            fallbacks.extend(got["averageFallback"])
+
+        return out, {"mode": mode, "difference": total,
+                     "entities": per_entity, "averageFallback": fallbacks}
+
     # ---- 工作底稿 ----
 
     def report(self, period: Any) -> dict[str, Any]:
@@ -257,17 +340,7 @@ class ConsolidationBook:
                         "implemented": ["intercompany-ar-ap"]})
 
         registered = {e["entityId"]: e for e in self.entities()}
-        for e in registered.values():
-            if str(e["functionalCurrency"]).upper() != self._base:
-                raise TemplateError(
-                    "NOT_WIRED",
-                    f"主体 {e['entityId']} 记账本位币 {e['functionalCurrency']} "
-                    f"≠ 集团本位币 {self._base}：本版无折算率数据通路，不按 1:1 混入",
-                    detail={"entityId": e["entityId"], "baseCurrency": self._base,
-                            "missing": "折算率通路（fx_translation 未实现）"})
-
-        rows = [r for r in self._entries()
-                if entry_period(r) in ("", "unknown") or entry_period(r) <= key]
+        rows, translation = self._translated_rows(key, cfg=cfg, registered=registered)
         by_group: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
             who, _col = self._split_source(row)
@@ -279,13 +352,18 @@ class ConsolidationBook:
         for who in names:
             sums = ConsolidationBook._sums(by_group.get(who, []))
             st = self._statement_lines(sums)
+            cta = (translation["entities"].get(who, {})
+                   .get("totals", {}).get("translationDifference"))
             entity_cols.append({
                 "entity": who, "registered": who in registered,
                 "ownership": registered.get(who, {}).get("ownership"),
                 "assets": _fmt(st["assets"]), "liabilities": _fmt(st["liabilities"]),
                 "equity": _fmt(st["equity"]),
                 "revenue": _fmt(st["revenue"]), "expense": _fmt(st["expense"]),
-                "balanced": (st["assets"] == st["liabilities"] + st["equity"] + st["retained"])
+                # 折算过的列自平要把折算差额算进去，否则外币主体每期都被判「不平」
+                "translationDifference": cta,
+                "balanced": (st["assets"] == st["liabilities"] + st["equity"]
+                             + st["retained"] + _dec(cta or 0))
                             and not st["unclassified"],
             })
 
@@ -306,7 +384,9 @@ class ConsolidationBook:
         combined_expense = sum((_dec(c["expense"]) for c in entity_cols), Decimal(0)) \
             + elim_st["expense"]
         retained = combined_revenue - combined_expense
-        rhs = combined_liab + combined_equity + retained
+        cta = translation["difference"]
+        # 折算差额进合并权益（列示为独立一行）；不塞进未结转损益
+        rhs = combined_liab + combined_equity + cta + retained
         balanced = combined_assets == rhs
 
         out = {
@@ -314,7 +394,17 @@ class ConsolidationBook:
             "baseCurrency": self._base,
             "entityModel": model,
             "eliminationScope": scope,
+            "fxTranslation": translation["mode"],
             "entities": entity_cols,
+            "translation": {
+                "difference": _fmt(cta),
+                "byEntity": [{"entity": who, "functionalCurrency": got["functionalCurrency"],
+                              "closingRate": got["rates"]["closing"],
+                              "difference": got["totals"]["translationDifference"],
+                              "balanced": got["balanced"]}
+                             for who, got in sorted(translation["entities"].items())],
+                "averageFallback": translation["averageFallback"],
+            },
             "elimination": {
                 "computed": {"assets": _fmt(computed["assets"]),
                              "liabilities": _fmt(computed["liabilities"])},
@@ -326,6 +416,7 @@ class ConsolidationBook:
                 "assets": _fmt(combined_assets),
                 "liabilities": _fmt(combined_liab),
                 "equity": _fmt(combined_equity),
+                "translationDifference": _fmt(cta),
                 "revenue": _fmt(combined_revenue),
                 "expense": _fmt(combined_expense),
                 "retained": _fmt(retained),
@@ -333,7 +424,10 @@ class ConsolidationBook:
             },
             "balanced": balanced,
             "caliber_note": "合并 = 各主体合计 + 抵销列 − 计算出的内部往来抵销；"
-                            "未标主体的分录单列 unattributed，不摊给任何主体",
+                            "未标主体的分录单列 unattributed，不摊给任何主体；"
+                            "外币主体先折算再抵销，折算差额进权益且未按持股拆分归母/少数股东；"
+                            "内部往来按科目（1100↔2000）识别——同一科目里若混有对外往来，"
+                            "会一并计入抵销，差额在 unmatched 里点名",
         }
         if not balanced:
             out["error"] = (f"合并后不平：资产 {_fmt(combined_assets)} ≠ "
@@ -397,7 +491,10 @@ class ConsolidationBook:
                              submitted_by: str = "consolidation-engine") -> dict[str, Any]:
         """把计算的内部往来抵销落成一笔待确认 proposal（业务日期 = 期间末日）。"""
         key = _check_period(period)
-        rows = [r for r in self._entries() if entry_period(r) <= key]
+        # 与 report 同源：外币主体先折算再算抵销额，否则两条路径会给出两个抵销数
+        registered = {e["entityId"]: e for e in self.entities()}
+        rows, _translation = self._translated_rows(
+            key, cfg=self._policy.current(), registered=registered)
         by_group: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
             who, _col = self._split_source(row)

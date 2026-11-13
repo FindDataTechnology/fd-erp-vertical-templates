@@ -144,8 +144,14 @@ def test_unknown_before_request_id_is_not_found(book):
 
 # ---- 4) 未实现引擎的口径：登记但明确不生效 ----
 
-def test_unimplemented_engine_keys_are_recorded_only(book):
-    # 折旧/预算/合并引擎都已交付，本版仅剩外币折算没有数据通路，用它做对照
+def test_unimplemented_engine_keys_are_recorded_only(book, monkeypatch):
+    """机制仍在：某键没接消费者时，提案当下就自报「仅登记」，不等人读历史才知道。
+
+    `fx_translation` 交付后（change: add-fx-translation）册内已没有一个
+    `implemented=False` 的键，所以这里临时把一个键标回去——验的是**通道本身**还通；
+    今天的「一个都没有」由下一条测试把关。
+    """
+    monkeypatch.setitem(KEYS["fx_translation"], "implemented", False)
     prop = book.propose({"fx_translation": "closing-rate"})
     assert prop["recordedOnly"] == ["fx_translation"]
     assert "仅登记" in prop["note"]          # 提案自己就说清「还没消费者」
@@ -154,23 +160,16 @@ def test_unimplemented_engine_keys_are_recorded_only(book):
     assert now["values"]["fx_translation"] == "closing-rate"
     assert now["keys"]["fx_translation"]["enforced"] is False
     assert now["keys"]["cost_method"]["enforced"] is True
-    # 合并两键已交付：合并车道的实现只认各键的一个取值，其余取值在车道里 NOT_WIRED
-    assert now["keys"]["entity_model"]["enforced"] is True
-    assert now["keys"]["elimination_scope"]["enforced"] is True
     assert now["counts"]["recordedOnly"] == 1
 
 
 def test_implemented_flags_match_reality(book):
-    for key in ("cost_method", "provisional_basis", "variance_policy", "close_grain",
-                "depreciation_method", "asset_ledger_owner",
-                "budget_dimension", "budget_period", "budget_control",
-                "bad_debt_method",
-                # 合并两键：车道已交付（实现的是 single-tenant-multi-entity 与
-                # intercompany-ar-ap；其它取值在车道里 NOT_WIRED，不是「没消费者」）
-                "entity_model", "elimination_scope"):
+    # 今天每个键都有消费者（合并两键实现的是 single-tenant-multi-entity 与
+    # intercompany-ar-ap，其余取值在车道里 NOT_WIRED——那是取值未实现，不是键没消费者）。
+    for key in KEYS:
         assert book.explain(key)["implemented"] is True, key
-    # 只剩外币折算没有数据通路
-    assert book.explain("fx_translation")["implemented"] is False
+    # 新增键若没接引擎却忘了标 implemented=False，这里会红。
+    assert book.current()["counts"]["recordedOnly"] == 0
 
 
 # ---- 5) 四类口径齐备，候选值一个不少 ----
