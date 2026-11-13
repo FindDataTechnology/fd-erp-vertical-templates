@@ -27,12 +27,19 @@ BASE = Path(__file__).resolve().parents[1] / "localization" / "cn"
 #: 内核科目的封闭五类（与 `accounts.account_type` 同构）。
 KINDS = ("asset", "liability", "equity", "revenue", "expense")
 
-#: 本次接的准则：小企业（报表已接）。大企业科目表进仓但报表未接。
+#: 本次接的准则：两套都接（change: add-cn-large-chart-statements）。
+#: 映射与报表行次**按准则分表**：同一科目码在两套准则里语义不同
+#: （5401 小表是主营业务成本、大表是工程施工；4001 小表是生产成本、大表是实收资本），
+#: 共用一份映射会让另一套静默错行。
 CHART_SMALL = "accounts-small.json"
 CHART_LARGE = "accounts-large.json"
 TAX_FILE = "tax-codes.json"
-MAPPING_FILE = "mapping.json"
-STATEMENTS_FILE = "statements-small.json"
+MAPPING_FILES = {CHART_SMALL: "mapping.json", CHART_LARGE: "mapping-large.json"}
+STATEMENTS_FILES = {CHART_SMALL: "statements-small.json",
+                    CHART_LARGE: "statements-large.json"}
+#: 兼容旧引用（默认准则那份）。
+MAPPING_FILE = MAPPING_FILES[CHART_SMALL]
+STATEMENTS_FILE = STATEMENTS_FILES[CHART_SMALL]
 
 #: 各文件的期望条数（上游实测；变化即需复核 PROVENANCE）。
 EXPECTED_COUNTS = {CHART_SMALL: 156, CHART_LARGE: 286, TAX_FILE: 62}
@@ -136,22 +143,22 @@ class CnPack:
                 f"国别科目的父级无法解析：{'、'.join(missing[:5])}",
                 detail={"missingParents": missing})
         self._tax = _read(self._root / TAX_FILE).get("codes") or []
-        self._mapping = _read(self._root / MAPPING_FILE)
-        self._statements = _read(self._root / STATEMENTS_FILE)
+        self._mapping = _read(self._root / MAPPING_FILES[chart])
+        self._statements = _read(self._root / STATEMENTS_FILES[chart])
         self._check_mapping()
+        self._check_statements()
 
     def _check_mapping(self) -> None:
-        """映射只对小企业准则成立；加载别的准则时跳过（不是它的错）。
+        """映射写错比不写更糟：目标科目必须真在包里，否则报表会静默少一行。
 
-        映射写错比不写更糟：目标科目必须真在包里，否则报表会静默少一行。
+        两套准则都做真校验（早先对非小企业直接 return，等于给大表发免检牌）。
         """
-        if self.chart != CHART_SMALL:
-            return
         chart = str(self._mapping.get("chart") or "")
-        if chart and chart != "cn-small-business":
+        expected = "cn-small-business" if self.chart == CHART_SMALL else "cn-enterprise"
+        if chart and chart != expected:
             raise TemplateError(
                 "INVALID_ARGUMENT",
-                f"映射文件声明的准则 {chart} 与所加载的小企业准则不一致",
+                f"映射文件声明的准则 {chart} 与所加载的准则 {expected} 不一致",
                 detail={"mappingChart": chart, "packChart": self.chart})
         kernel_to_cn = self._mapping.get("kernelToCn") or {}
         dangling = sorted({str(v.get("cn")) for v in kernel_to_cn.values()
@@ -159,8 +166,38 @@ class CnPack:
         if dangling:
             raise TemplateError(
                 "INVALID_ARGUMENT",
-                f"映射指向的准则科目不存在：{'、'.join(dangling[:5])}",
-                detail={"dangling": dangling})
+                f"映射指向的准则科目不存在：{'、'.join(dangling[:5])}"
+                f"（准则 {expected}）",
+                detail={"dangling": dangling, "chart": expected})
+
+    def _check_statements(self) -> None:
+        """报表行次的科目与引用都要能解析——否则报表会静默少一行或算成 0。"""
+        rules = self._statements
+        keys: set[str] = set()
+        problems: list[str] = []
+        sections = list((rules.get("balanceSheet") or {}).values()) + [
+            rules.get("incomeStatement") or []]
+        for lines in sections:
+            for line in lines:
+                keys.add(str(line.get("key")))
+        for lines in sections:
+            for line in lines:
+                key = str(line.get("key"))
+                for code in line.get("codes") or []:
+                    if not self.account(code):
+                        problems.append(f"{key}: 科目 {code} 不在准则表里")
+                for ref in line.get("subtotal_of") or []:
+                    if str(ref) not in keys:
+                        problems.append(f"{key}: 小计引用了未定义的键 {ref}")
+                for term in line.get("formula") or []:
+                    ref = str(term).lstrip("+-")
+                    if ref not in keys:
+                        problems.append(f"{key}: 公式引用了未定义的键 {ref}")
+        if problems:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"报表行次与准则表不一致（{self.chart}）：{'；'.join(problems[:5])}",
+                detail={"problems": problems[:20], "chart": self.chart})
 
     # ---- 查询 ----
 

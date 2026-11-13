@@ -85,7 +85,8 @@ def test_verify_reports_every_file():
     out = verify()
     assert {f["file"] for f in out["files"]} == {
         CHART_SMALL, CHART_LARGE, "tax-codes.json",
-        "mapping.json", "statements-small.json"}
+        "mapping.json", "statements-small.json",
+        "mapping-large.json", "statements-large.json"}
     assert out["source"].startswith("odoo/addons/l10n_cn")
 
 

@@ -7,11 +7,14 @@
 映射或忘了把它挂进某个报表项目——资产负债表两边同时少一笔，合计仍然相等，利润表照样
 出「净利润」，人眼看不出来。等到审计问「这笔钱在表上哪一行」，才发现表一直少一行。
 
-判据四条：
-1. 国别包自校验通过（条数、sha256、映射目标科目存在）；
-2. `statements.CHART` 的每个科目都有映射；
-3. 每个映射目标都被至少一个资产负债表或利润表项目覆盖（不覆盖即漏项）；
+判据四条（**两套准则各跑一遍**）：
+1. 国别包自校验通过（条数、sha256、映射目标科目存在、行次科目与引用可解析）；
+2. `statements.CHART` 的每个科目在两套准则里都有映射；
+3. 每个映射目标都被该准则至少一个资产负债表或利润表项目覆盖（不覆盖即漏项）；
 4. `statements.CHART` 与 `consolidation.CHART` 完全一致（分叉会让合并报表少科目）。
+
+为什么要两套：同一科目码在两张准则表里语义不同（5401 小表是主营业务成本、大表是工程施工），
+共用一份映射或只查一套，另一套就会静默少行——而报表照样平。
 
 用法：python3 scripts/check_cn_localization.py [--json]
 退出码：0 通过 / 1 有违规。
@@ -41,34 +44,39 @@ def main(argv: list[str] | None = None) -> int:
     from fd_erp_vertical_templates.statements import CHART as STATEMENTS_CHART
 
     problems: list[str] = []
-    try:
-        pack = CnPack()
-    except Exception as exc:                     # noqa: BLE001 - 加载失败即红
-        payload = {"ok": False, "problems": [f"国别包加载失败：{exc}"]}
-        print(json.dumps(payload, ensure_ascii=False) if args.json
-              else f"✗ 国别包加载失败：{exc}")
-        return 1
+    per_chart: dict[str, dict[str, int]] = {}
 
-    mapping = pack.kernel_to_cn()
-    rules = pack.statements()
-    bs = rules["balanceSheet"]
-    is_ = rules["incomeStatement"]
-    all_lines = bs["assets"] + bs["liabilities"] + bs["equity"] + is_
-    covered = [c for line in all_lines for c in (line.get("codes") or [])]
-
-    # 2) 每个内核科目都要有映射
-    for code in sorted(STATEMENTS_CHART):
-        if code not in mapping:
-            problems.append(f"内核科目 {code} 没有映射到准则科目——报表会静默少这一行")
-
-    # 3) 每个映射目标都要被某个报表项目覆盖
-    for code, target in sorted(mapping.items()):
-        if code not in STATEMENTS_CHART:
-            problems.append(f"映射里的 {code} 不是内核科目（内核里没有它）")
+    for chart in ("accounts-small.json", "accounts-large.json"):
+        try:
+            pack = CnPack(chart=chart)
+        except Exception as exc:                 # noqa: BLE001 - 加载失败即红
+            problems.append(f"{chart} 加载失败：{exc}")
             continue
-        if not _covers(covered, target):
-            problems.append(
-                f"内核科目 {code} → 准则 {target}，但该准则科目不在任何报表项目里（漏项）")
+        label = pack.statements().get("chart") or chart
+        mapping = pack.kernel_to_cn()
+        rules = pack.statements()
+        bs = rules["balanceSheet"]
+        is_ = rules["incomeStatement"]
+        all_lines = bs["assets"] + bs["liabilities"] + bs["equity"] + is_
+        covered = [c for line in all_lines for c in (line.get("codes") or [])]
+        per_chart[label] = {"kernelAccounts": len(STATEMENTS_CHART),
+                            "mapped": len(mapping), "statementLines": len(all_lines)}
+
+        # 2) 每个内核科目在该准则下都要有映射
+        for code in sorted(STATEMENTS_CHART):
+            if code not in mapping:
+                problems.append(f"[{label}] 内核科目 {code} 没有映射到准则科目"
+                                "——报表会静默少这一行")
+
+        # 3) 每个映射目标都要被该准则的某个报表项目覆盖
+        for code, target in sorted(mapping.items()):
+            if code not in STATEMENTS_CHART:
+                problems.append(f"[{label}] 映射里的 {code} 不是内核科目（内核里没有它）")
+                continue
+            if not _covers(covered, target):
+                problems.append(
+                    f"[{label}] 内核科目 {code} → 准则 {target}，"
+                    "但该准则科目不在任何报表项目里（漏项）")
 
     # 4) 两张 CHART 必须一致
     if STATEMENTS_CHART != CONSOLIDATION_CHART:
@@ -80,8 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "ok": not problems,
         "kernelAccounts": len(STATEMENTS_CHART),
-        "mapped": len(mapping),
-        "statementLines": len(all_lines),
+        "charts": per_chart,
         "problems": problems,
     }
     if args.json:
@@ -92,8 +99,10 @@ def main(argv: list[str] | None = None) -> int:
             for p in problems:
                 print("  ✗", p)
         else:
-            print(f"国别映射覆盖闸：通过（{len(STATEMENTS_CHART)} 个内核科目全部映射并落到"
-                  f" {len(all_lines)} 个报表项目；两张 CHART 一致）")
+            detail = "；".join(f"{name}：{c['mapped']} 映射 / {c['statementLines']} 行"
+                              for name, c in per_chart.items())
+            print(f"国别映射覆盖闸：通过（{len(STATEMENTS_CHART)} 个内核科目在两套准则下"
+                  f"均映射并落到报表项目——{detail}；两张 CHART 一致）")
     return 1 if problems else 0
 
 

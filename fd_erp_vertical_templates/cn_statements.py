@@ -79,6 +79,8 @@ class CnStatements:
         self._pack = pack or CnPack()
         self._map = self._pack.kernel_to_cn()
         self._rules = self._pack.statements()
+        #: 报表口径名随所加载的准则（两套报表同一引擎，只是行次与科目码不同）。
+        self._chart = str(self._rules.get("chart") or "cn-small-business")
 
     # ---- 取数 ----
 
@@ -221,7 +223,7 @@ class CnStatements:
                                   bs["assets"] + bs["liabilities"] + bs["equity"],
                                   include_kinds=("asset", "liability", "equity"))
         out = {
-            "schema": SCHEMA, "period": key, "chart": "cn-small-business",
+            "schema": SCHEMA, "period": key, "chart": self._chart,
             "assets": assets, "liabilities": liabilities, "equity": equity,
             "totals": {
                 "assets": _fmt(total_assets),
@@ -252,7 +254,7 @@ class CnStatements:
         unmapped = self._unmapped(by_kernel, missing, self._rules["incomeStatement"],
                                   include_kinds=("revenue", "expense"))
         out = {
-            "schema": SCHEMA, "period": key, "chart": "cn-small-business",
+            "schema": SCHEMA, "period": key, "chart": self._chart,
             "lines": lines,
             "totals": {"operatingProfit": _fmt(tot["operating_profit"]),
                        "totalProfit": _fmt(tot["total_profit"]),
