@@ -65,6 +65,17 @@ PROFIT_LOSS_ACCOUNTS: tuple[str, ...] = REVENUE_ACCOUNTS + EXPENSE_ACCOUNTS
 CLOSING_PREFIX = "close:"
 
 
+#: 期末调汇分录前缀（change: add-fx-revaluation）。间接法里它的影响通过「汇兑损益」加回，
+#: 若再算进应收/应付变动就是同一个数既加回又减掉。
+FX_REVAL_PREFIX = "fx-reval:"
+
+
+def is_fx_revaluation_entry(entry: Any) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    return str(entry.get("source_ref") or "").startswith(FX_REVAL_PREFIX)
+
+
 def is_closing_entry(entry: Any) -> bool:
     """结转分录判定（唯一实现：报表排除与结转车道自查都调这里）。"""
     if not isinstance(entry, dict):
@@ -78,6 +89,11 @@ def is_closing_entry(entry: Any) -> bool:
 CASH_ACCOUNTS: tuple[str, ...] = ("1000",)
 
 CATEGORIES = ("operating", "investing", "financing")
+
+#: 间接法里的营运资本：应收 / 存货 / 在途结算款 / 应付 / 预收暂收。
+#: 不含货币资金（它就是现金本身）、不含 1231（减值准备是估计，走加回项）、
+#: 不含固定资产与折旧（投资活动与加回项）。
+WORKING_CAPITAL_ACCOUNTS: tuple[str, ...] = ("1100", "1200", "1300", "2000", "2100")
 CATEGORY_LABELS = {
     "operating": "经营活动产生的现金流量",
     "investing": "投资活动产生的现金流量",
@@ -529,3 +545,80 @@ class StatementBook:
                             f"先查未归类科目与缺对手行的交易")
         return out
 
+    def cash_flow_indirect(self, period: str) -> dict[str, Any]:
+        """补充资料（间接法）：净利润 → 加回非现金 → 减营运资本占用 → 经营净额。
+
+        与直接法互证：两条完全独立的推导路径必须给出同一个经营净额。对不上就是有一处
+        算错了——而单看任一张表都「自洽」，所以这里必须报差额而不是调平。
+        """
+        key = _check_period(period)
+        grain = _grain(key)
+        window = [e for e in self._entries()
+                  if entry_period(e, grain) == key and not is_closing_entry(e)]
+
+        profit = Decimal(self.income_statement(key)["operatingProfit"])
+        sums = self._sums(window)
+        # 折旧：累计折旧在贷方增加（net 为负），加回额取正；处置转出会让它变负，如实保留。
+        depreciation = -sums.get("1602", {}).get("net", Decimal(0))
+        impairment = sums.get("6602", {}).get("net", Decimal(0))
+        # 汇兑损益：借方是损失（加回），贷方是收益（减掉）。
+        fx = sums.get("6603", {}).get("net", Decimal(0))
+
+        adjustments = [
+            {"line": "信用减值损失", "amount": _fmt(impairment)},
+            {"line": "固定资产折旧", "amount": _fmt(depreciation)},
+            {"line": "汇兑损益", "amount": _fmt(fx)},
+        ]
+        adjust_total = impairment + depreciation + fx
+
+        wc_rows: list[dict[str, Any]] = []
+        wc_total = Decimal(0)
+        for code in WORKING_CAPITAL_ACCOUNTS:
+            change = Decimal(0)
+            for entry in window:
+                if str(entry.get("account_code") or "").strip() != code:
+                    continue
+                if is_fx_revaluation_entry(entry):
+                    continue          # 调汇的影响在「汇兑损益」加回项里，不重复计
+                change += self._signed(entry)
+            wc_total += change
+            wc_rows.append({"accountCode": code,
+                            "account": CHART.get(code, (code, ""))[0],
+                            "change": _fmt(change)})
+
+        indirect = profit + adjust_total - wc_total
+        cash = self.cash_flow(key)
+        direct = Decimal(str(cash["categories"]["operating"]["net"]))
+        difference = indirect - direct
+        unclassified = list(cash.get("unclassified") or [])
+        consistent = difference == 0 and not unclassified and not cash.get("fragments")
+
+        out: dict[str, Any] = {
+            "period": key,
+            "netProfit": _fmt(profit),
+            "adjustments": adjustments,
+            "adjustmentsTotal": _fmt(adjust_total),
+            "workingCapital": wc_rows,
+            "workingCapitalTotal": _fmt(wc_total),
+            "indirectOperating": _fmt(indirect),
+            "directOperating": _fmt(direct),
+            "difference": _fmt(difference),
+            "consistent": consistent,
+            "caliber_note": "起点=本期营业利润（本版无所得税与营业外收支）；"
+                            "营运资本按「借 − 贷」取本期变动并整体减去（资产增加是占用、"
+                            "负债增加是来源）；调汇分录不计入营运资本（已通过汇兑损益加回）",
+        }
+        if unclassified:
+            out["unclassified"] = unclassified
+            out["note"] = (f"直接法有表外科目 {', '.join(unclassified)} 未归位，"
+                           f"两法不可能对上——先补归位表")
+        if not consistent and "error" not in out:
+            if difference != 0:
+                out["error"] = (f"间接法经营净额 {_fmt(indirect)} ≠ 直接法 {_fmt(direct)}"
+                                f"（差 {_fmt(difference)}）——两条路径各自自洽但对不上，"
+                                f"先查未归类科目与非现金项是否漏列")
+            else:
+                # 两法都是 0 却仍不自证：现金变了但拿不到对手科目，两法会一起「看不见」它。
+                out["error"] = ("两法净额相同，但直接法有未归位科目或缺对手行的交易，"
+                                "现金变动无法归类——报表仍判不自证")
+        return out

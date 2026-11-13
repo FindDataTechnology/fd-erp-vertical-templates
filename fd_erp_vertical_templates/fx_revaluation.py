@@ -29,11 +29,12 @@ from .dates import entry_period, period_end
 from .errors import TemplateError
 from .eventlog import EventLog
 from .kernel_rows import read_entries, read_proposals
-from .statements import CHART
+from .statements import CHART, FX_REVAL_PREFIX
 
 Q2 = Decimal("0.01")
 FX_ACCOUNT = "6603"
-FX_SOURCE_PREFIX = "fx-reval:"
+#: 与报表同源：间接法靠这个前缀把调汇分录从营运资本变动里排除。
+FX_SOURCE_PREFIX = FX_REVAL_PREFIX
 
 #: 外币货币性项目：现金、应收、在途结算款、应付、预收暂收。
 #: 存货（1200）/固定资产（1601）/累计折旧（1602）/坏账准备（1231）是**非货币性**或估计项，

@@ -358,3 +358,97 @@ def test_cash_flow_period_follows_booked_on_not_posting_time():
     assert oct_["netIncrease"] == "500.00" and oct_["consistent"] is True
     assert nov["openingCash"] == "500.00"
     assert nov["netIncrease"] == "0.00" and nov["consistent"] is True
+
+
+# ---- 9) 补充资料（间接法）（change: add-cash-flow-indirect）----
+
+def _ind(entries):
+    return _book(entries).cash_flow_indirect("2026-11")
+
+
+def test_indirect_reconciles_cash_sale_and_paid_expense():
+    """现销 3000、付现费用 800：净利润 2200，营运资本不动 → 两法都 2200。"""
+    entries = _t("t-sale", "2026-11-05",
+                 [("1000", "debit", "3000"), ("4000", "credit", "3000")]) + \
+        _t("t-exp", "2026-11-06",
+           [("5200", "debit", "800"), ("1000", "credit", "800")])
+    out = _ind(entries)
+    assert out["netProfit"] == "2200.00"
+    assert out["workingCapitalTotal"] == "0.00"
+    assert out["indirectOperating"] == out["directOperating"] == "2200.00"
+    assert out["difference"] == "0.00" and out["consistent"] is True
+
+
+def test_indirect_credit_sale_nets_to_zero_operating_cash():
+    entries = _t("t-credit", "2026-11-05",
+                 [("1100", "debit", "1000"), ("4000", "credit", "1000")])
+    out = _ind(entries)
+    assert out["netProfit"] == "1000.00"
+    assert {r["accountCode"]: r["change"] for r in out["workingCapital"]}["1100"] == "1000.00"
+    assert out["indirectOperating"] == out["directOperating"] == "0.00"
+    assert out["consistent"] is True
+
+
+def test_indirect_adds_back_depreciation():
+    entries = _t("t-dep", "2026-11-30",
+                 [("5200", "debit", "1000"), ("1602", "credit", "1000")])
+    out = _ind(entries)
+    assert out["netProfit"] == "-1000.00"
+    assert {r["line"]: r["amount"] for r in out["adjustments"]}["固定资产折旧"] == "1000.00"
+    assert out["indirectOperating"] == "0.00"
+    assert out["consistent"] is True
+
+
+def test_indirect_adds_back_impairment_without_touching_receivables():
+    """减值：净利润 −650，加回 650；1231 不是营运资本（估计项），所以经营净额为零。"""
+    entries = _t("t-imp", "2026-11-30",
+                 [("6602", "debit", "650"), ("1231", "credit", "650")])
+    out = _ind(entries)
+    assert out["netProfit"] == "-650.00"
+    assert {r["line"]: r["amount"] for r in out["adjustments"]}["信用减值损失"] == "650.00"
+    assert out["indirectOperating"] == "0.00"
+    assert out["consistent"] is True
+
+
+def test_indirect_excludes_fx_revaluation_from_working_capital():
+    """200 调汇（无现金流入）不能同时进「汇兑损益加回」和「应收变动」。"""
+    entries = (
+        [{"account_code": "1100", "direction": "debit", "amount": "1000",
+            "amount_base": "7000", "currency": "USD", "booked_on": "2026-11-06",
+            "posted_at": "2026-11-06T09:00:00+08:00", "txn_id": "t-usd", "line_no": 1},
+           {"account_code": "4000", "direction": "credit", "amount": "7000",
+            "amount_base": "7000", "currency": "CNY", "booked_on": "2026-11-06",
+            "posted_at": "2026-11-06T09:00:00+08:00", "txn_id": "t-usd", "line_no": 2}]
+        + [{"account_code": "1100", "direction": "debit", "amount": "200",
+            "amount_base": "200", "currency": "CNY", "booked_on": "2026-11-30",
+            "posted_at": "2026-11-30T09:00:00+08:00", "txn_id": "t-rev", "line_no": 1,
+            "source_ref": "fx-reval:2026-11"},
+           {"account_code": "6603", "direction": "credit", "amount": "200",
+            "amount_base": "200", "currency": "CNY", "booked_on": "2026-11-30",
+            "posted_at": "2026-11-30T09:00:00+08:00", "txn_id": "t-rev", "line_no": 2,
+            "source_ref": "fx-reval:2026-11"}]
+    )
+    out = _ind(entries)
+    # 应收变动只含业务分录 7000（调汇的 200 被排除），汇兑收益 −200 加回
+    assert {r["accountCode"]: r["change"] for r in out["workingCapital"]}["1100"] == "7000.00"
+    assert {r["line"]: r["amount"] for r in out["adjustments"]}["汇兑损益"] == "-200.00"
+    assert out["netProfit"] == "7200.00"          # 7000 收入 + 200 汇兑收益
+    assert out["indirectOperating"] == "0.00"
+    assert out["difference"] == "0.00" and out["consistent"] is True
+
+
+def test_indirect_flags_a_difference_instead_of_forcing_it():
+    """出现归位表外科目（外币现金调汇）→ 两法对不上，如实报差额。"""
+    entries = [{"account_code": "1000", "direction": "debit", "amount": "200",
+                "amount_base": "200", "currency": "CNY", "booked_on": "2026-11-30",
+                "posted_at": "2026-11-30T09:00:00+08:00", "txn_id": "t-cashrev",
+                "line_no": 1, "source_ref": "fx-reval:2026-11"},
+               {"account_code": "6603", "direction": "credit", "amount": "200",
+                "amount_base": "200", "currency": "CNY", "booked_on": "2026-11-30",
+                "posted_at": "2026-11-30T09:00:00+08:00", "txn_id": "t-cashrev",
+                "line_no": 2, "source_ref": "fx-reval:2026-11"}]
+    out = _ind(entries)
+    assert out["consistent"] is False             # 现金变了 200，但两法都看不见它
+    assert out["unclassified"] == ["6603"]
+    assert out["difference"] == "0.00"            # 差额为零不等于自证：还有未归位科目
+    assert "不自证" in out["error"]
