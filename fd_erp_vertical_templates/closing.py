@@ -30,17 +30,16 @@ from typing import Any
 from .dates import entry_period, period_end
 from .errors import TemplateError
 from .kernel_rows import read_entries, read_proposals
-from .statements import (CLOSING_PREFIX, EXPENSE_ACCOUNTS, PROFIT_LOSS_ACCOUNTS,
-                         REVENUE_ACCOUNTS, is_closing_entry)
+from .statements import (CHART, CLOSING_PREFIX, EXPENSE_ACCOUNTS,
+                         PROFIT_LOSS_ACCOUNTS, REVENUE_ACCOUNTS, is_closing_entry)
 
 Q2 = Decimal("0.01")
 #: 期末转入的权益科目（留存收益）。盈利记贷、亏损记借。
 RETAINED_ACCOUNT = "3100"
-ACCOUNT_NAMES = {
-    "4000": "营业收入", "5000": "营业成本", "5100": "平台及支付费用",
-    "5200": "其他经营费用", "6602": "信用减值损失", "6603": "汇兑损益",
-    "3100": "留存收益",
-}
+#: 科目名从 `CHART` 派生：另写一份表就会在加科目时漏——0019 加的
+#: 5301/5403/5711/5801 就漏过，预览里显示成裸科目码。
+ACCOUNT_NAMES = {code: CHART[code][0]
+                 for code in (*PROFIT_LOSS_ACCOUNTS, RETAINED_ACCOUNT)}
 
 _PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 

@@ -212,3 +212,41 @@ def test_trial_balance_includes_closing_and_stays_balanced():
     rows = {r["accountCode"]: r for r in tb["rows"]}
     assert rows["4000"]["debit"] == "3000.00"   # 结平的借记确实进了试算表
     assert rows["4000"]["balance"] == "0.00"
+
+
+# ---- 5) 附加税/所得税也在结转范围内（change: add-cn-surcharge-and-income-tax）----
+
+def _tax_entries() -> list[dict]:
+    """含税销售 113（收入 100、销项 13）+ 附加税 7.80 + 所得税 23.05。"""
+    return [
+        _e("1000", "debit", "113"), _e("4000", "credit", "100"),
+        _e("2221.01.01", "credit", "13"),
+        _e("5403", "debit", "7.80"), _e("2221.12", "credit", "4.55"),
+        _e("2221.13", "credit", "1.95"), _e("2221.14", "credit", "1.30"),
+        _e("5801", "debit", "23.05"), _e("2221.11", "credit", "23.05"),
+    ]
+
+
+def test_closing_closes_surcharges_and_income_tax():
+    """漏一个损益科目，它就永远结不平：5403/5801 必须出现在结平行里。
+
+    结出的净损益是 100 − 7.80 − 23.05 = 69.15（净利润），不是营业利润。
+    """
+    kernel = _StubKernel(_tax_entries())
+    out = PeriodClosing(TENANT, kernel).transfer(PERIOD)
+    lines = {(l["account_code"], l["direction"]): l["amount"] for l in out["lines"]}
+    assert lines[("5403", "credit")] == "7.80"
+    assert lines[("5801", "credit")] == "23.05"
+    assert lines[("4000", "debit")] == "100.00"
+    assert lines[("3100", "credit")] == "69.15"
+    debit = sum(Decimal(v) for (c, d), v in lines.items() if d == "debit")
+    credit = sum(Decimal(v) for (c, d), v in lines.items() if d == "credit")
+    assert debit == credit
+
+
+def test_closing_preview_names_the_new_accounts():
+    """预览里的科目名从 CHART 派生：另写一份表就会显示成裸科目码。"""
+    out = PeriodClosing(TENANT, _StubKernel(_tax_entries())).preview(PERIOD)
+    names = {b["accountCode"]: b["account"] for b in out["balances"]}
+    assert names["5403"] == "税金及附加"
+    assert names["5801"] == "所得税费用"

@@ -452,3 +452,73 @@ def test_indirect_flags_a_difference_instead_of_forcing_it():
     assert out["unclassified"] == ["6603"]
     assert out["difference"] == "0.00"            # 差额为零不等于自证：还有未归位科目
     assert "不自证" in out["error"]
+
+
+# ---- 9) 税金及附加 / 营业外收支 / 所得税（change: add-cn-surcharge-and-income-tax）----
+
+def _tax_entries() -> list[dict]:
+    """一笔含税销售 + 附加税计提 + 所得税计提，三笔都借贷平。
+
+    销售 113 含 13 增值税；附加税按应纳 13 计（7.80）；所得税按利润总额 92.20 计（23.05）。
+    """
+    return (_t("sale", "2026-11-10", [("1000", "debit", "113"),
+                                      ("4000", "credit", "100"),
+                                      ("2221.01.01", "credit", "13")])
+            + _t("surcharge", "2026-11-30", [("5403", "debit", "7.80"),
+                                            ("2221.12", "credit", "4.55"),
+                                            ("2221.13", "credit", "1.95"),
+                                            ("2221.14", "credit", "1.30")])
+            + _t("itax", "2026-11-30", [("5801", "debit", "23.05"),
+                                       ("2221.11", "credit", "23.05")]))
+
+
+def test_income_statement_has_three_tiers():
+    """营业利润 → 利润总额 → 净利润：税金及附加进第一段，所得税只进第三段。"""
+    inc = _book(_tax_entries()).income_statement("2026-11")
+    assert inc["revenue"] == "100.00"
+    assert inc["taxesAndSurcharges"] == "7.80"
+    assert inc["operatingProfit"] == "92.20"      # 100 − 7.80
+    assert inc["totalProfit"] == "92.20"          # 无营业外收支
+    assert inc["incomeTax"] == "23.05"
+    assert inc["netProfit"] == "69.15"
+    lines = {r["line"]: r["amount"] for r in inc["lines"]}
+    assert lines["税金及附加"] == "7.80" and lines["净利润"] == "69.15"
+
+
+def test_balance_sheet_stays_balanced_after_tax_accruals():
+    """0019 只把 5301/5403/5711/5801 放进 CHART 时，一计提附加税这张表就不平。
+
+    未结转损益必须认这四类科目：负债 +43.85 与「未结转损益 69.15」相加才是资产 113。
+    """
+    bs = _book(_tax_entries()).balance_sheet("2026-11")
+    assert bs["balanced"] is True, bs.get("error")
+    assert bs["assets"]["total"] == "113.00"
+    assert bs["liabilities"]["total"] == "43.85"
+    assert bs["unclosedProfit"] == "69.15"
+
+
+def test_cash_flow_indirect_reconciles_when_taxes_are_accrued():
+    """计提税费不付现：间接法必须靠「应交税费全族」把它加回来，否则差一个税钱。
+
+    这是增值税/附加税/所得税车道一上线就必然踩到的形态——直接法 113（收到含税货款）、
+    间接法从净利润 69.15 起算，加回未付的 43.85 才等于 113。
+    """
+    out = _book(_tax_entries()).cash_flow_indirect("2026-11")
+    assert out["netProfit"] == "69.15"
+    wc = {r["accountCode"]: r["change"] for r in out["workingCapital"]}
+    assert wc["2221.01.01"] == "-13.00" and wc["2221.11"] == "-23.05"
+    assert out["workingCapitalTotal"] == "-43.85"
+    assert out["directOperating"] == "113.00"
+    assert out["indirectOperating"] == "113.00"
+    assert out["difference"] == "0.00" and out["consistent"] is True
+
+
+def test_paying_tax_is_an_operating_cash_outflow_not_unclassified():
+    """缴税（借 2221.11 / 贷 货币资金）对手科目就是应交税费：必须归「支付的各项税费」。"""
+    entries = _tax_entries() + _t("pay", "2026-11-30",
+                                  [("2221.11", "debit", "23.05"),
+                                   ("1000", "credit", "23.05")])
+    out = _book(entries).cash_flow("2026-11")
+    assert out.get("unclassified") is None          # 无未归类科目
+    assert out["categories"]["operating"]["net"] == "89.95"      # 113 − 23.05
+    assert out["consistent"] is True

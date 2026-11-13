@@ -48,6 +48,10 @@ CHART: dict[str, tuple[str, str]] = {
     "2221.01.02": ("应交增值税（进项税额）", "liability"),
     "2221.01.07": ("应交增值税（转出未交增值税）", "liability"),
     "2221.02": ("未交增值税", "liability"),
+    "2221.11": ("应交企业所得税", "liability"),
+    "2221.12": ("应交城市维护建设税", "liability"),
+    "2221.13": ("应交教育费附加", "liability"),
+    "2221.14": ("应交地方教育附加", "liability"),
     "3000": ("业主投入资本", "equity"),
     "3100": ("留存收益", "equity"),
     "4000": ("营业收入", "revenue"),
@@ -64,12 +68,33 @@ CHART: dict[str, tuple[str, str]] = {
 #: 抵减资产：报表上从资产里扣，不另起一行「负数资产」误导读者。
 CONTRA_ASSETS = ("1602", "1231")
 
+#: 三段式利润表的四个「后段」科目（change: add-cn-surcharge-and-income-tax）。
+#: `5301` 只影响利润总额、`5711` 只影响利润总额、`5403` 进营业利润、`5801` 只影响净利润。
+TAX_SURCHARGE_ACCOUNT = "5403"
+NON_OPERATING_INCOME_ACCOUNT = "5301"
+NON_OPERATING_EXPENSE_ACCOUNT = "5711"
+INCOME_TAX_EXPENSE_ACCOUNT = "5801"
+
+#: 应交税费全族（增值税及其子目、附加税、所得税）。它们是**经营性负债**：
+#: 计提不付现、缴款才付现。漏掉这一族，间接法会凭空多出「利润里有、现金里没有」的一截——
+#: 增值税车道、附加税/所得税车道一上线，直接法与间接法就再也对不上（而且两张表各自自洽）。
+#: 从 `CHART` 派生而不是另写一份清单：新增税费科目自动纳入，不会再漏一次。
+TAX_PAYABLE_ACCOUNTS: tuple[str, ...] = tuple(
+    sorted(c for c in CHART if c == "2221" or c.startswith("2221.")))
+
 DIMENSION_KEYS = ("department", "project", "channel", "cost_center")
 
 #: 损益类科目（change: add-profit-closing）。收入在贷方、成本费用在借方；这两组也是
 #: 期末结转的结平对象——口径只在这里定义一次，结转车道从这里取。
-REVENUE_ACCOUNTS: tuple[str, ...] = ("4000",)
-EXPENSE_ACCOUNTS: tuple[str, ...] = ("5000", "5100", "5200", "6602", "6603")
+#:
+#: **改这一处之前先想清楚三处下游**（change: add-cn-surcharge-and-income-tax 就踩过）：
+#: ① `balance_sheet` 的「未结转损益」用它 ⇒ 漏一个科目资产负债表立刻不平；
+#: ② 期末结转用它 ⇒ 漏一个科目该科目永远结不平；
+#: ③ `cash_flow_indirect` 从净利润起算 ⇒ 漏一个非现金科目两条推导路径差一个税钱。
+REVENUE_ACCOUNTS: tuple[str, ...] = ("4000", NON_OPERATING_INCOME_ACCOUNT)
+EXPENSE_ACCOUNTS: tuple[str, ...] = ("5000", "5100", "5200", TAX_SURCHARGE_ACCOUNT,
+                                     NON_OPERATING_EXPENSE_ACCOUNT,
+                                     INCOME_TAX_EXPENSE_ACCOUNT, "6602", "6603")
 PROFIT_LOSS_ACCOUNTS: tuple[str, ...] = REVENUE_ACCOUNTS + EXPENSE_ACCOUNTS
 #: 结转分录的 `source_ref` 前缀。它把损益搬进 3100，所以**不进损益口径**（否则已结转
 #: 期间的利润表会显示收入 0、费用 0——那是账做完了，不是这期没赚钱）。
@@ -101,10 +126,11 @@ CASH_ACCOUNTS: tuple[str, ...] = ("1000",)
 
 CATEGORIES = ("operating", "investing", "financing")
 
-#: 间接法里的营运资本：应收 / 存货 / 在途结算款 / 应付 / 预收暂收。
+#: 间接法里的营运资本：应收 / 存货 / 在途结算款 / 应付 / 预收暂收，加上**应交税费全族**。
 #: 不含货币资金（它就是现金本身）、不含 1231（减值准备是估计，走加回项）、
 #: 不含固定资产与折旧（投资活动与加回项）。
-WORKING_CAPITAL_ACCOUNTS: tuple[str, ...] = ("1100", "1200", "1300", "2000", "2100")
+WORKING_CAPITAL_ACCOUNTS: tuple[str, ...] = (("1100", "1200", "1300", "2000", "2100")
+                                             + TAX_PAYABLE_ACCOUNTS)
 CATEGORY_LABELS = {
     "operating": "经营活动产生的现金流量",
     "investing": "投资活动产生的现金流量",
@@ -128,6 +154,10 @@ CASH_FLOW_MAP: dict[str, tuple[str, str]] = {
     "3000": ("financing", "吸收投资收到的现金"),
     "3100": ("financing", "分配利润支付的现金"),
 }
+# 缴税是经营性现金流出（借 2221.x / 贷 货币资金），对手科目就是应交税费本身。
+# 不登记它，一笔正常缴税会让整张现金流量表落进 `unclassified` 并自报不一致。
+CASH_FLOW_MAP.update({code: ("operating", "支付的各项税费")
+                      for code in TAX_PAYABLE_ACCOUNTS})
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 _WEEK_RE = re.compile(r"^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$")
@@ -266,7 +296,19 @@ class StatementBook:
         return {"period": key, **out}
 
     def _income_from(self, entries: list[dict[str, Any]]) -> dict[str, Any]:
-        """利润表口径的纯计算（不含期间键）：单期与区间累计共用同一份逻辑。"""
+        """利润表口径的纯计算（不含期间键）：单期与区间累计共用同一份逻辑。
+
+        三段式（与《小企业会计准则》利润表 <会小企 02 表> 的行次同构）：
+
+        - **营业利润** = 营业收入 − 营业成本 − 平台/其他/减值/汇兑 − **税金及附加**；
+        - **利润总额** = 营业利润 + 营业外收入 − 营业外支出；
+        - **净利润** = 利润总额 − 所得税费用。
+
+        分三段而不是混成一段，因为下游判据各不相同：`cash_flow_indirect` 从**净利润**起算；
+        所得税预缴的基数是**利润总额**（会计口径，未做纳税调整）；营业利润率只用第一段。
+        早先 `5403/5301/5711/5801` 四个科目只进了 `CHART` 没进损益口径——一计提附加税，
+        资产负债表的「未结转损益」就不认它，表面自洽、实际不平。
+        """
         sums = self._sums([e for e in entries if not is_closing_entry(e)])
 
         def amount(code: str) -> Decimal:
@@ -286,25 +328,44 @@ class StatementBook:
         # 汇兑损益单列：它是财务性损益，混进"其他经营费用"会让经营费用口径失真
         # （change: add-fx-revaluation）。
         fx = amount("6603")
+        # 税金及附加（含附加税）是营业利润的行次，不塞进营业费用——两个口径都要能用。
+        taxes = amount(TAX_SURCHARGE_ACCOUNT)
         opex = platform + other + impairment + fx
-        profit = revenue - cogs - opex
+        profit = revenue - cogs - opex - taxes
+        nonop_income = amount(NON_OPERATING_INCOME_ACCOUNT)
+        nonop_expense = amount(NON_OPERATING_EXPENSE_ACCOUNT)
+        total_profit = profit + nonop_income - nonop_expense
+        income_tax = amount(INCOME_TAX_EXPENSE_ACCOUNT)
+        net_profit = total_profit - income_tax
         return {
             "revenue": _fmt(revenue), "costOfSales": _fmt(cogs),
             "platformFees": _fmt(platform), "otherOpex": _fmt(other),
             "impairmentLoss": _fmt(impairment),
             "fxGainLoss": _fmt(fx),
+            "taxesAndSurcharges": _fmt(taxes),
             "operatingExpenses": _fmt(opex), "operatingProfit": _fmt(profit),
+            "nonOperatingIncome": _fmt(nonop_income),
+            "nonOperatingExpense": _fmt(nonop_expense),
+            "totalProfit": _fmt(total_profit),
+            "incomeTax": _fmt(income_tax), "netProfit": _fmt(net_profit),
             "lines": [
                 {"line": "营业收入", "amount": _fmt(revenue)},
                 {"line": "营业成本", "amount": _fmt(cogs)},
+                {"line": "税金及附加", "amount": _fmt(taxes)},
                 {"line": "平台及支付费用", "amount": _fmt(platform)},
                 {"line": "其他经营费用", "amount": _fmt(other)},
                 {"line": "信用减值损失", "amount": _fmt(impairment)},
                 {"line": "汇兑损益", "amount": _fmt(fx)},
                 {"line": "营业利润", "amount": _fmt(profit)},
+                {"line": "营业外收入", "amount": _fmt(nonop_income)},
+                {"line": "营业外支出", "amount": _fmt(nonop_expense)},
+                {"line": "利润总额", "amount": _fmt(total_profit)},
+                {"line": "所得税费用", "amount": _fmt(income_tax)},
+                {"line": "净利润", "amount": _fmt(net_profit)},
             ],
             "caliber_note": "收入取贷方净额，成本费用取借方净额；不混入资本类科目；"
-                            "本表不含所得税与营业外收支（内核科目表没有这两类）",
+                            "三段式为营业利润 → 利润总额 → 净利润，"
+                            "所得税预缴的基数是**利润总额**（未做纳税调整）",
         }
 
     # ---- 3) 资产负债表 ----
@@ -572,7 +633,9 @@ class StatementBook:
         window = [e for e in self._entries()
                   if entry_period(e, grain) == key and not is_closing_entry(e)]
 
-        profit = Decimal(self.income_statement(key)["operatingProfit"])
+        # 起点是**净利润**（含营业外收支与所得税费用），不是营业利润：从营业利润起算，
+        # 那两段在间接法里就凭空消失了，而直接法照常算它们——两条路径必然差一个数。
+        profit = Decimal(self.income_statement(key)["netProfit"])
         sums = self._sums(window)
         # 折旧：累计折旧在贷方增加（net 为负），加回额取正；处置转出会让它变负，如实保留。
         depreciation = -sums.get("1602", {}).get("net", Decimal(0))
