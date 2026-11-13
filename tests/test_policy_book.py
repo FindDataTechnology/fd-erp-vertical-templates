@@ -145,25 +145,32 @@ def test_unknown_before_request_id_is_not_found(book):
 # ---- 4) 未实现引擎的口径：登记但明确不生效 ----
 
 def test_unimplemented_engine_keys_are_recorded_only(book):
-    # 折旧与预算引擎都已交付，故改用仍无消费者的合并主体模型做对照
-    prop = book.propose({"entity_model": "tenant-per-entity"})
-    assert prop["recordedOnly"] == ["entity_model"]
+    # 折旧/预算/合并引擎都已交付，本版仅剩外币折算没有数据通路，用它做对照
+    prop = book.propose({"fx_translation": "closing-rate"})
+    assert prop["recordedOnly"] == ["fx_translation"]
     assert "仅登记" in prop["note"]          # 提案自己就说清「还没消费者」
     book.confirm(prop["requestId"])
     now = book.current()
-    assert now["values"]["entity_model"] == "tenant-per-entity"
-    assert now["keys"]["entity_model"]["enforced"] is False
+    assert now["values"]["fx_translation"] == "closing-rate"
+    assert now["keys"]["fx_translation"]["enforced"] is False
     assert now["keys"]["cost_method"]["enforced"] is True
-    assert now["counts"]["recordedOnly"] >= 1
+    # 合并两键已交付：合并车道的实现只认各键的一个取值，其余取值在车道里 NOT_WIRED
+    assert now["keys"]["entity_model"]["enforced"] is True
+    assert now["keys"]["elimination_scope"]["enforced"] is True
+    assert now["counts"]["recordedOnly"] == 1
 
 
 def test_implemented_flags_match_reality(book):
     for key in ("cost_method", "provisional_basis", "variance_policy", "close_grain",
                 "depreciation_method", "asset_ledger_owner",
-                "budget_dimension", "budget_period", "budget_control"):
+                "budget_dimension", "budget_period", "budget_control",
+                "bad_debt_method",
+                # 合并两键：车道已交付（实现的是 single-tenant-multi-entity 与
+                # intercompany-ar-ap；其它取值在车道里 NOT_WIRED，不是「没消费者」）
+                "entity_model", "elimination_scope"):
         assert book.explain(key)["implemented"] is True, key
-    for key in ("entity_model", "elimination_scope", "fx_translation"):
-        assert book.explain(key)["implemented"] is False, key
+    # 只剩外币折算没有数据通路
+    assert book.explain("fx_translation")["implemented"] is False
 
 
 # ---- 5) 四类口径齐备，候选值一个不少 ----

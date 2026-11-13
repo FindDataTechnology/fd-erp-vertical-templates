@@ -121,16 +121,17 @@ KEYS: dict[str, dict[str, Any]] = {
         "values": ("single-tenant-multi-entity", "tenant-per-entity"),
         "default": "single-tenant-multi-entity",
         "impact": "影响账套隔离、权限与取数路径；单租户多主体要防串主体记账，"
-                  "一主体一租户则合并要跨租户只读通道",
-        "implemented": False,
+                  "一主体一租户则合并要跨租户只读通道（本版未实现：跨租户只读通道未开，"
+                  "调用即 NOT_WIRED）",
+        "implemented": True,
     },
     "elimination_scope": {
         "domain": "consolidation",
         "values": ("intercompany-ar-ap", "plus-inventory-profit", "plus-equity"),
         "default": "intercompany-ar-ap",
-        "impact": "影响抵销分录张数与对账工作量；含存货未实现利润需要内部毛利数据，"
-                  "含权益则接近完整合并",
-        "implemented": False,
+        "impact": "影响抵销分录张数与对账工作量；intercompany-ar-ap 按内部往来科目对抵销，"
+                  "含存货未实现利润要内部毛利数据、含权益要完整股权链（本版未实现，调用即 NOT_WIRED）",
+        "implemented": True,
     },
     "fx_translation": {
         "domain": "consolidation",
