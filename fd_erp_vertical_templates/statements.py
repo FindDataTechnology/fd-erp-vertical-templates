@@ -251,8 +251,12 @@ class StatementBook:
         变成「收入 0、费用 0」——那是账做完了，不是这期没赚钱。
         """
         key = _check_period(period)
-        sums = self._sums([e for e in self._in_period(self._entries(), key)
-                           if not is_closing_entry(e)])
+        out = self._income_from(self._in_period(self._entries(), key))
+        return {"period": key, **out}
+
+    def _income_from(self, entries: list[dict[str, Any]]) -> dict[str, Any]:
+        """利润表口径的纯计算（不含期间键）：单期与区间累计共用同一份逻辑。"""
+        sums = self._sums([e for e in entries if not is_closing_entry(e)])
 
         def amount(code: str) -> Decimal:
             bucket = sums.get(code)
@@ -274,7 +278,6 @@ class StatementBook:
         opex = platform + other + impairment + fx
         profit = revenue - cogs - opex
         return {
-            "period": key,
             "revenue": _fmt(revenue), "costOfSales": _fmt(cogs),
             "platformFees": _fmt(platform), "otherOpex": _fmt(other),
             "impairmentLoss": _fmt(impairment),
@@ -410,7 +413,8 @@ class StatementBook:
                     if str(e.get("account_code") or "").strip() in CASH_ACCOUNTS),
                    Decimal(0))
 
-    def cash_flow(self, period: str) -> dict[str, Any]:
+    def cash_flow(self, period: str, *,
+                  entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """直接法现金流量表：按对手科目归入经营/投资/筹资，并自证净增加额。
 
         归类不给分录加字段、也不从利润表倒推：**对手科目本身就说明了钱的来路与去向**。
@@ -419,12 +423,13 @@ class StatementBook:
         逐笔可核，不需要平均或估值。
         """
         key = _check_period(period)
-        entries = self._entries()
+        # `entries` 允许注入：累计口径要把同一个月跑多次，重复读全量分录既慢又容易不一致。
+        pool = self._entries() if entries is None else entries
         start, _end = _period_bounds(key)
         grain = _grain(key)
         # 期间归属复用 dates.entry_period（业务日期优先），与利润表/账龄同一口径。
-        window = [e for e in entries if entry_period(e, grain) == key]
-        earlier = [e for e in entries
+        window = [e for e in pool if entry_period(e, grain) == key]
+        earlier = [e for e in pool
                    if (day := entry_date(e)) is not None and day < start]
 
         opening = self._cash_balance(earlier)
