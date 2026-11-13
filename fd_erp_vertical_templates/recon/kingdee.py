@@ -30,6 +30,7 @@ import hashlib
 from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
 
+from ..dates import entry_when
 from ..errors import TemplateError
 from ..kernel_client import KernelClient
 from .crossborder import WRITEBACK_ALLOWED_ACCOUNTS
@@ -216,7 +217,9 @@ class SettlementRecon:
         rows = list(result.get("entries") or [])
         by_txn: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
-            posted = str(row.get("posted_at") or "")
+            # 账期按**业务日期**（booked_on）算，回落 posted_at 兼容历史行：
+            # 用落账时刻的话，10 月的凭证 11 月才确认就会推给 11 月那一期。
+            posted = str(entry_when(row) or "")
             if not posted.startswith(period):
                 continue
             if source_prefix and not str(row.get("source_ref") or "") \
@@ -246,7 +249,7 @@ class SettlementRecon:
                 "amount": _fmt(debit_total),
                 "currency": self._base,
                 "status": "posted",
-                "occurred_at": str(first.get("posted_at") or ""),
+                "occurred_at": str(entry_when(first) or ""),
                 "source_ref": f"ledger:{txn_id}",
                 "raw": {
                     "link": f"kv:{txn_id}",

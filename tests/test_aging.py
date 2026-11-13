@@ -156,3 +156,15 @@ def test_report_only_reads_the_given_account():
         _e("debit", "999", "2026-11-10", "C-A", account="1200"),
     ])
     assert _rows(out)["C-A"]["outstanding"] == "100.00"
+
+
+# ---- 4) 账龄从业务日期起算（change: add-period-close）----
+
+def test_aging_starts_from_booked_on_when_it_differs_from_posting_time():
+    """10 月的单据 11 月才落账：账龄必须从业务日期算，否则逾期凭空变好。"""
+    late = _e("debit", "100", "2026-11-20", "C-A")   # posted_at = 11-20
+    late["booked_on"] = "2026-08-22"                  # 业务日期 = 100 天前
+    out = _report([late])
+    row = _rows(out)["C-A"]
+    assert _bucket(out, row, "91天以上") == "100.00"
+    assert _bucket(out, row, "0-30天") == "0.00"

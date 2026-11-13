@@ -17,10 +17,11 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
+from .dates import entry_period
 from .errors import TemplateError
 
 Q2 = Decimal("0.01")
@@ -64,18 +65,6 @@ def _dec(value: Any) -> Decimal:
         return Decimal(0)
 
 
-def _period_of(occurred_at: Any, grain: str = "monthly") -> str:
-    raw = str(occurred_at or "").strip()
-    try:
-        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except ValueError:
-        return "unknown"
-    if grain == "weekly":
-        iso = dt.isocalendar()
-        return f"{iso.year}-W{iso.week:02d}"
-    return dt.strftime("%Y-%m")
-
-
 def _check_period(period: Any) -> str:
     key = str(period or "").strip()
     if not (_MONTH_RE.match(key) or _WEEK_RE.match(key)):
@@ -115,14 +104,14 @@ class StatementBook:
               grain: str = "monthly") -> list[dict[str, Any]]:
         if as_of is None:
             return entries
-        return [e for e in entries
-                if _period_of(e.get("posted_at"), grain) <= as_of]
+        # 期间按**业务日期**归属（dates.entry_period 一处定义）：用 posted_at 的话，
+        # 「10 月的单据 11 月才确认」会被算进 11 月，同一张报表还会随确认时点变化。
+        return [e for e in entries if entry_period(e, grain) <= as_of]
 
     @staticmethod
     def _in_period(entries: list[dict[str, Any]], period: str,
                    grain: str = "monthly") -> list[dict[str, Any]]:
-        return [e for e in entries
-                if _period_of(e.get("posted_at"), grain) == period]
+        return [e for e in entries if entry_period(e, grain) == period]
 
     # ---- 汇总原语 ----
 

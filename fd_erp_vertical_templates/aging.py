@@ -25,6 +25,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
+from .dates import entry_date
 from .errors import TemplateError
 
 Q2 = Decimal("0.01")
@@ -146,7 +147,9 @@ class AgingReport:
 
         entries = []
         for e in self._entries(acct):
-            when = _date_of(e.get("posted_at"))
+            # 账龄从**业务日期**起算（dates.entry_date）：用落账时刻的话，10 月的单据
+            # 11 月才确认就会被算成「刚发生」，逾期看起来凭空变好。
+            when = entry_date(e)
             if when is None or when > cutoff:
                 continue
             entries.append({**e, "_when": when})

@@ -195,3 +195,22 @@ def test_new_entries_show_up_without_any_rebuild():
     kernel._entries.append(_e("1000", "credit", "500"))
     after = book.income_statement("2026-11")["operatingProfit"]
     assert before == "-2400.00" and after == "-2900.00"
+
+
+# ---- 6) 期间按业务日期归属（change: add-period-close）----
+
+def test_period_follows_booked_on_not_posting_time():
+    """10 月的单据 11 月才落账：利润表必须把它算进 10 月。
+
+    这正是「报表事后会变」的根因——若按 posted_at 归属，同一张 10 月利润表会随着
+    谁什么时候确认而变，而且两次都「自洽」。
+    """
+    entries = [
+        {**_e("4000", "credit", "1000"), "booked_on": "2026-10-31"},
+        {**_e("4000", "credit", "2000"), "booked_on": "2026-11-02"},
+    ]
+    book = StatementBook(TENANT, _StubKernel(entries))
+    oct_inc = book.income_statement("2026-10")
+    nov_inc = book.income_statement("2026-11")
+    assert oct_inc["revenue"] == "1000.00"
+    assert nov_inc["revenue"] == "2000.00"

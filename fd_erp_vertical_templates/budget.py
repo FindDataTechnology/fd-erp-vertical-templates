@@ -39,6 +39,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
+from .dates import entry_date
 from .errors import TemplateError
 from .eventlog import EventLog
 from .policy import PolicyBook
@@ -457,7 +458,7 @@ class BudgetBook:
             if not rows:
                 break
             for row in rows:
-                when = _entry_date(row.get("posted_at"))
+                when = entry_date(row)
                 if when is None or not (start <= when < end):
                     continue
                 amount = _dec(row.get("amount_base") or row.get("amount"), "分录金额")
@@ -485,7 +486,7 @@ class BudgetBook:
             for row in rows:
                 if row.get("dimensions"):
                     continue                     # 有维度的归它自己，不重复计
-                when = _entry_date(row.get("posted_at"))
+                when = entry_date(row)
                 if when is None or not (start <= when < end):
                     continue
                 amount = _dec(row.get("amount_base") or row.get("amount"), "分录金额")
@@ -512,16 +513,6 @@ class BudgetBook:
                          "committed": _fmt(self._committed(dv, account, per))})
         rows.sort(key=lambda r: (r["period"], r["dimensionValue"], r["accountCode"]))
         return rows
-
-
-def _entry_date(value: Any) -> date | None:
-    raw = str(value or "").strip()
-    if not raw:
-        return None
-    try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
-    except ValueError:
-        return None
 
 
 __all__ = ["BudgetBook", "CONTROL_MODES", "GRAINS", "period_key", "period_range",
