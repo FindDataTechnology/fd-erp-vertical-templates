@@ -41,6 +41,7 @@ from typing import Any
 
 from .dates import entry_date
 from .errors import TemplateError
+from .statements import is_closing_entry
 from .eventlog import EventLog
 from .policy import PolicyBook
 
@@ -128,6 +129,27 @@ def kernel_dimension_key(policy_key: str) -> str:
             detail={"allowed": list(DIMENSION_KEY_MAP),
                     "policy_key": policy_key})
     return key
+
+
+def _periods_between(first: str, last: str, grain: str) -> list[str]:
+    """闭区间内的期间键列表（按口径粒度），供累计口径求和。"""
+    if grain == "quarterly":
+        def _index(key: str) -> int:
+            return int(key[:4]) * 4 + int(key[6]) - 1
+        def _key(index: int) -> str:
+            return f"{index // 4:04d}-Q{index % 4 + 1}"
+    else:
+        def _index(key: str) -> int:
+            return int(key[:4]) * 12 + int(key[5:]) - 1
+        def _key(index: int) -> str:
+            return f"{index // 12:04d}-{index % 12 + 1:02d}"
+    out: list[str] = []
+    index = _index(first)
+    stop = _index(last)
+    while index <= stop:
+        out.append(_key(index))
+        index += 1
+    return out
 
 
 def _check_period(period: Any, grain: str) -> str:
@@ -445,9 +467,19 @@ class BudgetBook:
         而漏掉的数字在报表上看起来只是「偏小」。
         """
         start, end = period_range(period, grain)
+        return self._actual_between(account_code, start, end,
+                                   dimensions=dimensions)
+
+    def _actual_between(self, account_code: str, start: date, end: date,
+                        *, dimensions: dict[str, str] | None = None
+                        ) -> tuple[Decimal, int, Decimal]:
+        """区间内的已落账净额（借 − 贷）。单期与累计共用这一份实现。
+
+        结转分录 MUST 排除：它把损益科目反向结平，算进来的话「已关账期间的预算实际」
+        会显示成 0 或负数——那会让预算执行表在关账后自己「归零」。
+        """
         total = Decimal(0)
         seen = 0
-        unattributed = Decimal(0)
         offset = 0
         while True:
             out = self._kernel.query_entries(account_code=account_code,
@@ -458,6 +490,8 @@ class BudgetBook:
             if not rows:
                 break
             for row in rows:
+                if is_closing_entry(row):
+                    continue
                 when = entry_date(row)
                 if when is None or not (start <= when < end):
                     continue
@@ -468,8 +502,8 @@ class BudgetBook:
             offset += len(rows)
             if len(rows) < 200:
                 break
-        if dimensions:
-            unattributed = self._unattributed(account_code, start, end)
+        unattributed = (self._unattributed(account_code, start, end)
+                        if dimensions else Decimal(0))
         return total, seen, unattributed
 
     def _unattributed(self, account_code: str, start: date, end: date) -> Decimal:
@@ -495,6 +529,170 @@ class BudgetBook:
             if len(rows) < 200:
                 break
         return total
+
+    # ---- 整表执行报告（change: add-budget-execution）----
+
+    def execution(self, period: Any | None = None, *, cumulative: bool = False,
+                  threshold: Any = "0.9") -> dict[str, Any]:
+        """一张整表：本期所有（维度值, 科目）的预算 / 承诺 / 实际 / 双执行率 / 预警。
+
+        与 `status()` 的差别不是排版：`status` 逐维度值查、执行率算的是**承诺**；
+        这张表把「有预算 / 有承诺 / 有实际」三者取并集，并给**实际**执行率。
+        花了钱却没登记预算的科目必须出现——否则「预算合规」只是没查到的假象。
+        """
+        cfg = self._cfg()
+        dim_key = cfg["budget_dimension"]
+        grain = cfg["budget_period"]
+        pkey = (_check_period(period, grain) if period not in (None, "")
+                else period_key(date.today(), grain))
+        limit = _dec(threshold, "预警阈值")
+        if limit <= 0 or limit > 1:
+            raise TemplateError("INVALID_ARGUMENT",
+                                f"预警阈值须在 (0, 1] 之间：{threshold!r}")
+
+        start, end = period_range(pkey, grain)
+        periods = [pkey]
+        if cumulative:
+            first = f"{pkey[:4]}-01" if grain == "monthly" else f"{pkey[:4]}-Q1"
+            start, _ = period_range(first, grain)
+            periods = _periods_between(first, pkey, grain)
+
+        budget_by: dict[tuple[str, str], Decimal] = {}
+        budget_seen: set[tuple[str, str]] = set()
+        for (dim, dv, account, per), rec in self._budget_rows().items():
+            if dim != dim_key or per not in periods:
+                continue
+            key = (dv, account)
+            budget_by[key] = budget_by.get(key, Decimal(0)) + _dec(rec["amount"], "预算金额")
+            budget_seen.add(key)
+
+        committed_by: dict[tuple[str, str], Decimal] = {}
+        for rec in self._commit_state()["active"].values():
+            if rec.get("dimension") != dim_key or rec.get("period") not in periods:
+                continue
+            key = (rec["dimensionValue"], rec["accountCode"])
+            committed_by[key] = (committed_by.get(key, Decimal(0))
+                                 + _dec(rec.get("amount"), "承诺金额"))
+
+        actual_by: dict[tuple[str, str], Decimal] = {}
+        entries_by: dict[tuple[str, str], int] = {}
+        unattributed_by: dict[str, Decimal] = {}
+        dim_of = kernel_dimension_key(dim_key)
+        for row in self._entries_between(start, end):
+            account = str(row.get("account_code") or "").strip()
+            if not account:
+                continue
+            amount = _dec(row.get("amount_base") or row.get("amount"), "分录金额")
+            signed = amount if row.get("direction") == "debit" else -amount
+            dv = str((row.get("dimensions") or {}).get(dim_of) or "").strip()
+            if not dv:
+                # 没标维度就是不属于任何维度：单列，别摊给谁
+                unattributed_by[account] = unattributed_by.get(account, Decimal(0)) + signed
+                continue
+            key = (dv, account)
+            actual_by[key] = actual_by.get(key, Decimal(0)) + signed
+            entries_by[key] = entries_by.get(key, 0) + 1
+
+        keys = sorted(set(budget_by) | set(committed_by) | set(actual_by))
+        rows: list[dict[str, Any]] = []
+        totals = {"budget": Decimal(0), "committed": Decimal(0), "actual": Decimal(0),
+                  "remaining": Decimal(0)}
+        unbudgeted: list[dict[str, Any]] = []
+        for dv, account in keys:
+            registered = (dv, account) in budget_seen
+            budget = budget_by.get((dv, account), Decimal(0))
+            committed = committed_by.get((dv, account), Decimal(0))
+            actual = actual_by.get((dv, account), Decimal(0))
+            used = max(committed, actual)          # 承诺与实际可能重叠，取大者作保守估计
+            remaining = budget - used if registered else None
+            committed_rate = (committed / budget) if registered and budget > 0 else None
+            actual_rate = (actual / budget) if registered and budget > 0 else None
+            over_by = None
+            if registered and remaining is not None and remaining < 0:
+                over_by = "actual" if actual >= committed else "committed"
+            level = "ok"
+            # 只把「有净支出/净占用却没预算」的点名：负净额的行（现金对侧、退款）留在表里
+            # 但不进 unbudgeted——把现金科目当「没预算的开支」点名，等于把噪声当告警。
+            if not registered and (committed > 0 or actual > 0):
+                level = "unbudgeted"
+            elif over_by is not None:
+                level = "over"
+            elif any(r is not None and r >= limit
+                     for r in (committed_rate, actual_rate)):
+                level = "near"
+            row = {
+                "dimensionValue": dv, "accountCode": account,
+                "budget": _fmt(budget) if registered else None,
+                "committed": _fmt(committed), "actual": _fmt(actual),
+                "remaining": None if remaining is None else _fmt(remaining),
+                "committedRate": (None if committed_rate is None
+                                  else str(committed_rate.quantize(
+                                      Decimal("0.0001"), rounding=ROUND_HALF_UP))),
+                "actualRate": (None if actual_rate is None
+                               else str(actual_rate.quantize(
+                                   Decimal("0.0001"), rounding=ROUND_HALF_UP))),
+                "budgetRegistered": registered,
+                "overBudget": over_by is not None,
+                "overBy": over_by,
+                "level": level,
+                "actualEntries": entries_by.get((dv, account), 0),
+            }
+            rows.append(row)
+            if registered:
+                totals["budget"] += budget
+                totals["remaining"] += remaining or Decimal(0)
+            totals["committed"] += committed
+            totals["actual"] += actual
+            if level == "unbudgeted":
+                unbudgeted.append({"dimensionValue": dv, "accountCode": account,
+                                   "committed": _fmt(committed),
+                                   "actual": _fmt(actual)})
+
+        alerts = [r for r in rows if r["level"] != "ok"]
+        order = {"over": 0, "near": 1, "unbudgeted": 2}
+        alerts.sort(key=lambda r: (order[r["level"]], r["dimensionValue"],
+                                   r["accountCode"]))
+
+        unattributed = [{"accountCode": code, "actual": _fmt(value)}
+                        for code, value in sorted(unattributed_by.items())]
+        return {
+            "dimension": dim_key, "kernelDimensionKey": dim_of,
+            "period": pkey, "periods": periods, "cumulative": cumulative,
+            "grain": grain, "control": cfg["budget_control"],
+            "threshold": str(limit),
+            "rows": rows, "alerts": alerts, "unbudgeted": unbudgeted,
+            "unattributed": unattributed,
+            "totals": {k: _fmt(v) for k, v in totals.items()},
+            "caliber_note": "承诺由本车道记、实际来自内核已落账分录（结转分录已排除）；"
+                            "`remaining = 预算 − max(承诺, 实际)`——承诺与实际可能重叠"
+                            "（承诺的单据后来落账了），取较大者作保守估计，不做假去重；"
+                            "未登记预算的行两个执行率都是 null（不写 0%）；有净支出或净占用"
+                            "（承诺/实际 > 0）的进 unbudgeted，负净额的行留在表内但不点名；"
+                            "`unattributed` 是没标维度的实际，不属于任何维度",
+        }
+
+    def _entries_between(self, start: date, end: date) -> list[dict[str, Any]]:
+        """区间内全部分录（一次扫描）。整表实际要覆盖「有预算之外」的科目，
+        逐个科目去查就永远发现不了「没登记预算却在花钱」。"""
+        out: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = self._kernel.query_entries(offset=offset, limit=200) or {}
+            rows = [r for r in (page.get("entries") or page.get("data") or [])
+                    if isinstance(r, dict)]
+            if not rows:
+                break
+            for row in rows:
+                if is_closing_entry(row):
+                    continue
+                when = entry_date(row)
+                if when is None or not (start <= when < end):
+                    continue
+                out.append(row)
+            offset += len(rows)
+            if len(rows) < 200:
+                break
+        return out
 
     def budgets(self, period: Any | None = None) -> list[dict[str, Any]]:
         """已登记的预算清单（生效版本）。"""
