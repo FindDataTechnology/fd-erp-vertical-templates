@@ -32,6 +32,7 @@ STATEMENTS_SCHEMA = "fd-erp-vertical-templates/statements/v1"
 CHART: dict[str, tuple[str, str]] = {
     "1000": ("货币资金", "asset"),
     "1100": ("应收账款", "asset"),
+    "1231": ("坏账准备", "asset"),
     "1200": ("存货", "asset"),
     "1300": ("在途结算款", "asset"),
     "1601": ("固定资产原值", "asset"),
@@ -44,9 +45,10 @@ CHART: dict[str, tuple[str, str]] = {
     "5000": ("营业成本", "expense"),
     "5100": ("平台及支付费用", "expense"),
     "5200": ("其他经营费用", "expense"),
+    "6602": ("信用减值损失", "expense"),
 }
 #: 抵减资产：报表上从资产里扣，不另起一行「负数资产」误导读者。
-CONTRA_ASSETS = ("1602",)
+CONTRA_ASSETS = ("1602", "1231")
 
 DIMENSION_KEYS = ("department", "project", "channel", "cost_center")
 
@@ -189,18 +191,23 @@ class StatementBook:
         cogs = amount("5000")
         platform = amount("5100")
         other = amount("5200")
-        opex = platform + other
+        # 信用减值损失是期间费用（与平台费/其他经营费用并列），不是营业成本的调整项：
+        # 混进 5000 会让毛利口径失真。
+        impairment = amount("6602")
+        opex = platform + other + impairment
         profit = revenue - cogs - opex
         return {
             "period": key,
             "revenue": _fmt(revenue), "costOfSales": _fmt(cogs),
             "platformFees": _fmt(platform), "otherOpex": _fmt(other),
+            "impairmentLoss": _fmt(impairment),
             "operatingExpenses": _fmt(opex), "operatingProfit": _fmt(profit),
             "lines": [
                 {"line": "营业收入", "amount": _fmt(revenue)},
                 {"line": "营业成本", "amount": _fmt(cogs)},
                 {"line": "平台及支付费用", "amount": _fmt(platform)},
                 {"line": "其他经营费用", "amount": _fmt(other)},
+                {"line": "信用减值损失", "amount": _fmt(impairment)},
                 {"line": "营业利润", "amount": _fmt(profit)},
             ],
             "caliber_note": "收入取贷方净额，成本费用取借方净额；不混入资本类科目；"
@@ -249,7 +256,7 @@ class StatementBook:
         # 未结转损益 = 收入净额 − 成本费用净额（权益的等价物，等结账后才转 3100）
         revenue = -sums.get("4000", {}).get("net", Decimal(0))
         expense = sum((sums.get(c, {}).get("net", Decimal(0))
-                       for c in ("5000", "5100", "5200")), Decimal(0))
+                       for c in ("5000", "5100", "5200", "6602")), Decimal(0))
         retained = revenue - expense
         rhs = liability_total + equity_total + retained
         balanced = (asset_total == rhs) and not unclassified
@@ -289,7 +296,7 @@ class StatementBook:
         total = Decimal(0)
         for e in entries:
             code = str(e.get("account_code") or "")
-            if code not in ("5000", "5100", "5200"):
+            if code not in ("5000", "5100", "5200", "6602"):
                 continue
             amount = _dec(e.get("amount_base") or e.get("amount"))
             signed = amount if e.get("direction") == "debit" else -amount

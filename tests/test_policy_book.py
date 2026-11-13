@@ -169,7 +169,9 @@ def test_implemented_flags_match_reality(book):
 # ---- 5) 四类口径齐备，候选值一个不少 ----
 
 def test_four_domains_and_all_candidates_present(book):
-    assert set(DOMAINS) == {"cost-accounting", "budget", "fixed-assets", "consolidation"}
+    # 五个域：应收减值（add-bad-debt-provision）加入后新增 receivables。
+    assert set(DOMAINS) == {"cost-accounting", "budget", "fixed-assets",
+                            "receivables", "consolidation"}
     for domain in DOMAINS:
         rows = book.explain_all(domain=domain)["rows"]
         assert rows, domain
@@ -181,7 +183,9 @@ def test_four_domains_and_all_candidates_present(book):
         "straight-line", "double-declining", "units-of-production"}
     assert set(KEYS["entity_model"]["values"]) == {
         "single-tenant-multi-entity", "tenant-per-entity"}
-    assert len(KEYS) == 12
+    assert set(KEYS["bad_debt_method"]["values"]) == {
+        "aging-rate", "specific-identification", "direct-writeoff"}
+    assert len(KEYS) == 13
 
 
 def test_explain_all_covers_every_key(book):

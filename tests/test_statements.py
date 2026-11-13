@@ -214,3 +214,24 @@ def test_period_follows_booked_on_not_posting_time():
     nov_inc = book.income_statement("2026-11")
     assert oct_inc["revenue"] == "1000.00"
     assert nov_inc["revenue"] == "2000.00"
+
+
+# ---- 7) 坏账准备按净额呈现（change: add-bad-debt-provision）----
+
+def test_allowance_is_a_contra_asset_and_impairment_is_an_expense():
+    """计提后：资产 = 应收 − 准备，未结转损益同步减少，资产负债表仍平。"""
+    entries = [
+        _e("1100", "debit", "12000"), _e("4000", "credit", "12000"),
+        _e("6602", "debit", "650"), _e("1231", "credit", "650"),
+    ]
+    book = StatementBook(TENANT, _StubKernel(entries))
+    bs = book.balance_sheet("2026-11")
+    assert bs["balanced"] is True, bs.get("error")
+    assert bs["assets"]["total"] == "11350.00"
+    contra = [l for l in bs["assets"]["lines"] if l["accountCode"] == "1231"]
+    assert contra and contra[0]["contra"] is True
+    assert bs["unclosedProfit"] == "11350.00"
+
+    inc = book.income_statement("2026-11")
+    assert inc["impairmentLoss"] == "650.00"
+    assert inc["operatingProfit"] == "11350.00"

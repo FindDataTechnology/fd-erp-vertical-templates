@@ -105,6 +105,16 @@ KEYS: dict[str, dict[str, Any]] = {
                   "回写则需要客户系统开放写接口与回滚口径",
         "implemented": True,
     },
+    # ---- 应收减值（change: add-bad-debt-provision）----
+    "bad_debt_method": {
+        "domain": "receivables",
+        "values": ("aging-rate", "specific-identification", "direct-writeoff"),
+        "default": "aging-rate",
+        "impact": "影响应收在报表上按什么口径计提：aging-rate 按账龄分档费率（分档与费率在本层登记），"
+                  "specific-identification 要逐户评估与证据材料（本版未实现，调用即拒），"
+                  "direct-writeoff 走核销审批链（同样未实现）——未实现的方法如实拒，不用账龄假装算",
+        "implemented": True,
+    },
     # ---- 合并报表 ----
     "entity_model": {
         "domain": "consolidation",
@@ -132,7 +142,7 @@ KEYS: dict[str, dict[str, Any]] = {
     },
 }
 
-DOMAINS = ("cost-accounting", "budget", "fixed-assets", "consolidation")
+DOMAINS = ("cost-accounting", "budget", "fixed-assets", "receivables", "consolidation")
 
 
 def _ref() -> str:
