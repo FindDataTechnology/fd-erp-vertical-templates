@@ -235,3 +235,126 @@ def test_allowance_is_a_contra_asset_and_impairment_is_an_expense():
     inc = book.income_statement("2026-11")
     assert inc["impairmentLoss"] == "650.00"
     assert inc["operatingProfit"] == "11350.00"
+
+
+# ---- 8) 现金流量表（change: add-cash-flow-statement）----
+
+def _t(txn: str, booked_on: str, legs: list[tuple[str, str, str]]) -> list[dict]:
+    """一笔交易：`txn_id` 相同的多行、同一业务日期。"""
+    return [{**_e(code, direction, amount,
+                  posted_at=f"{booked_on}T09:00:00+08:00"),
+             "booked_on": booked_on, "txn_id": txn}
+            for code, direction, amount in legs]
+
+
+def test_cash_flow_classifies_sale_as_operating():
+    entries = _t("t-sale", "2026-11-05",
+                 [("1000", "debit", "1000"), ("4000", "credit", "1000")])
+    cf = _book(entries).cash_flow("2026-11")
+    op = cf["categories"]["operating"]
+    assert op["net"] == "1000.00"
+    assert op["inflow"] == "1000.00" and op["outflow"] == "0.00"
+    line = next(x for x in op["lines"] if x["accountCode"] == "4000")
+    assert line["line"] == "销售商品、提供劳务收到的现金"
+    assert cf["openingCash"] == "0.00"
+    assert cf["closingCash"] == "1000.00"
+    assert cf["netIncrease"] == "1000.00"
+    assert cf["consistent"] is True
+    assert cf["categories"]["investing"]["lines"] == []
+    assert cf["categories"]["financing"]["lines"] == []
+
+
+def test_cash_flow_three_categories_and_self_proof():
+    """投资 5000 → 收现 3000 → 购建固定资产 2000：三类净额之和 == 期末 − 期初。"""
+    entries = (
+        _t("t-capital", "2026-11-01",
+           [("1000", "debit", "5000"), ("3000", "credit", "5000")])
+        + _t("t-sale", "2026-11-05",
+             [("1000", "debit", "3000"), ("4000", "credit", "3000")])
+        + _t("t-fa", "2026-11-08",
+             [("1601", "debit", "2000"), ("1000", "credit", "2000")])
+    )
+    cf = _book(entries).cash_flow("2026-11")
+    assert cf["categories"]["financing"]["net"] == "5000.00"
+    assert cf["categories"]["operating"]["net"] == "3000.00"
+    assert cf["categories"]["investing"]["net"] == "-2000.00"
+    assert cf["categorizedNet"] == "6000.00"
+    assert cf["closingCash"] == "6000.00"
+    assert cf["difference"] == "0.00"
+    assert cf["consistent"] is True, cf.get("error")
+    investing_line = cf["categories"]["investing"]["lines"][0]
+    assert investing_line["line"] == "购建固定资产支付的现金"
+    assert investing_line["outflow"] == "2000.00"
+
+
+def test_cash_flow_allocates_multi_counter_by_amount():
+    """一次付款 1000，其中费用 800、预付货款 200：逐笔可核，合计仍为 1000。"""
+    entries = _t("t-pay", "2026-11-06",
+                 [("5200", "debit", "800"), ("1200", "debit", "200"),
+                  ("1000", "credit", "1000")])
+    cf = _book(entries).cash_flow("2026-11")
+    op = cf["categories"]["operating"]
+    nets = {l["accountCode"]: l["net"] for l in op["lines"]}
+    assert nets == {"5200": "-800.00", "1200": "-200.00"}
+    assert {l["line"] for l in op["lines"]} == {
+        "支付其他与经营活动有关的现金", "购买商品、接受劳务支付的现金"}
+    assert op["outflow"] == "1000.00" and op["net"] == "-1000.00"
+
+    rows = [a for a in cf["attributions"] if a["txnId"] == "t-pay"]
+    assert {r["accountCode"]: r["amount"] for r in rows} == {
+        "5200": "-800.00", "1200": "-200.00"}
+    assert cf["netIncrease"] == "-1000.00" and cf["consistent"] is True
+
+
+def test_internal_transfer_is_listed_but_excluded_from_categories():
+    entries = _t("t-move", "2026-11-07",
+                 [("1000", "debit", "900"), ("1000", "credit", "900")])
+    cf = _book(entries).cash_flow("2026-11")
+    assert cf["internal"] == [{"txnId": "t-move", "inflow": "900.00",
+                               "outflow": "900.00", "net": "0.00"}]
+    for category in ("operating", "investing", "financing"):
+        assert cf["categories"][category]["lines"] == []
+        assert cf["categories"][category]["net"] == "0.00"
+    assert cf["netIncrease"] == "0.00"
+    assert cf["consistent"] is True
+
+
+def test_off_map_counter_is_not_guessed_and_breaks_self_proof():
+    """信用减值损失（6602）不与现金同笔；真出现就不猜——进 unclassified 并判不自证。"""
+    entries = _t("t-odd", "2026-11-09",
+                 [("6602", "debit", "650"), ("1000", "credit", "650")])
+    cf = _book(entries).cash_flow("2026-11")
+    assert cf["unclassified"] == ["6602"]
+    assert cf["categories"]["operating"]["lines"] == []
+    assert cf["consistent"] is False
+    assert cf["netIncrease"] == "-650.00"
+    assert cf["difference"] == "-650.00"
+    assert "error" in cf and "6602" in cf["note"]
+
+
+def test_cash_leg_without_counterpart_is_a_fragment_not_an_internal_transfer():
+    """只有现金行、没有对手行＝交易不完整。绝不能当成「内部调拨」混过去。"""
+    cf = _book([_e("1000", "credit", "100")]).cash_flow("2026-11")
+    assert cf["internal"] == []
+    assert cf["fragments"][0]["net"] == "-100.00"
+    assert cf["consistent"] is False
+    assert cf["difference"] == "-100.00"
+
+
+def test_cash_flow_period_follows_booked_on_not_posting_time():
+    """10 月 31 日的收现 11 月 2 日才落账：算 10 月；11 月的期初现金是 500。"""
+    posted = "2026-11-02T09:00:00+08:00"
+    entries = [
+        {"account_code": "1000", "direction": "debit", "amount": "500",
+         "amount_base": "500", "posted_at": posted, "booked_on": "2026-10-31",
+         "txn_id": "t-oct"},
+        {"account_code": "4000", "direction": "credit", "amount": "500",
+         "amount_base": "500", "posted_at": posted, "booked_on": "2026-10-31",
+         "txn_id": "t-oct"},
+    ]
+    book = _book(entries)
+    oct_ = book.cash_flow("2026-10")
+    nov = book.cash_flow("2026-11")
+    assert oct_["netIncrease"] == "500.00" and oct_["consistent"] is True
+    assert nov["openingCash"] == "500.00"
+    assert nov["netIncrease"] == "0.00" and nov["consistent"] is True
