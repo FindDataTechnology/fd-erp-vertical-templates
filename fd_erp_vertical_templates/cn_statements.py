@@ -27,7 +27,7 @@ from .dates import entry_period
 from .errors import TemplateError
 from .localization import CnPack
 from .cn_tax import vat_position
-from .statements import CHART
+from .statements import CHART, cash_flow_report
 
 Q2 = Decimal("0.01")
 SCHEMA = "fd-erp-vertical-templates/cn-statements/v1"
@@ -37,6 +37,27 @@ _PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 OUTPUT_VAT = "2221.01.01"
 INPUT_VAT = "2221.01.02"
 INPUT_TRANSFER_OUT = "2221.01.04"   # 进项税额转出（change: add-cn-red-letter-and-input-transfer-out）
+
+
+def _by_statutory_line(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按报表行名合并（同一行由多个对手科目凑成时，合计才是那一行）。"""
+    merged: dict[str, dict[str, Any]] = {}
+    for row in lines:
+        key = str(row.get("line") or row.get("account") or row.get("accountCode"))
+        slot = merged.setdefault(key, {"line": key, "accountCodes": [],
+                                       "inflow": Decimal(0), "outflow": Decimal(0),
+                                       "net": Decimal(0)})
+        slot["accountCodes"].append(str(row.get("accountCode")))
+        slot["inflow"] += Decimal(str(row.get("inflow") or "0"))
+        slot["outflow"] += Decimal(str(row.get("outflow") or "0"))
+        slot["net"] += Decimal(str(row.get("net") or "0"))
+    out = []
+    for slot in merged.values():
+        slot.update({"inflow": _fmt(slot["inflow"]), "outflow": _fmt(slot["outflow"]),
+                     "net": _fmt(slot["net"])})
+        slot["accountCodes"] = sorted(slot["accountCodes"])
+        out.append(slot)
+    return out
 
 
 def _check_period(value: Any) -> str:
@@ -265,6 +286,146 @@ class CnStatements:
                            "在制品（4001）与制造费用是成本归集科目，不进利润表",
         }
         return out
+
+    # ---- 现金流量表 ----
+
+    def _cash_codes(self) -> tuple[str, ...]:
+        """「现金」= 资产负债表「货币资金」这一行覆盖的科目，展开成实际存在的科目码。
+
+        口径不在这里另声明一次：资产负债表说货币资金是哪些码，现金流量表的期初期末就用哪些码，
+        所以「期末现金 = 资产负债表货币资金」是同一份定义推出来的，而不是两处各算一遍再对。
+        """
+        cf = self._rules.get("cashFlow") or {}
+        key = str(cf.get("cashLine") or "cash")
+        bs = self._rules.get("balanceSheet") or {}
+        line = next((l for l in (bs.get("assets") or []) if str(l.get("key")) == key), None)
+        if line is None:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"现金流量表指向的资产行 {key!r} 不存在——先修 statements 包",
+                detail={"chart": self._chart, "cashLine": key})
+        roots = [str(c) for c in (line.get("codes") or [])]
+        return tuple(str(a["code"]) for a in self._pack.accounts()
+                     if any(str(a["code"]) == r or str(a["code"]).startswith(r + ".")
+                            for r in roots))
+
+    def _flow_map(self) -> dict[str, Any]:
+        """归位表：行键 → (类别, 行名)，方向分支的按 inflow/outflow 各给一份。"""
+        cf = self._rules.get("cashFlow") or {}
+        lines = cf.get("lines") or {}
+        categories = cf.get("categories") or {}
+        out: dict[str, Any] = {}
+
+        def resolve(target: Any) -> tuple[str, str]:
+            spec = lines.get(str(target)) or {}
+            category = str(spec.get("category") or "")
+            if category not in categories:
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"现金流量表行 {target!r} 的类别 {category!r} 未声明",
+                    detail={"chart": self._chart, "line": target})
+            return category, str(spec.get("label") or target)
+
+        for code, spec in (cf.get("map") or {}).items():
+            if not isinstance(spec, dict):
+                continue
+            if spec.get("line"):
+                out[str(code)] = resolve(spec["line"])
+            else:
+                out[str(code)] = {side: resolve(spec[side])
+                                  for side in ("inflow", "outflow") if spec.get(side)}
+        return out
+
+    def _disposal_line(self) -> tuple[str, str] | None:
+        spec = (self._rules.get("cashFlow") or {}).get("disposal") or {}
+        line = str(spec.get("line") or "")
+        if not line:
+            return None
+        lines = (self._rules.get("cashFlow") or {}).get("lines") or {}
+        target = lines.get(line) or {}
+        category = str(target.get("category") or "")
+        if not category:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"现金流量表处置行 {line!r} 未在 lines 里声明",
+                detail={"chart": self._chart, "line": line})
+        return category, str(target.get("label") or line)
+
+    def cash_flow(self, period: Any, *,
+                  entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """现金流量表（直接法，会小企 03 表 / 会企 03 表项目）。
+
+        账里只有内核科目码，所以先把每行的科目换成准则码再交给共用引擎——归位表因此
+        与报表其余部分同一套词汇（准则科目码），校验也才能拿准则科目表去查。
+
+        与通用 `StatementBook.cash_flow` 是同一个实现、同一套判据（三类净额之和 =
+        现金增减、缺对手行与未归类都判不自证），差别只在科目码与行名。
+        """
+        key = _check_period(period)
+        cf = self._rules.get("cashFlow") or {}
+        rows = self._read_all() if entries is None else entries
+        translated = []
+        for row in rows:
+            code = str(row.get("account_code") or "").strip()
+            translated.append({**row, "account_code": self._map.get(code, code)})
+        out = cash_flow_report(
+            translated, key,
+            cash_codes=self._cash_codes(),
+            flow_map=self._flow_map(),
+            label_of=lambda code: (self._pack.account(code) or {}).get("name") or code,
+            category_labels={k: str(v) for k, v in (cf.get("categories") or {}).items()},
+            disposal_roots=tuple(str(r) for r in
+                                 ((cf.get("disposal") or {}).get("roots") or ())),
+            disposal_line=self._disposal_line(),
+            caliber_note=(
+                "直接法（准则报表项目）。现金口径＝资产负债表「货币资金」这一行覆盖的科目"
+                "（含银行待清算/在途结算），故期末现金与货币资金由同一份定义得出；"
+                "对手科目按准则码归位，处置与购建、借入与偿还按方向分行；"
+                "表外科目进 unclassified 并判不自证，不猜类别"),
+        )
+        # 法定报表按**行**列示，不按科目列示：同一行可能由多个对手科目凑成
+        # （处置行的固定资产/累计折旧/处置收益），逐科目一行会让同一行名出现三次、
+        # 每次只有一部分金额——看着像三行，加起来才是那一行的数。
+        out["categories"] = {
+            category: {**bucket, "lines": _by_statutory_line(bucket["lines"])}
+            for category, bucket in out["categories"].items()}
+        out["schema"] = SCHEMA
+        out["chart"] = self._chart
+        feet = self._cash_feet(key, out)
+        out.update(feet)
+        return out
+
+    def _cash_feet(self, period: str, flow: dict[str, Any]) -> dict[str, Any]:
+        """两条脚注互证：三类净额之和 = 净增加额；期末现金 = 资产负债表货币资金。
+
+        第三条（与通用引擎同账本比净增加额）不放在这里：那要拿两套科目码各算一遍，
+        属于测试的职责，放进报表返回值只会让人以为运行时真的对过两遍。
+        """
+        bs = self.balance_sheet(period)
+        cash_line = next((l for l in bs["assets"]
+                          if str(l.get("key")) == str(
+                              (self._rules.get("cashFlow") or {}).get("cashLine") or "cash")),
+                         None)
+        balance_cash = Decimal(str((cash_line or {}).get("amount") or "0"))
+        closing = Decimal(str(flow.get("closingCash") or "0"))
+        categories_sum = Decimal(0)
+        for bucket in (flow.get("categories") or {}).values():
+            categories_sum += Decimal(str(bucket.get("net") or "0"))
+        net_increase = Decimal(str(flow.get("netIncrease") or "0"))
+        return {
+            "sumCheck": {
+                "categoriesSum": _fmt(categories_sum),
+                "netIncrease": _fmt(net_increase),
+                "difference": _fmt(categories_sum - net_increase),
+                "ok": categories_sum == net_increase,
+            },
+            "balanceCheck": {
+                "closingCash": _fmt(closing),
+                "balanceSheetCash": _fmt(balance_cash),
+                "difference": _fmt(closing - balance_cash),
+                "ok": closing == balance_cash,
+            },
+        }
 
     # ---- 增值税申报口径 ----
 

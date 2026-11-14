@@ -193,11 +193,97 @@ class CnPack:
                     ref = str(term).lstrip("+-")
                     if ref not in keys:
                         problems.append(f"{key}: 公式引用了未定义的键 {ref}")
+        problems.extend(self._check_cash_flow())
         if problems:
             raise TemplateError(
                 "INVALID_ARGUMENT",
                 f"报表行次与准则表不一致（{self.chart}）：{'；'.join(problems[:5])}",
                 detail={"problems": problems[:20], "chart": self.chart})
+
+    def _check_cash_flow(self) -> list[str]:
+        """现金流量表归位表的校验。
+
+        这张表的每个数都由「对手科目 → 报表行」推出来，写错的形态只有两类：科目码打错
+        （该进表的钱静默进 unclassified）与行键打错（行名变 None、金额落进不存在的行）。
+        两者都不会让报表报错，只会让某一类净额差一截——所以在加载期逐条查。
+        """
+        cf = self._statements.get("cashFlow")
+        if not isinstance(cf, dict):
+            return []
+        problems: list[str] = []
+        cash_line = str(cf.get("cashLine") or "")
+        assets = (self._statements.get("balanceSheet") or {}).get("assets") or []
+        if cash_line and not any(str(l.get("key")) == cash_line for l in assets):
+            problems.append(f"cashFlow.cashLine 指向资产负债表里不存在的行 {cash_line!r}")
+        categories = cf.get("categories") or {}
+        lines = cf.get("lines") or {}
+        for key, spec in lines.items():
+            category = str((spec or {}).get("category") or "")
+            if category not in categories:
+                problems.append(f"cashFlow.lines.{key}: 类别 {category!r} 不在 categories 里")
+            if not str((spec or {}).get("label") or "").strip():
+                problems.append(f"cashFlow.lines.{key}: 缺报表行名")
+        for code, spec in (cf.get("map") or {}).items():
+            if not self.account(code):
+                problems.append(f"cashFlow.map.{code}: 科目不在准则表里")
+            if not isinstance(spec, dict):
+                problems.append(f"cashFlow.map.{code}: 归位值须为对象（line 或 inflow/outflow）")
+                continue
+            targets = [spec[k] for k in ("line", "inflow", "outflow") if spec.get(k)]
+            if not targets:
+                problems.append(f"cashFlow.map.{code}: 既没给 line 也没给 inflow/outflow")
+            for target in targets:
+                if str(target) not in lines:
+                    problems.append(f"cashFlow.map.{code}: 归位到未定义的行 {target!r}")
+        disposal = cf.get("disposal") or {}
+        if disposal:
+            if str(disposal.get("line") or "") not in lines:
+                problems.append(
+                    f"cashFlow.disposal: 行 {disposal.get('line')!r} 未在 lines 里声明")
+            for code in disposal.get("roots") or []:
+                if not self.account(code):
+                    problems.append(f"cashFlow.disposal.roots: 科目 {code} 不在准则表里")
+            if not [c for c in (disposal.get("roots") or []) if self.account(c)]:
+                problems.append("cashFlow.disposal.roots: 一个可解析的科目都没有——"
+                                "整笔归位会永不触发")
+        problems.extend(self._check_cash_flow_coverage(cf))
+        return problems
+
+    def _check_cash_flow_coverage(self, cf: dict[str, Any]) -> list[str]:
+        """映射的每个目标都必须有归宿：现金科目 / 归位表（含父级）/ 显式声明不会带现金。
+
+        **漏登记是静默的**：内核科目映射到准则科目 A，而 A 不在归位表里，那一笔现金
+        照样在账上、报表照样平——只是它不进任何一类，`categorizedNet` 少一截，且
+        `unclassified` 要点开才看得见。2026-11-14 大表就漏了 2203 预收账款（300 元
+        静默落表外），是这条判据把它点出来的。
+        """
+        known = set(cf.get("map") or {}) | set(cf.get("neverCash") or {})
+        roots = [str(c) for c in (((cf.get("cashLine") and
+                   next((l.get("codes") for l in
+                         ((self._statements.get("balanceSheet") or {}).get("assets") or [])
+                         if str(l.get("key")) == str(cf.get("cashLine"))), [])) or []))]
+        roots = [str(c) for c in roots]
+        problems: list[str] = []
+        for code in sorted({str(v.get("cn")) for v in
+                            (self._mapping.get("kernelToCn") or {}).values()}):
+            if any(code == r or code.startswith(r + ".") for r in roots):
+                continue                      # 现金本身不归位
+            head = code
+            while head and head not in known:
+                if "." not in head:
+                    head = ""
+                    break
+                head = head.rsplit(".", 1)[0]
+            if not head:
+                problems.append(
+                    f"cashFlow: 映射目标 {code} 既不是现金科目、也不在归位表里、"
+                    f"也没在 neverCash 里声明——那笔现金会静默落表外")
+        for code, why in (cf.get("neverCash") or {}).items():
+            if not str(why or "").strip():
+                problems.append(f"cashFlow.neverCash.{code}: 要写清为什么不带现金")
+            if not self.account(code):
+                problems.append(f"cashFlow.neverCash.{code}: 科目不在准则表里")
+        return problems
 
     # ---- 查询 ----
 

@@ -502,5 +502,347 @@
         "-income_tax"
       ]
     }
-  ]
+  ],
+  "cashFlow": {
+    "note": "直接法（会小企 03 表 / 会企 03 表项目）。不新设科目、不加分录字段：「现金」由 balanceSheet 里 cash 这一行的科目集合定义，所以「期末现金 = 资产负债表货币资金」是同一份定义推出来的，不是两处各算一遍；归位按对手科目（取负即该对手带来的现金流入），一个对手科目只登记一次，需要区分方向的行（处置/购建、借款/偿还）写成 inflow/outflow 两个分支。表外的科目进 unclassified 并让 consistent=false，不猜类别、不调明细凑平。",
+    "cashLine": "cash",
+    "categories": {
+      "operating": "经营活动产生的现金流量",
+      "investing": "投资活动产生的现金流量",
+      "financing": "筹资活动产生的现金流量"
+    },
+    "lines": {
+      "op-sales": {
+        "category": "operating",
+        "label": "销售商品、提供劳务收到的现金"
+      },
+      "op-other-in": {
+        "category": "operating",
+        "label": "收到其他与经营活动有关的现金"
+      },
+      "op-purchase": {
+        "category": "operating",
+        "label": "购买商品、接受劳务支付的现金"
+      },
+      "op-payroll": {
+        "category": "operating",
+        "label": "支付给职工以及为职工支付的现金"
+      },
+      "op-tax": {
+        "category": "operating",
+        "label": "支付的各项税费"
+      },
+      "op-other-out": {
+        "category": "operating",
+        "label": "支付其他与经营活动有关的现金"
+      },
+      "inv-recover": {
+        "category": "investing",
+        "label": "收回投资收到的现金"
+      },
+      "inv-income": {
+        "category": "investing",
+        "label": "取得投资收益收到的现金"
+      },
+      "inv-dispose": {
+        "category": "investing",
+        "label": "处置固定资产、无形资产和其他长期资产收回的现金净额"
+      },
+      "inv-build": {
+        "category": "investing",
+        "label": "购建固定资产、无形资产和其他长期资产支付的现金"
+      },
+      "inv-pay": {
+        "category": "investing",
+        "label": "投资支付的现金"
+      },
+      "fin-in": {
+        "category": "financing",
+        "label": "吸收投资收到的现金"
+      },
+      "fin-borrow": {
+        "category": "financing",
+        "label": "取得借款收到的现金"
+      },
+      "fin-repay": {
+        "category": "financing",
+        "label": "偿还债务支付的现金"
+      },
+      "fin-dividend": {
+        "category": "financing",
+        "label": "分配利润、利润或偿付利息支付的现金"
+      }
+    },
+    "map": {
+      "1101": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "交易性金融资产：赎回是收回投资，买入是投资支付，方向决定行"
+      },
+      "1121": {
+        "line": "op-sales",
+        "why": "应收票据：票据结算是销售回款的一种形态"
+      },
+      "1122": {
+        "line": "op-sales",
+        "why": "应收账款：销售未收款，收款时与现金同笔"
+      },
+      "1123": {
+        "line": "op-purchase",
+        "why": "预付账款：先付钱后收货，付款即购买流出"
+      },
+      "1124": {
+        "line": "op-sales",
+        "why": "应收款项融资：以票据/应收质押融资收到的现金仍属销售回款"
+      },
+      "1401": {
+        "line": "op-purchase",
+        "why": "材料采购"
+      },
+      "1402": {
+        "line": "op-purchase",
+        "why": "在途物资"
+      },
+      "1403": {
+        "line": "op-purchase",
+        "why": "原材料"
+      },
+      "1405": {
+        "line": "op-purchase",
+        "why": "库存商品：现购入库时与现金同笔"
+      },
+      "1408": {
+        "line": "op-purchase",
+        "why": "委托加工物资"
+      },
+      "1411": {
+        "line": "op-purchase",
+        "why": "周转材料"
+      },
+      "1504": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "债权投资：同上"
+      },
+      "1505": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "其他债权投资：同上"
+      },
+      "1511": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "长期股权投资：同上"
+      },
+      "1513": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "其他权益工具投资：同上"
+      },
+      "1521": {
+        "inflow": "inv-recover",
+        "outflow": "inv-pay",
+        "why": "投资性房地产：买是投资支付，卖是收回投资"
+      },
+      "1601": {
+        "inflow": "inv-dispose",
+        "outflow": "inv-build",
+        "why": "固定资产：买是购建，卖是处置，同一个科目两个方向落在法定表两行"
+      },
+      "1604": {
+        "line": "inv-build",
+        "why": "在建工程付现"
+      },
+      "1605": {
+        "line": "inv-build",
+        "why": "工程物资付现"
+      },
+      "1606": {
+        "line": "inv-dispose",
+        "why": "固定资产清理：清理收现走处置行"
+      },
+      "1701": {
+        "inflow": "inv-dispose",
+        "outflow": "inv-build",
+        "why": "无形资产：同上"
+      },
+      "1704": {
+        "inflow": "inv-dispose",
+        "outflow": "inv-build",
+        "why": "使用权资产：同上"
+      },
+      "1731": {
+        "line": "inv-build",
+        "why": "开发支出付现"
+      },
+      "2001": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "短期借款：借入与归还是两行"
+      },
+      "2201": {
+        "line": "op-purchase",
+        "why": "应付票据：付票即付款"
+      },
+      "2202": {
+        "line": "op-purchase",
+        "why": "应付账款：付款时与现金同笔"
+      },
+      "2203": {
+        "line": "op-sales",
+        "why": "预收账款：先收钱后发货，收款即销售流入（本表 2204 是合同负债，内核 2100 映射到 2203，两个科目都在用）"
+      },
+      "2204": {
+        "line": "op-sales",
+        "why": "合同负债：先收钱后履约，收款即销售流入"
+      },
+      "2211": {
+        "line": "op-payroll",
+        "why": "应付职工薪酬：发工资的对手科目"
+      },
+      "2221": {
+        "line": "op-tax",
+        "why": "应交税费全族：缴税的对手科目就是它，按前缀命中 2221.01.01 这类明细"
+      },
+      "2231": {
+        "line": "fin-dividend",
+        "why": "应付利息：付息"
+      },
+      "2232": {
+        "line": "fin-dividend",
+        "why": "应付股利：付股利"
+      },
+      "2241": {
+        "line": "op-other-out",
+        "why": "其他应付款付出"
+      },
+      "2402": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "一年内到期的非流动负债：到期偿还"
+      },
+      "2501": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "长期借款：同上"
+      },
+      "2502": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "应付债券：发行与兑付/回购"
+      },
+      "2510": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "租赁负债：租金的偿还部分"
+      },
+      "2702": {
+        "inflow": "fin-borrow",
+        "outflow": "fin-repay",
+        "why": "未确认融资费用：随还款摊销，方向同借款"
+      },
+      "4001": {
+        "line": "fin-in",
+        "why": "实收资本：股东投入"
+      },
+      "4002": {
+        "line": "fin-in",
+        "why": "资本公积：溢价随出资一起进来"
+      },
+      "4104": {
+        "line": "fin-dividend",
+        "why": "利润分配：向股东分钱"
+      },
+      "4106": {
+        "line": "fin-in",
+        "why": "其他权益工具：优先股/永续债发行收到的现金"
+      },
+      "5001": {
+        "line": "op-purchase",
+        "why": "生产成本：材料/人工付现经它归集"
+      },
+      "5101": {
+        "line": "op-purchase",
+        "why": "制造费用：车间付现费用归这里"
+      },
+      "5201": {
+        "line": "op-purchase",
+        "why": "劳务成本"
+      },
+      "6001": {
+        "line": "op-sales",
+        "why": "主营业务收入：现销的钱直接来自这一科目"
+      },
+      "6041": {
+        "line": "op-sales",
+        "why": "租赁收入：现收租金"
+      },
+      "6051": {
+        "line": "op-sales",
+        "why": "其他业务收入：现销同上"
+      },
+      "6111": {
+        "line": "inv-income",
+        "why": "投资收益与现金同笔时是收到的分配"
+      },
+      "6301": {
+        "line": "op-other-in",
+        "why": "营业外收入与现金同笔的只有现金溢余、政府补助这类收款"
+      },
+      "6401": {
+        "line": "op-purchase",
+        "why": "主营业务成本：现购并结转时与现金同笔"
+      },
+      "6402": {
+        "line": "op-purchase",
+        "why": "其他业务成本"
+      },
+      "6403": {
+        "line": "op-tax",
+        "why": "税金及附加与现金同笔时是直接缴税"
+      },
+      "6421": {
+        "line": "op-other-out",
+        "why": "手续费及佣金支出付现"
+      },
+      "6601": {
+        "line": "op-other-out",
+        "why": "销售费用付现"
+      },
+      "6602": {
+        "line": "op-other-out",
+        "why": "管理费用付现"
+      },
+      "6603": {
+        "line": "fin-dividend",
+        "why": "财务费用与现金同笔时主要是付息（手续费金额小），法定表把付息列在筹资"
+      },
+      "6711": {
+        "line": "op-other-out",
+        "why": "营业外支出付现：滞纳金、捐赠这类"
+      },
+      "6801": {
+        "line": "op-tax",
+        "why": "所得税费用与现金同笔时是预缴"
+      }
+    },
+    "disposal": {
+      "roots": [
+        "1601",
+        "1604",
+        "1605",
+        "1606",
+        "1701",
+        "1704",
+        "1731",
+        "1521"
+      ],
+      "line": "inv-dispose",
+      "why": "该笔里有长期资产减少（贷方腿）即整笔归「处置…收回的现金净额」：三条腿（现金/资产/处置收益）合计的现金净额才是这一行该有的数，逐条按对手科目归位会把收益那部分挪进经营活动。"
+    },
+    "neverCash": {
+      "1602": "累计折旧：计提是纯估计，永远没有现金腿；处置时的折旧腿由 disposal 整笔归位",
+      "6721": "信用减值损失：估计，不同现金同笔"
+    }
+  }
 }

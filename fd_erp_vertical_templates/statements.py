@@ -198,6 +198,221 @@ def _period_bounds(key: str) -> tuple[date, date]:
     return start, date(year + (month == 12), month % 12 + 1, 1)
 
 
+def cash_flow_report(rows: list[dict[str, Any]], period: str, *, cash_codes,
+                     flow_map: dict[str, Any], label_of,
+                     categories: tuple[str, ...] = CATEGORIES,
+                     category_labels: dict[str, str] | None = None,
+                     caliber_note: str | None = None,
+                     disposal_roots: tuple[str, ...] = (),
+                     disposal_line: tuple[str, str] | None = None
+                     ) -> dict[str, Any]:
+    """直接法现金流量表（唯一实现）。
+
+    通用报表用内核科目码与 `CASH_FLOW_MAP`，国别包用它自己准则下的码与归位表——
+    两处各写一遍分类逻辑，今天一致、改一处就漂，而漂了只表现为「某类净额差一截」。
+
+    归类不给分录加字段、也不从利润表倒推：**对手科目本身就说明了钱的来路与去向**。
+    一笔交易内，每个非现金对手行的带符号金额取负，就是它带来的现金流入（正）或流出
+    （负）；双分录保证这些取负之和恒等于该笔的现金净额，所以多对手行天然按金额分摊、
+    逐笔可核，不需要平均或估值。
+    """
+    labels = category_labels or CATEGORY_LABELS
+
+    def target(mapped: Any, flow: Decimal) -> tuple[str, str]:
+        """归位表的值可以是 `(类别, 行名)`，也可以是按方向分开的
+        `{"inflow": (...), "outflow": (...)}`——处置长期资产是 inflow、购建是 outflow，
+        同一个对手科目两个方向落在法定报表的两行上；只给一边时另一边沿用它。"""
+        if isinstance(mapped, dict):
+            side = mapped.get("inflow" if flow >= 0 else "outflow") \
+                or mapped.get("inflow") or mapped.get("outflow")
+            if side is None:
+                raise TemplateError("INVALID_ARGUMENT",
+                                    "cashFlow 归位表的方向分支必须有至少一侧")
+            category, line = side
+            return str(category), str(line)
+        category, line = mapped
+        return str(category), str(line)
+    start_day, _end = _period_bounds(period)
+    grain = _grain(period)
+    window = [e for e in rows if entry_period(e, grain) == period]
+    earlier = [e for e in rows
+               if (day := entry_date(e)) is not None and day < start_day]
+
+    def signed(entry: dict[str, Any]) -> Decimal:
+        amount = _dec(entry.get("amount_base") or entry.get("amount"))
+        return amount if entry.get("direction") == "debit" else -amount
+
+    def balance(pool: list[dict[str, Any]]) -> Decimal:
+        return sum((signed(e) for e in pool
+                    if str(e.get("account_code") or "").strip() in cash_codes),
+                   Decimal(0))
+
+    def lookup(code: str) -> tuple[str, str] | None:
+        """精确命中；没命中就沿点号逐级上溯（准则科目是层级码：2221.01.01 → 2221.01 → 2221）。"""
+        hit = flow_map.get(code)
+        if hit is not None:
+            return hit
+        head = code
+        while "." in head:
+            head = head.rsplit(".", 1)[0]
+            hit = flow_map.get(head)
+            if hit is not None:
+                return hit
+        return None
+
+    opening = balance(earlier)
+    closing = opening + balance(window)
+
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for index, entry in enumerate(window):
+        gid = str(entry.get("txn_id") or entry.get("stable_id") or "").strip() \
+            or f"row-{index}"
+        groups.setdefault(gid, []).append(entry)
+
+    # 桶键是 (报表行, 科目) 而不是科目：同一个科目在一个月里可能两个方向落在两行
+    # （1601 既被购建付现、又被处置收现），只按科目归桶会让后写的那条覆盖前一行的行名。
+    buckets: dict[str, dict[tuple[str, str], dict[str, Any]]] = {
+        c: {} for c in categories}
+    attributions: list[dict[str, Any]] = []
+    internal: list[dict[str, Any]] = []
+    fragments: list[dict[str, Any]] = []
+    unclassified: set[str] = set()
+
+    for gid, legs in groups.items():
+        cash_legs = [e for e in legs
+                     if str(e.get("account_code") or "").strip() in cash_codes]
+        if not cash_legs:
+            continue
+        counters = [e for e in legs
+                    if str(e.get("account_code") or "").strip() not in cash_codes]
+        cash_net = sum((signed(e) for e in cash_legs), Decimal(0))
+
+        if not counters:
+            if cash_net == 0:
+                inflow = sum((v for v in (signed(e) for e in cash_legs) if v > 0),
+                             Decimal(0))
+                outflow = -sum((v for v in (signed(e) for e in cash_legs) if v < 0),
+                               Decimal(0))
+                internal.append({"txnId": gid, "inflow": _fmt(inflow),
+                                 "outflow": _fmt(outflow), "net": _fmt(cash_net)})
+            else:
+                fragments.append({"txnId": gid, "net": _fmt(cash_net),
+                                  "reason": "只有现金行、缺对手行——交易的其余分录"
+                                            "不在本期间或不在账本里"})
+            continue
+
+        # 处置长期资产是**整笔**的事：卖一台设备，账上是「借现金/贷固定资产/贷处置收益」
+        # 三条腿。按对手科目逐条归位会把 80 记进投资、把 20 收益记进经营——合计对得上，
+        # 但法定表的「处置…收回的现金净额」该是全部 113。判据只认一个客观事实：
+        # 该笔里有长期资产**减少**（贷方腿），则整笔非现金腿都归处置行。
+        forced: tuple[str, str] | None = None
+        if disposal_line is not None and disposal_roots:
+            for leg in counters:
+                code = str(leg.get("account_code") or "").strip()
+                if signed(leg) < 0 and any(code == r or code.startswith(r + ".")
+                                           for r in disposal_roots):
+                    forced = disposal_line
+                    break
+
+        for entry in counters:
+            code = str(entry.get("account_code") or "").strip()
+            flow = -signed(entry)
+            if forced is not None:
+                category, line = forced
+                slot = buckets[category].setdefault(
+                    (line, code), {"line": line, "accountCode": code,
+                                   "inflow": Decimal(0), "outflow": Decimal(0)})
+                if flow >= 0:
+                    slot["inflow"] += flow
+                else:
+                    slot["outflow"] += -flow
+                attributions.append({"txnId": gid, "accountCode": code,
+                                     "category": category, "line": line,
+                                     "amount": _fmt(flow)})
+                continue
+            mapped = lookup(code)
+            if mapped is None:
+                unclassified.add(code)
+                attributions.append({"txnId": gid, "accountCode": code,
+                                     "category": None, "line": None,
+                                     "amount": _fmt(flow)})
+                continue
+            category, line = target(mapped, flow)
+            slot = buckets[category].setdefault(
+                (line, code), {"line": line, "accountCode": code,
+                               "inflow": Decimal(0), "outflow": Decimal(0)})
+            if flow >= 0:
+                slot["inflow"] += flow
+            else:
+                slot["outflow"] += -flow
+            attributions.append({"txnId": gid, "accountCode": code,
+                                 "category": category, "line": line,
+                                 "amount": _fmt(flow)})
+
+    out_categories: dict[str, dict[str, Any]] = {}
+    categorized = Decimal(0)
+    for category in categories:
+        lines: list[dict[str, Any]] = []
+        inflow_total = outflow_total = Decimal(0)
+        for _key in sorted(buckets[category]):
+            slot = buckets[category][_key]
+            net = slot["inflow"] - slot["outflow"]
+            inflow_total += slot["inflow"]
+            outflow_total += slot["outflow"]
+            lines.append({
+                "accountCode": slot["accountCode"],
+                "account": label_of(code),
+                "line": slot["line"],
+                "inflow": _fmt(slot["inflow"]), "outflow": _fmt(slot["outflow"]),
+                "net": _fmt(net),
+            })
+        net = inflow_total - outflow_total
+        categorized += net
+        out_categories[category] = {"label": labels[category], "lines": lines,
+                                    "inflow": _fmt(inflow_total),
+                                    "outflow": _fmt(outflow_total), "net": _fmt(net)}
+
+    net_increase = closing - opening
+    # 自证：三类净额之和 == 期末现金 − 期初现金。不等就把差额与未归类科目摆出来，
+    # **不调明细去凑平**——凑平会让「有组合没归到位」这件事永远查不出来。
+    difference = net_increase - categorized
+    consistent = difference == 0 and not unclassified and not fragments
+    out: dict[str, Any] = {
+        "period": period,
+        "openingCash": _fmt(opening), "closingCash": _fmt(closing),
+        "netIncrease": _fmt(net_increase),
+        "categories": out_categories,
+        "categorizedNet": _fmt(categorized),
+        "difference": _fmt(difference),
+        "internal": internal,
+        "consistent": consistent,
+        "attributions": attributions,
+        "caliber_note": caliber_note or (
+            "直接法：逐笔按对手科目归位（取负即该对手带来的现金流入），"
+            "多对手行按各自金额分摊且逐笔随 txnId 可核；"
+            "现金口径＝货币资金；期间按业务日期"),
+    }
+    if unclassified:
+        out["unclassified"] = sorted(unclassified)
+        out["note"] = (f"表外科目 {', '.join(sorted(unclassified))} 未进归位表，"
+                       f"既不猜类别也不计入三类——报表因此判不自证")
+    if fragments:
+        out["fragments"] = fragments
+        out["note"] = ("有交易的现金行找不到对手行（分录被拆开或不在本期），"
+                       "差额已计入 difference")
+    if not consistent and "error" not in out:
+        tail = []
+        if unclassified:
+            tail.append(f"未归类：{'、'.join(sorted(unclassified))}")
+        if fragments:
+            tail.append(f"缺对手行 {len(fragments)} 笔")
+        out["error"] = (f"三类净额之和 {_fmt(categorized)} ≠ 净增加额 "
+                        f"{_fmt(net_increase)}——差 {_fmt(difference)}"
+                        + (f"（{'；'.join(tail)}）" if tail else "")
+                        + "，先查未归类科目与缺对手行的交易")
+    return out
+
+
 class StatementBook:
     """试算平衡 / 利润表 / 资产负债表 / 按维度费用表（全部现算）。"""
 
@@ -490,138 +705,13 @@ class StatementBook:
                   entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """直接法现金流量表：按对手科目归入经营/投资/筹资，并自证净增加额。
 
-        归类不给分录加字段、也不从利润表倒推：**对手科目本身就说明了钱的来路与去向**。
-        一笔交易内，每个非现金对手行的带符号金额取负，就是它带来的现金流入（正）或流出
-        （负）；双分录保证这些取负之和恒等于该笔的现金净额，所以多对手行天然按金额分摊、
-        逐笔可核，不需要平均或估值。
+        实现只有一份（`cash_flow_report`），这里只是把内核科目码与归位表递进去。
         """
         key = _check_period(period)
-        # `entries` 允许注入：累计口径要把同一个月跑多次，重复读全量分录既慢又容易不一致。
         pool = self._entries() if entries is None else entries
-        start, _end = _period_bounds(key)
-        grain = _grain(key)
-        # 期间归属复用 dates.entry_period（业务日期优先），与利润表/账龄同一口径。
-        window = [e for e in pool if entry_period(e, grain) == key]
-        earlier = [e for e in pool
-                   if (day := entry_date(e)) is not None and day < start]
-
-        opening = self._cash_balance(earlier)
-        closing = opening + self._cash_balance(window)
-
-        # 一笔交易 = 一个 txn_id。没有 txn_id 的行只能各自成组，那样会缺对手行——
-        # 这正是下面 `fragments` 要如实点名的情况，而不是当成「内部调拨」混过去。
-        groups: dict[str, list[dict[str, Any]]] = {}
-        for index, entry in enumerate(window):
-            gid = str(entry.get("txn_id") or entry.get("stable_id") or "").strip() \
-                or f"row-{index}"
-            groups.setdefault(gid, []).append(entry)
-
-        buckets: dict[str, dict[str, dict[str, Any]]] = {c: {} for c in CATEGORIES}
-        attributions: list[dict[str, Any]] = []
-        internal: list[dict[str, Any]] = []
-        fragments: list[dict[str, Any]] = []
-        unclassified: set[str] = set()
-
-        for gid, legs in groups.items():
-            cash_legs = [e for e in legs
-                         if str(e.get("account_code") or "").strip() in CASH_ACCOUNTS]
-            if not cash_legs:
-                continue
-            counters = [e for e in legs
-                        if str(e.get("account_code") or "").strip() not in CASH_ACCOUNTS]
-            cash_net = sum((self._signed(e) for e in cash_legs), Decimal(0))
-
-            if not counters:
-                if cash_net == 0:
-                    # 两侧都是货币资金：内部调拨。单列、不进三类、不影响净增加额。
-                    inflow = sum((s for s in (self._signed(e) for e in cash_legs)
-                                  if s > 0), Decimal(0))
-                    outflow = -sum((s for s in (self._signed(e) for e in cash_legs)
-                                    if s < 0), Decimal(0))
-                    internal.append({"txnId": gid, "inflow": _fmt(inflow),
-                                     "outflow": _fmt(outflow), "net": _fmt(cash_net)})
-                else:
-                    fragments.append({"txnId": gid, "net": _fmt(cash_net),
-                                      "reason": "只有现金行、缺对手行——交易的其余分录"
-                                                "不在本期间或不在账本里"})
-                continue
-
-            for entry in counters:
-                code = str(entry.get("account_code") or "").strip()
-                flow = -self._signed(entry)
-                mapped = CASH_FLOW_MAP.get(code)
-                if mapped is None:
-                    unclassified.add(code)
-                    attributions.append({"txnId": gid, "accountCode": code,
-                                         "category": None, "line": None,
-                                         "amount": _fmt(flow)})
-                    continue
-                category, line = mapped
-                slot = buckets[category].setdefault(
-                    code, {"line": line, "inflow": Decimal(0), "outflow": Decimal(0)})
-                if flow >= 0:
-                    slot["inflow"] += flow
-                else:
-                    slot["outflow"] += -flow
-                attributions.append({"txnId": gid, "accountCode": code,
-                                     "category": category, "line": line,
-                                     "amount": _fmt(flow)})
-
-        categories: dict[str, dict[str, Any]] = {}
-        categorized = Decimal(0)
-        for category in CATEGORIES:
-            lines: list[dict[str, Any]] = []
-            inflow_total = outflow_total = Decimal(0)
-            for code in sorted(buckets[category]):
-                slot = buckets[category][code]
-                net = slot["inflow"] - slot["outflow"]
-                inflow_total += slot["inflow"]
-                outflow_total += slot["outflow"]
-                lines.append({
-                    "accountCode": code,
-                    "account": CHART.get(code, (code, ""))[0],
-                    "line": slot["line"],
-                    "inflow": _fmt(slot["inflow"]), "outflow": _fmt(slot["outflow"]),
-                    "net": _fmt(net),
-                })
-            net = inflow_total - outflow_total
-            categorized += net
-            categories[category] = {"label": CATEGORY_LABELS[category], "lines": lines,
-                                    "inflow": _fmt(inflow_total),
-                                    "outflow": _fmt(outflow_total), "net": _fmt(net)}
-
-        net_increase = closing - opening
-        # 自证：三类净额之和 == 期末现金 − 期初现金。不等就把差额与未归类科目摆出来，
-        # **不调明细去凑平**——凑平会让「有组合没归到位」这件事永远查不出来。
-        difference = net_increase - categorized
-        consistent = difference == 0 and not unclassified and not fragments
-        out: dict[str, Any] = {
-            "period": key,
-            "openingCash": _fmt(opening), "closingCash": _fmt(closing),
-            "netIncrease": _fmt(net_increase),
-            "categories": categories,
-            "categorizedNet": _fmt(categorized),
-            "difference": _fmt(difference),
-            "internal": internal,
-            "consistent": consistent,
-            "attributions": attributions,
-            "caliber_note": "直接法：逐笔按对手科目归位（取负即该对手带来的现金流入），"
-                            "多对手行按各自金额分摊且逐笔随 txnId 可核；"
-                            "现金口径＝货币资金 1000；期间按业务日期",
-        }
-        if unclassified:
-            out["unclassified"] = sorted(unclassified)
-            out["note"] = (f"表外科目 {', '.join(sorted(unclassified))} 未进归位表，"
-                           f"既不猜类别也不计入三类——报表因此判不自证")
-        if fragments:
-            out["fragments"] = fragments
-            out["note"] = ("有交易的现金行找不到对手行（分录被拆开或不在本期），"
-                           "差额已计入 difference")
-        if not consistent and "error" not in out:
-            out["error"] = (f"三类净额之和 {_fmt(categorized)} ≠ 净增加额 "
-                            f"{_fmt(net_increase)}——差 {_fmt(difference)}，"
-                            f"先查未归类科目与缺对手行的交易")
-        return out
+        return cash_flow_report(
+            pool, key, cash_codes=CASH_ACCOUNTS, flow_map=CASH_FLOW_MAP,
+            label_of=lambda code: CHART.get(code, (code, ""))[0])
 
     def cash_flow_indirect(self, period: str) -> dict[str, Any]:
         """补充资料（间接法）：净利润 → 加回非现金 → 减营运资本占用 → 经营净额。
