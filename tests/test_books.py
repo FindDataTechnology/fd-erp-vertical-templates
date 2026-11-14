@@ -203,3 +203,81 @@ def test_period_follows_booked_on_not_posting_time():
     assert nov["totals"]["debit"] == "0.00"
     sub = books.subsidiary_ledger("1100", "2026-11")
     assert sub["opening"] == "100.00"                  # 期初把它算进来
+
+
+# ---- 6) 序时账与凭证（change: add-fi-voucher-and-journal）----
+
+def _two_vouchers():
+    """两张业务凭证（各借贷相等）+ 一张结转凭证。"""
+    return [
+        _e("1100", "debit", "1130", txn="T1", line_no=1, source_ref="vat-sale:S1"),
+        _e("4000", "credit", "1000", txn="T1", line_no=2, source_ref="vat-sale:S1"),
+        _e("2221", "credit", "130", txn="T1", line_no=3, source_ref="vat-sale:S1"),
+        _e("5000", "debit", "300", txn="T2", line_no=1, source_ref="cogs:2026-11"),
+        _e("1200", "credit", "300", txn="T2", line_no=2, source_ref="cogs:2026-11"),
+        _e("4000", "debit", "1000", txn="T9", line_no=1, source_ref="close:2026-11"),
+        _e("3103", "credit", "1000", txn="T9", line_no=2, source_ref="close:2026-11"),
+    ]
+
+
+def test_journal_summarises_per_voucher():
+    out = _books(_two_vouchers()).journal("2026-11")
+    assert out["vouchers"] == 3 and out["lines"] == 7
+    assert out["balanced"] is True, out.get("error")
+    rows = {r["txnId"]: r for r in out["rows"]}
+    assert rows["T1"]["debit"] == "1130.00" and rows["T1"]["credit"] == "1130.00"
+    assert rows["T1"]["balanced"] is True and rows["T1"]["lines"] == 3
+    assert rows["T2"]["debit"] == "300.00"
+    # 结转凭证必须标出来——不标会被当成业务发生额
+    assert rows["T9"]["isClosing"] is True
+    assert rows["T1"]["isClosing"] is False
+    assert out["totals"]["debit"] == out["totals"]["credit"] == "2430.00"
+
+
+def test_journal_limit_truncates_only_the_displayed_vouchers():
+    out = _books(_two_vouchers()).journal("2026-11", limit=1)
+    assert out["truncated"] is True and out["rowCount"] == 3
+    assert len(out["rows"]) == 1
+    # 合计按全量三张算
+    assert out["totals"]["debit"] == "2430.00" and out["vouchers"] == 3
+
+
+def test_journal_on_an_empty_period():
+    out = _books([]).journal("2026-11")
+    assert out["rows"] == [] and out["vouchers"] == 0
+    assert out["balanced"] is True
+    assert "没有分录" in out["note"]
+
+
+def test_voucher_returns_every_line_and_balances():
+    out = _books(_two_vouchers()).voucher("T1")
+    assert out["txnId"] == "T1"
+    assert len(out["lines"]) == 3
+    codes = [r["accountCode"] for r in out["lines"]]
+    assert codes == ["1100", "4000", "2221"]        # 按行号
+    assert out["lines"][0]["debit"] == "1130.00"
+    assert out["lines"][0]["account"]                  # 带科目名
+    assert out["totals"] == {"debit": "1130.00", "credit": "1130.00"}
+    assert out["balanced"] is True
+    assert out["isClosing"] is False
+    assert out["sourceRef"] == "vat-sale:S1"
+
+
+def test_voucher_marks_a_closing_voucher():
+    out = _books(_two_vouchers()).voucher("T9")
+    assert out["isClosing"] is True
+    assert out["balanced"] is True
+    assert [r["accountCode"] for r in out["lines"]] == ["4000", "3103"]
+
+
+def test_voucher_of_an_unknown_txn_is_not_found():
+    with pytest.raises(TemplateError) as ei:
+        _books(_two_vouchers()).voucher("NOPE")
+    assert ei.value.code == "NOT_FOUND"
+    assert ei.value.detail["txnId"] == "NOPE"
+
+
+def test_voucher_requires_a_txn_id():
+    with pytest.raises(TemplateError) as ei:
+        _books([]).voucher("  ")
+    assert ei.value.code == "INVALID_ARGUMENT"

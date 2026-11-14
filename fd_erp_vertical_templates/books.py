@@ -21,7 +21,7 @@ from typing import Any
 from .dates import entry_period
 from .errors import TemplateError
 from .kernel_rows import read_entries
-from .statements import CHART
+from .statements import CHART, is_closing_entry
 
 Q2 = Decimal("0.01")
 BOOKS_SCHEMA = "fd-erp-vertical-templates/books/v1"
@@ -234,7 +234,140 @@ class LedgerBooks:
         return out
 
 
-    # ---- 3) 往来对账单（change: add-party-statement）----
+    # ---- 3) 序时账与凭证（change: add-fi-voucher-and-journal）----
+
+    def journal(self, period: Any = None, *, limit: int = 0) -> dict[str, Any]:
+        """序时账：按凭证（`txnId`）汇总，逐凭证一行。
+
+        为什么要有它：`txnId` 只能从某条明细账行里捡到，意味着「先知道要查哪个科目」才能查。
+        序时账把这一段期间发生了哪些业务按凭证摊开，是查账的起点。
+
+        `limit` 只截**显示行**：合计按全量算。与明细账同一纪律——只截合计会让
+        「最后一行的金额」骗人。
+        """
+        key = _check_period(period) if period not in (None, "") else None
+        _, window = self._split(key)
+
+        vouchers: dict[str, dict[str, Any]] = {}
+        for entry in sorted(window, key=_sort_key):
+            txn = str(entry.get("txn_id") or "").strip() or "__no_txn__"
+            slot = vouchers.setdefault(txn, {
+                "txnId": None if txn == "__no_txn__" else txn,
+                "bookedOn": entry.get("booked_on"),
+                "postedAt": entry.get("posted_at"),
+                "sourceRef": entry.get("source_ref"),
+                "stableId": entry.get("stable_id"),
+                "summary": str(entry.get("source_ref") or entry.get("stable_id")
+                               or txn),
+                "debit": Decimal(0), "credit": Decimal(0), "lines": 0,
+                "dimensions": {},
+                "isClosing": False,
+            })
+            amount = _dec(entry.get("amount_base") or entry.get("amount"))
+            if entry.get("direction") == "debit":
+                slot["debit"] += amount
+            else:
+                slot["credit"] += amount
+            slot["lines"] += 1
+            if not slot["isClosing"] and is_closing_entry(entry):
+                slot["isClosing"] = True
+            for dim, value in (entry.get("dimensions") or {}).items():
+                text = str(value or "").strip()
+                if text:
+                    slot["dimensions"].setdefault(dim, text)
+
+        rows = sorted(vouchers.values(), key=lambda r: (
+            str(r["bookedOn"] or ""), str(r["postedAt"] or ""),
+            str(r["txnId"] or "")))
+        total_debit = sum((r["debit"] for r in rows), Decimal(0))
+        total_credit = sum((r["credit"] for r in rows), Decimal(0))
+        shown = rows[-limit:] if limit and len(rows) > limit else rows
+        out: dict[str, Any] = {
+            "period": key,
+            "rows": [{**r,
+                      "debit": _fmt(r["debit"]), "credit": _fmt(r["credit"]),
+                      "balanced": r["debit"] == r["credit"]}
+                     for r in shown],
+            "vouchers": len(rows),
+            "lines": sum(r["lines"] for r in rows),
+            "totals": {"debit": _fmt(total_debit), "credit": _fmt(total_credit)},
+            "balanced": total_debit == total_credit,
+            "caliber_note": "按凭证汇总：借方合计 == 贷方合计；`limit` 只截显示行，"
+                            "合计与凭证数按全量；`isClosing` 标出结转损益凭证"
+                            "（报表口径排除它，查账时要认得出来）",
+        }
+        if limit and len(rows) > limit:
+            out["truncated"] = True
+            out["rowCount"] = len(rows)
+            out["note"] = (f"仅显示最后 {limit} 张（合计与凭证数按全量 {len(rows)} 张计算）")
+        if not rows:
+            out["note"] = f"{'本期' if key else '建账以来'}没有分录"
+        if total_debit != total_credit:
+            out["error"] = (f"序时账借贷合计不等：借 {_fmt(total_debit)} / "
+                            f"贷 {_fmt(total_credit)}——账本本身有问题，不是汇总口径问题")
+        return out
+
+    def voucher(self, txn_id: Any) -> dict[str, Any]:
+        """单张凭证：该 `txnId` 下的全部借贷行 + 合计 + 平衡断言。
+
+        这是「账」与「表」之间唯一不可替代的一步：报表说这一期费用 12 万、明细账说某天有一笔
+        3000 挂着某个 `txnId`，而这 3000 借的是费用还是预付、对方科目是什么——只有凭证能答。
+        """
+        txn = str(txn_id or "").strip()
+        if not txn:
+            raise TemplateError("INVALID_ARGUMENT", "凭证查询须给 txnId")
+        entries = [e for e in read_entries(self._kernel)
+                   if str(e.get("txn_id") or "").strip() == txn]
+        if not entries:
+            raise TemplateError("NOT_FOUND", f"凭证不存在：{txn}",
+                                detail={"txnId": txn})
+        entries.sort(key=_sort_key)
+        lines: list[dict[str, Any]] = []
+        total_debit = total_credit = Decimal(0)
+        closing = False
+        for entry in entries:
+            amount = _dec(entry.get("amount_base") or entry.get("amount"))
+            is_debit = entry.get("direction") == "debit"
+            if is_debit:
+                total_debit += amount
+            else:
+                total_credit += amount
+            code = _code(entry)
+            line_name = CHART.get(code, (None, None))[0]
+            if not closing and is_closing_entry(entry):
+                closing = True
+            lines.append({
+                "lineNo": entry.get("line_no"),
+                "accountCode": code,
+                "account": line_name or code,
+                "summary": str(entry.get("source_ref") or entry.get("stable_id")
+                               or txn),
+                "debit": _fmt(amount) if is_debit else "0.00",
+                "credit": "0.00" if is_debit else _fmt(amount),
+                "currency": entry.get("currency"),
+                "dimensions": entry.get("dimensions") or {},
+            })
+        first = entries[0]
+        balanced = total_debit == total_credit
+        out: dict[str, Any] = {
+            "txnId": txn,
+            "bookedOn": first.get("booked_on"),
+            "postedAt": first.get("posted_at"),
+            "sourceRef": first.get("source_ref"),
+            "stableId": first.get("stable_id"),
+            "lines": lines,
+            "totals": {"debit": _fmt(total_debit), "credit": _fmt(total_credit)},
+            "balanced": balanced,
+            "isClosing": closing,
+            "caliber_note": "一张凭证的借贷必须相等；`isClosing=true` 表示这是结转损益"
+                            "生成的凭证（报表口径排除它，查账时要认得出来）",
+        }
+        if not balanced:
+            out["error"] = (f"凭证借贷不等：借 {_fmt(total_debit)} / 贷 {_fmt(total_credit)}"
+                            f"——账本本身有问题")
+        return out
+
+    # ---- 4) 往来对账单（change: add-party-statement）----
 
     def party_statement(self, dimension: Any, value: Any, period: Any = None,
                         *, accounts: list[str] | tuple[str, ...] | None = None,

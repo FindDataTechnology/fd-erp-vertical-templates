@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 128
+    "routes": 130
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -269,6 +269,14 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_journal",
+      "line": 2020,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/books/journal",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_subsidiary_ledger",
       "line": 2003,
       "method": "GET",
@@ -278,9 +286,17 @@
     },
     {
       "function": "fi_party_statement",
-      "line": 2020,
+      "line": 2047,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/books/party-statement",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_voucher",
+      "line": 2037,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/books/voucher/{txn_id}",
       "placeholder": false,
       "source": "faces.py"
     },
@@ -294,7 +310,7 @@
     },
     {
       "function": "fi_post_cogs",
-      "line": 2066,
+      "line": 2093,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/cost/cogs/{period}",
       "placeholder": false,
@@ -302,7 +318,7 @@
     },
     {
       "function": "fi_cost_issue_price",
-      "line": 2046,
+      "line": 2073,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/cost/issue-price",
       "placeholder": false,
@@ -310,7 +326,7 @@
     },
     {
       "function": "fi_cost_replay",
-      "line": 2037,
+      "line": 2064,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/cost/replay",
       "placeholder": false,
@@ -318,7 +334,7 @@
     },
     {
       "function": "fi_set_standard_cost",
-      "line": 2076,
+      "line": 2103,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/cost/standard",
       "placeholder": false,
@@ -566,7 +582,7 @@
     },
     {
       "function": "fi_cogs_preview",
-      "line": 2059,
+      "line": 2086,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/cogs-preview",
       "placeholder": false,
