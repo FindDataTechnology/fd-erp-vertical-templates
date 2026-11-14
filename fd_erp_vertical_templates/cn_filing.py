@@ -74,6 +74,7 @@ class CnFilingLane:
     def __init__(self, tenant_id: str, data_dir: str | Path, kernel: Any, *,
                  vat: CnVatLane | None = None,
                  statements: CnStatements | None = None,
+                 invoices: Any = None,
                  base_currency: str = "CNY"):
         self._tenant = tenant_id
         self._log = EventLog(Path(data_dir) / f"cn-filing-{tenant_id}.jsonl")
@@ -81,6 +82,8 @@ class CnFilingLane:
         self._vat = vat or CnVatLane(tenant_id, kernel, base_currency=base_currency)
         self._statements = statements or CnStatements(tenant_id, kernel,
                                                       base_currency=base_currency)
+        #: 发票台账：申报口径要给出进项三档（可抵/待认证/不可抵），账上只有可抵那一档。
+        self._invoices = invoices
         self._base = base_currency
 
     # ---- 税率（人工登记的外部事实） ----
@@ -155,6 +158,89 @@ class CnFilingLane:
                 "（地区/政策不同，不拿默认值顶）",
                 detail={"period": period, "missing": got["missing"]})
         return got["rates"]
+
+    # ---- 增值税申报数（外部事实，带出处登记） ----
+
+    #: 申报口径的六项；顺序与报表对照表一致，差额逐项给出。
+    VAT_ITEMS = ("sales", "outputVat", "inputVat", "inputTransferOut",
+                 "openingCredit")
+    VAT_LABELS = {"sales": "销售额", "outputVat": "销项税额", "inputVat": "进项税额",
+                  "inputTransferOut": "进项税额转出", "openingCredit": "上期留抵",
+                  "payable": "应纳税额"}
+
+    def register_vat_return(self, period: Any, *, source: Any,
+                            registered_by: str = "cfo", **items: Any) -> dict[str, Any]:
+        """登记某期间的**申报数**（电子税局实际报出去的数）。
+
+        为什么必须带出处：申报是外部事实，与税率同理——没有出处，几个月后没人能复核
+        「这个数是报出去的、还是有人手填进来试算的」。所以 `source` 必填，且整条记录
+        进本车道事件档（追加式，同期间以后一次为准）。
+        """
+        key = _check_period(period)
+        note = str(source or "").strip()
+        if not note:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                "申报数必须带出处（source）：无出处无法复核这是报出去的还是试算的",
+                detail={"period": key, "required": "source"})
+        unknown = sorted(k for k in items if k not in self.VAT_ITEMS)
+        if unknown:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"未知申报项：{'、'.join(unknown)}",
+                detail={"allowed": list(self.VAT_ITEMS)})
+        cleaned: dict[str, str] = {}
+        for name in self.VAT_ITEMS:
+            value = _dec(items.get(name, 0), f"申报项 {name}")
+            if value < 0:
+                raise TemplateError(
+                    "INVALID_ARGUMENT",
+                    f"申报项 {name} 不能为负：{items.get(name)!r}"
+                    "（红字/退回冲减在账面侧处理，申报表没有负数栏）",
+                    detail={"period": key, "item": name})
+            cleaned[name] = str(value)
+        self._log.append({"kind": "vat-return", "period": key, "declared": cleaned,
+                          "source": note, "registeredBy": str(registered_by)})
+        return {"period": key, "declared": cleaned, "source": note,
+                "caliberNote": "追加式：同期间以后一次登记为准；用 vat_declared 回读"}
+
+    def vat_declared(self, period: Any) -> dict[str, str] | None:
+        """该期间最后一次登记的申报数；**从未登记返回 None**。
+
+        `None` 与「登记了全 0」必须是两种事实：前者是「没提供申报数，不能当作已核对」，
+        后者是「报了零」。混成一个，报表就会把「没人报过」显示成「报了零」。
+        """
+        key = _check_period(period)
+        latest = None
+        effective = ""
+        for rec in self._log.events():
+            if rec.get("kind") != "vat-return":
+                continue
+            when = str(rec.get("period") or "")
+            if when != key and not when.startswith(f"{key}#"):
+                continue
+            # 同期间多次登记（重报/更正）以后写入者为准；事件档是追加式，顺序即时间序。
+            latest = rec
+            effective = when
+        if latest is None:
+            return None
+        return {k: str(v) for k, v in (latest.get("declared") or {}).items()}
+
+    def vat_reconciliation(self, period: Any) -> dict[str, Any]:
+        """把「账面 vs 申报」两侧拼齐，并带上进项三档。
+
+        为什么要这一个方法而不是让调用方自己拼：`declared` 与 `invoices` 都是
+        「忘了传就静默少半张表」的形态——报表照样返回、`provided=false`、三档干脆没有，
+        而读者只会以为「这期就是没差异」。供给方在这里定死，调用方不需要记得。
+        """
+        key = _check_period(period)
+        declared = self.vat_declared(key)
+        out = self._statements.vat_return(key, declared=declared,
+                                          invoices=self._invoices)
+        out["declaredSource"] = None if declared is None else next(
+            (str(rec.get("source")) for rec in reversed(self._log.events())
+             if rec.get("kind") == "vat-return" and rec.get("period") == key), None)
+        return out
 
     # ---- 附加税 ----
 
