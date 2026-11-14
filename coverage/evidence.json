@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 72
+    "routes": 76
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -149,6 +149,14 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_register_vat_return",
+      "line": 1402,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/filings/vat-return",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_balance_sheet",
       "line": 1362,
       "method": "GET",
@@ -165,6 +173,14 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_filing_summary",
+      "line": 1396,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/filing-summary",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_income_statement",
       "line": 1368,
       "method": "GET",
@@ -173,8 +189,24 @@
       "source": "faces.py"
     },
     {
-      "function": "fi_vat_return",
+      "function": "fi_income_tax_prepay",
+      "line": 1390,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/income-tax-prepay",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_surcharges",
       "line": 1380,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/surcharges",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_vat_return",
+      "line": 1416,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/vat-return",
       "placeholder": false,

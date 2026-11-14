@@ -244,16 +244,20 @@ class CnFilingLane:
 
     # ---- 附加税 ----
 
-    def surcharges(self, period: Any, *, submitted_by: str = "cn-filing-engine"
-                   ) -> dict[str, Any]:
-        """按本期应纳增值税计提三项附加税；留抵为 0 → noop。"""
+    def surcharges(self, period: Any, *, submitted_by: str = "cn-filing-engine",
+                   preview: bool = False) -> dict[str, Any]:
+        """按本期应纳增值税计提三项附加税；留抵为 0 → noop。
+
+        `preview=True` **只算不写**：不给内核提提案。财务后台的「看一眼要缴多少」必须走这条路——
+        读接口顺手在账上留两笔待确认提案，是最难查的副作用（谁点的、点两次是否重复，事后都说不清）。
+        """
         key = _check_period(period)
         rates = self._require(key)
         pos = self._vat.position(key)
         payable = Decimal(pos["payable"])
         if payable <= 0:
             return {"period": key, "noop": True, "base": "0.00",
-                    "total": "0.00", "items": [],
+                    "total": "0.00", "items": [], "proposed": False,
                     "caliberNote": "本期无应纳增值税（留抵），附加税为 0，不生成提案"}
         relief = Decimal(rates["surcharge_relief"])
         items = [
@@ -275,6 +279,12 @@ class CnFilingLane:
             if Decimal(item["amount"]) > 0:
                 lines.append({"account_code": item["account"], "direction": "credit",
                               "amount": item["amount"], "currency": self._base})
+        if preview:
+            return {"period": key, "noop": False, "base": _fmt(payable),
+                    "relief": str(relief), "items": computed, "total": _fmt(total),
+                    "proposed": False, "preview": True,
+                    "caliberNote": "预演：只算不写，未向内核提交提案；"
+                                   "要真计提请调 surcharges(preview=False)"}
         stable_id = f"surcharge:{key}"
         proposal = self._kernel.submit_proposal(
             stable_id, lines, source_ref=stable_id, kind="journal",
@@ -282,6 +292,7 @@ class CnFilingLane:
             submitted_by=submitted_by)
         return {"period": key, "noop": False, "base": _fmt(payable),
                 "relief": str(relief), "items": computed, "total": _fmt(total),
+                "proposed": True,
                 "stableId": stable_id, "proposal": proposal,
                 "bookedOn": _period_end(key),
                 "duplicate": bool(proposal and proposal.get("duplicate")),
@@ -327,8 +338,12 @@ class CnFilingLane:
         return total
 
     def income_tax_prepay(self, period: Any, *,
-                          submitted_by: str = "cn-filing-engine") -> dict[str, Any]:
-        """按本年累计利润 × 税率 − 已预缴，出本期应预缴。"""
+                          submitted_by: str = "cn-filing-engine",
+                          preview: bool = False) -> dict[str, Any]:
+        """按本年累计利润 × 税率 − 已预缴，出本期应预缴。
+
+        `preview=True` 只算不写（与 `surcharges` 同一纪律）：读接口不得在账上留提案。
+        """
         key = _check_period(period)
         rates = self._require(key)
         profit = self._cumulative_profit(key)
@@ -342,8 +357,15 @@ class CnFilingLane:
             return {"period": key, "noop": True, "cumulativeProfit": _fmt(profit),
                     "target": _fmt(target), "alreadyPrepaid": _fmt(booked),
                     "due": "0.00", "overPrepaid": _fmt(max(-due, Decimal(0))),
-                    "rate": rates["income_tax"], "caliberNote": note}
+                    "rate": rates["income_tax"], "proposed": False,
+                    "caliberNote": note}
         amount = _fmt(due)
+        if preview:
+            return {"period": key, "noop": False, "cumulativeProfit": _fmt(profit),
+                    "target": _fmt(target), "alreadyPrepaid": _fmt(booked),
+                    "due": amount, "rate": rates["income_tax"],
+                    "proposed": False, "preview": True,
+                    "caliberNote": note + "；预演：只算不写，未向内核提交提案"}
         stable_id = f"income-tax:{key}"
         proposal = self._kernel.submit_proposal(
             stable_id,
@@ -356,7 +378,8 @@ class CnFilingLane:
             submitted_by=submitted_by)
         return {"period": key, "noop": False, "cumulativeProfit": _fmt(profit),
                 "target": _fmt(target), "alreadyPrepaid": _fmt(booked),
-                "due": amount, "rate": rates["income_tax"], "stableId": stable_id,
+                "due": amount, "rate": rates["income_tax"], "proposed": True,
+                "stableId": stable_id,
                 "proposal": proposal, "bookedOn": _period_end(key),
                 "duplicate": bool(proposal and proposal.get("duplicate")),
                 "caliberNote": note}
