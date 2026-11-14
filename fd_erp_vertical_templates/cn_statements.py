@@ -28,7 +28,7 @@ from .dates import entry_date, entry_period
 from .errors import TemplateError
 from .localization import CnPack
 from .cn_tax import vat_position
-from .statements import CHART, cash_flow_report
+from .statements import CHART, cash_flow_report, is_closing_entry
 
 Q2 = Decimal("0.01")
 SCHEMA = "fd-erp-vertical-templates/cn-statements/v1"
@@ -300,6 +300,8 @@ class CnStatements:
         """
         key = _check_period(period)
         pool = self._read_all() if rows is None else rows
+        # 结转分录**不排除**：它是真实分录，把损益搬进权益正是它该做的事。
+        # 排除它会让「未结转损益」永远不减，余额口径与试算平衡一起失真。
         closing = [r for r in pool
                    if entry_period(r) in ("", "unknown") or entry_period(r) <= key]
         out: dict[str, Any] = {
@@ -327,6 +329,10 @@ class CnStatements:
 
     def _income_from(self, rows: list[dict[str, Any]], *,
                      with_unmapped: bool = True) -> dict[str, Any]:
+        # 结转分录必须排除（判定走 statements.is_closing_entry 那一处实现）。
+        # 不排除的话，已结账月份的利润表是「收入 0、费用 0」——那不是这期没赚钱，
+        # 是账已经做完了；而报表不会报错，`complete` 也照样是 true。
+        rows = [r for r in rows if not is_closing_entry(r)]
         by_cn, by_kernel, missing = self._by_cn(rows)
         lines, tot = self._build(self._rules["incomeStatement"], by_cn)
         out: dict[str, Any] = {
@@ -546,7 +552,9 @@ class CnStatements:
         并在口径说明里写明「未提供独立申报数」——不能让读者以为核过了。
         """
         key = _check_period(period)
-        rows = self._rows(key, cumulative=False)
+        # 销售额同样排除结转分录：否则已结账月份的「账面 vs 申报」会显示一个漂亮的 0 对 0。
+        rows = [r for r in self._rows(key, cumulative=False)
+                if not is_closing_entry(r)]
         sales = Decimal(0)
         for row in rows:
             code = str(row.get("account_code") or "")

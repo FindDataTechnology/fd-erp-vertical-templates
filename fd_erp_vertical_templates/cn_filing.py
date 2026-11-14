@@ -205,35 +205,25 @@ class CnFilingLane:
     # ---- 所得税预缴 ----
 
     def _cumulative_profit(self, period: str) -> Decimal:
-        """本年 1 月至该期间的累计**利润总额**（会计口径，未做纳税调整）。
+        """本年 1 月至该期间的累计**利润总额**——**取利润表，不自己遍历分录**。
 
-        两处口径各有一个坑，错都在「不报错只是数不对」那一类：
+        这里原本自己扫一遍账，于是同一口径在本仓有两份实现：`CnStatements` 当时没排除
+        结转分录，这份排除了。两个数在结账月就会分叉（一个 0、一个真实值），
+        而两侧都不报错——`drivers.py` 里那句「不同源就会算出两份口径」说的正是它。
+        现在只有一份：利润表累计列的 `totalProfit`。
 
-        - **损益方向**：收入在贷方、费用在借方，带符号金额已经是「借正贷负」，
-          所以两类都是 `profit -= signed`。按类别分别加减会把费用反过来加成利润
-          （亏损月因此算出利润、还去预缴）。
-        - **税前不是净利**：所得税费用（5801）在利润总额之后，扣掉它再乘税率就等于
-          重复计税；结转分录（`close:`）也不能计——它把损益搬进 3100，
-          计入会把已结账月份的累计利润清零，于是「已预缴的不再补差」变成「重新算一遍」。
+        两个口径坑由报表那边保证，不再各写一遍：
+
+        - **损益方向**：收入在贷方、费用在借方，带符号金额是「借正贷负」，两类都是
+          `profit -= signed`；按类别分别加减会把费用反过来加成利润（亏损月因此算出利润、
+          还去预缴）。
+        - **税前不是净利**：利润总额在所得税费用（5801）之前，扣掉它再乘税率等于重复计税；
+          结转分录（`close:`）也不能计，它把损益搬进 3100，计入会把已结账月份的累计利润
+          清零，于是「已预缴的不再补差」变成「重新算一遍」。
         """
-        year = period[:4]
-        profit = Decimal(0)
-        for row in read_entries(self._kernel):
-            if is_closing_entry(row):
-                continue
-            when = entry_period(row)
-            if when in ("", "unknown") or not when.startswith(year) or when > period:
-                continue
-            code = str(row.get("account_code") or "")
-            if code == INCOME_TAX_ACCOUNT:
-                continue
-            kind = CHART.get(code, (None, None))[1]
-            if kind not in ("revenue", "expense"):
-                continue
-            amount = _dec(row.get("amount_base") or row.get("amount"), "金额")
-            signed = amount if row.get("direction") == "debit" else -amount
-            profit -= signed
-        return profit
+        key = _check_period(period)
+        report = self._statements.income_statement(key)
+        return Decimal(str(report["cumulative"]["totals"]["totalProfit"]))
 
     def _booked_income_tax(self, period: str, *, before: bool = False) -> Decimal:
         """截至该期间已预缴的所得税（2221.11 贷方累计）；`before=True` 只算本期之前。"""
