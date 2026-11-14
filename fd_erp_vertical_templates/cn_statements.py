@@ -20,10 +20,11 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
-from .dates import entry_period
+from .dates import entry_date, entry_period
 from .errors import TemplateError
 from .localization import CnPack
 from .cn_tax import vat_position
@@ -115,6 +116,37 @@ class CnStatements:
             elif key == period:
                 out.append(row)
         return out
+
+    @staticmethod
+    def _year_start(period: str) -> date:
+        return date(int(period[:4]), 1, 1)
+
+    @classmethod
+    def _period_open_end(cls, period: str) -> tuple[date, date]:
+        """期间的半开区间 [起, 止)。"""
+        year, month = int(period[:4]), int(period[5:7])
+        start = date(year, month, 1)
+        return start, date(year + (month == 12), month % 12 + 1, 1)
+
+    @staticmethod
+    def _prior_period(period: str) -> str:
+        """上年同期＝**同月去年**。取「上一期」（2026-11 → 2026-10）是另一个数，
+        而且错得毫无痕迹：报表照样平、利润照样像样，只是对不上税务局那一份。"""
+        return f"{int(period[:4]) - 1:04d}-{period[5:7]}"
+
+    @staticmethod
+    def _rows_before(rows: list[dict[str, Any]], day: date) -> list[dict[str, Any]]:
+        """`day` 之前（含无日期——报表口径把无日期算在最早）。"""
+        return [r for r in rows if (d := entry_date(r)) is None or d < day]
+
+    @classmethod
+    def _rows_in_year(cls, rows: list[dict[str, Any]], period: str
+                      ) -> list[dict[str, Any]]:
+        """本年度 1 月 1 日起至本期（半开）。流量窗口不收无日期分录：它们没有时点，
+        放进哪一期都是猜；资产负债表把它们计入期末是另一回事（余额不需要时点）。"""
+        start = cls._year_start(period)
+        _start, end = cls._period_open_end(period)
+        return [r for r in rows if (d := entry_date(r)) is not None and start <= d < end]
 
     def _read_all(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -220,9 +252,9 @@ class CnStatements:
 
     # ---- 资产负债表 ----
 
-    def balance_sheet(self, period: Any) -> dict[str, Any]:
-        key = _check_period(period)
-        rows = self._rows(key, cumulative=True)
+    def _balance_from(self, rows: list[dict[str, Any]], *,
+                      with_unmapped: bool = True) -> dict[str, Any]:
+        """一套行次、只吃给定的一批分录——期末与年初走同一段代码。"""
         by_cn, by_kernel, missing = self._by_cn(rows)
         bs = self._rules["balanceSheet"]
         # 未结转损益：账上仍挂着的损益净额（结转后进 3100/留存收益）
@@ -240,11 +272,7 @@ class CnStatements:
 
         total_assets = a_tot["total_assets"]
         total_right = l_tot["total_liabilities"] + e_tot["total_equity"]
-        unmapped = self._unmapped(by_kernel, missing,
-                                  bs["assets"] + bs["liabilities"] + bs["equity"],
-                                  include_kinds=("asset", "liability", "equity"))
-        out = {
-            "schema": SCHEMA, "period": key, "chart": self._chart,
+        out: dict[str, Any] = {
             "assets": assets, "liabilities": liabilities, "equity": equity,
             "totals": {
                 "assets": _fmt(total_assets),
@@ -254,37 +282,96 @@ class CnStatements:
             },
             "balanced": total_assets == total_right,
             "difference": _fmt(total_assets - total_right),
-            "unmapped": unmapped,
-            "complete": not unmapped,
+        }
+        if with_unmapped:
+            unmapped = self._unmapped(
+                by_kernel, missing, bs["assets"] + bs["liabilities"] + bs["equity"],
+                include_kinds=("asset", "liability", "equity"))
+            out["unmapped"] = unmapped
+            out["complete"] = not unmapped
+        return out
+
+    def balance_sheet(self, period: Any, *, opening: bool = True,
+                      rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """资产负债表（期末 + 年初）。
+
+        年初不是另算一份表：同一套行次、同一段代码，只把取数窗口换成「本年 1 月 1 日之前」。
+        这样「年初 + 本年变动 = 期末」是构造出来的，不是靠两处各算一遍再对。
+        """
+        key = _check_period(period)
+        pool = self._read_all() if rows is None else rows
+        closing = [r for r in pool
+                   if entry_period(r) in ("", "unknown") or entry_period(r) <= key]
+        out: dict[str, Any] = {
+            "schema": SCHEMA, "period": key, "chart": self._chart,
+            **self._balance_from(closing),
             "caliberNote": "小企业会计准则格式；资产总计 = 负债和所有者权益总计；"
                            "「未结转损益」是账上仍挂着的损益净额，结转后进留存收益",
         }
         if out["difference"] != "0.00":
-            out["error"] = (f"资产负债表不平：资产 {_fmt(total_assets)} ≠ "
-                            f"负债+权益 {_fmt(total_right)}（差 {_fmt(total_assets - total_right)}）"
+            out["error"] = (f"资产负债表不平：资产 {out['totals']['assets']} ≠ "
+                            f"负债+权益 {out['totals']['liabilitiesAndEquity']}"
+                            f"（差 {out['difference']}）"
                             "——先看 unmapped 里是否有落不进项目的科目")
+        if opening:
+            start = self._year_start(key)
+            out["opening"] = {
+                **self._balance_from(self._rows_before(pool, start),
+                                     with_unmapped=False),
+                "asOf": f"{int(key[:4]) - 1}-12-31",
+                "caliberNote": "年初数＝本期所属年度 1 月 1 日之前的全部余额（含无日期分录）",
+            }
         return out
 
     # ---- 利润表 ----
 
-    def income_statement(self, period: Any) -> dict[str, Any]:
-        key = _check_period(period)
-        rows = self._rows(key, cumulative=False)
+    def _income_from(self, rows: list[dict[str, Any]], *,
+                     with_unmapped: bool = True) -> dict[str, Any]:
         by_cn, by_kernel, missing = self._by_cn(rows)
         lines, tot = self._build(self._rules["incomeStatement"], by_cn)
-        unmapped = self._unmapped(by_kernel, missing, self._rules["incomeStatement"],
-                                  include_kinds=("revenue", "expense"))
-        out = {
-            "schema": SCHEMA, "period": key, "chart": self._chart,
+        out: dict[str, Any] = {
             "lines": lines,
             "totals": {"operatingProfit": _fmt(tot["operating_profit"]),
                        "totalProfit": _fmt(tot["total_profit"]),
                        "netProfit": _fmt(tot["net_profit"])},
-            "unmapped": unmapped,
-            "complete": not unmapped,
+        }
+        if with_unmapped:
+            unmapped = self._unmapped(by_kernel, missing,
+                                      self._rules["incomeStatement"],
+                                      include_kinds=("revenue", "expense"))
+            out["unmapped"] = unmapped
+            out["complete"] = not unmapped
+        return out
+
+    def income_statement(self, period: Any, *, prior_year: bool = True,
+                         cumulative: bool = True,
+                         rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """利润表（本期 + 上年同期 + 本年累计）。
+
+        上年同期取**同月去年**；本年累计从 1 月 1 日起算（不是从账本第一天起算——
+        那是资产负债表的口径，两张表一个参数兼两种语义正是错源之一）。
+        """
+        key = _check_period(period)
+        pool = self._read_all() if rows is None else rows
+        out: dict[str, Any] = {
+            "schema": SCHEMA, "period": key, "chart": self._chart,
+            **self._income_from([r for r in pool if entry_period(r) == key]),
             "caliberNote": "小企业会计准则格式（会小企 02 表）；本期发生额口径，不是累计；"
                            "在制品（4001）与制造费用是成本归集科目，不进利润表",
         }
+        if prior_year:
+            prior = self._prior_period(key)
+            out["priorYear"] = {
+                "period": prior,
+                **self._income_from([r for r in pool if entry_period(r) == prior],
+                                    with_unmapped=False),
+            }
+        if cumulative:
+            out["cumulative"] = {
+                "period": key,
+                **self._income_from(self._rows_in_year(pool, key),
+                                    with_unmapped=False),
+            }
         return out
 
     # ---- 现金流量表 ----
@@ -351,37 +438,30 @@ class CnStatements:
                 detail={"chart": self._chart, "line": line})
         return category, str(target.get("label") or line)
 
-    def cash_flow(self, period: Any, *,
-                  entries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-        """现金流量表（直接法，会小企 03 表 / 会企 03 表项目）。
-
-        账里只有内核科目码，所以先把每行的科目换成准则码再交给共用引擎——归位表因此
-        与报表其余部分同一套词汇（准则科目码），校验也才能拿准则科目表去查。
-
-        与通用 `StatementBook.cash_flow` 是同一个实现、同一套判据（三类净额之和 =
-        现金增减、缺对手行与未归类都判不自证），差别只在科目码与行名。
-        """
-        key = _check_period(period)
+    def _cash_from(self, pool: list[dict[str, Any]], period: str, *,
+                   window: tuple[date, date] | None = None,
+                   with_feet: bool = True) -> dict[str, Any]:
+        """一张现金流量表：同一段实现，只换取数窗口。"""
         cf = self._rules.get("cashFlow") or {}
-        rows = self._read_all() if entries is None else entries
-        translated = []
-        for row in rows:
-            code = str(row.get("account_code") or "").strip()
-            translated.append({**row, "account_code": self._map.get(code, code)})
+        translated = [{**row, "account_code": self._map.get(
+            str(row.get("account_code") or "").strip(),
+            str(row.get("account_code") or "").strip())}
+            for row in pool]
         out = cash_flow_report(
-            translated, key,
+            translated, period,
             cash_codes=self._cash_codes(),
             flow_map=self._flow_map(),
             label_of=lambda code: (self._pack.account(code) or {}).get("name") or code,
             category_labels={k: str(v) for k, v in (cf.get("categories") or {}).items()},
-            disposal_roots=tuple(str(r) for r in
-                                 ((cf.get("disposal") or {}).get("roots") or ())),
-            disposal_line=self._disposal_line(),
             caliber_note=(
                 "直接法（准则报表项目）。现金口径＝资产负债表「货币资金」这一行覆盖的科目"
                 "（含银行待清算/在途结算），故期末现金与货币资金由同一份定义得出；"
                 "对手科目按准则码归位，处置与购建、借入与偿还按方向分行；"
                 "表外科目进 unclassified 并判不自证，不猜类别"),
+            disposal_roots=tuple(str(r) for r in
+                                 ((cf.get("disposal") or {}).get("roots") or ())),
+            disposal_line=self._disposal_line(),
+            window=window,
         )
         # 法定报表按**行**列示，不按科目列示：同一行可能由多个对手科目凑成
         # （处置行的固定资产/累计折旧/处置收益），逐科目一行会让同一行名出现三次、
@@ -389,19 +469,48 @@ class CnStatements:
         out["categories"] = {
             category: {**bucket, "lines": _by_statutory_line(bucket["lines"])}
             for category, bucket in out["categories"].items()}
-        out["schema"] = SCHEMA
-        out["chart"] = self._chart
-        feet = self._cash_feet(key, out)
-        out.update(feet)
+        if with_feet:
+            out.update(self._cash_feet(period, out, pool))
         return out
 
-    def _cash_feet(self, period: str, flow: dict[str, Any]) -> dict[str, Any]:
+    def cash_flow(self, period: Any, *, prior_year: bool = True,
+                  cumulative: bool = True,
+                  rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """现金流量表（直接法，会小企 03 表 / 会企 03 表项目）。
+
+        账里只有内核科目码，所以先把每行的科目换成准则码再交给共用引擎——归位表因此
+        与报表其余部分同一套词汇（准则科目码），校验也才能拿准则科目表去查。
+
+        与通用 `StatementBook.cash_flow` 是同一个实现、同一套判据（三类净额之和 =
+        现金增减、缺对手行与未归类都判不自证），差别只在科目码与行名。
+        对照列同样是同一个实现：本年累计＝把窗口换成 1 月 1 日至期末。
+        """
+        key = _check_period(period)
+        pool = self._read_all() if rows is None else rows
+        out = self._cash_from(pool, key)
+        out["schema"] = SCHEMA
+        out["chart"] = self._chart
+        if prior_year:
+            prior = self._prior_period(key)
+            out["priorYear"] = {"period": prior,
+                                **self._cash_from(pool, prior, with_feet=False)}
+        if cumulative:
+            _start, end = self._period_open_end(key)
+            out["cumulative"] = {
+                "period": key,
+                **self._cash_from(pool, key, window=(self._year_start(key), end),
+                                  with_feet=False),
+            }
+        return out
+
+    def _cash_feet(self, period: str, flow: dict[str, Any],
+                   pool: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """两条脚注互证：三类净额之和 = 净增加额；期末现金 = 资产负债表货币资金。
 
         第三条（与通用引擎同账本比净增加额）不放在这里：那要拿两套科目码各算一遍，
         属于测试的职责，放进报表返回值只会让人以为运行时真的对过两遍。
         """
-        bs = self.balance_sheet(period)
+        bs = self.balance_sheet(period, opening=False, rows=pool)
         cash_line = next((l for l in bs["assets"]
                           if str(l.get("key")) == str(
                               (self._rules.get("cashFlow") or {}).get("cashLine") or "cash")),

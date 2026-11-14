@@ -204,12 +204,17 @@ def cash_flow_report(rows: list[dict[str, Any]], period: str, *, cash_codes,
                      category_labels: dict[str, str] | None = None,
                      caliber_note: str | None = None,
                      disposal_roots: tuple[str, ...] = (),
-                     disposal_line: tuple[str, str] | None = None
+                     disposal_line: tuple[str, str] | None = None,
+                     window: tuple[date, date] | None = None
                      ) -> dict[str, Any]:
     """直接法现金流量表（唯一实现）。
 
     通用报表用内核科目码与 `CASH_FLOW_MAP`，国别包用它自己准则下的码与归位表——
     两处各写一遍分类逻辑，今天一致、改一处就漂，而漂了只表现为「某类净额差一截」。
+
+    `window` 只改取数范围，不改算法：国别报表现金流量表的「本年累计」就是同一个函数
+    换一个窗口（1 月 1 日至期末），期初还是「窗口之前的全部」。不给它时窗口按 `period`
+    自身推出——通用报表的行为逐字段不变。
 
     归类不给分录加字段、也不从利润表倒推：**对手科目本身就说明了钱的来路与去向**。
     一笔交易内，每个非现金对手行的带符号金额取负，就是它带来的现金流入（正）或流出
@@ -232,11 +237,21 @@ def cash_flow_report(rows: list[dict[str, Any]], period: str, *, cash_codes,
             return str(category), str(line)
         category, line = mapped
         return str(category), str(line)
-    start_day, _end = _period_bounds(period)
-    grain = _grain(period)
-    window = [e for e in rows if entry_period(e, grain) == period]
+    start_day, end_day = window if window is not None else _period_bounds(period)
+    # 无日期分录算在**最早**：资产负债表的口径本来就是这样（它把 `unknown` 归入本期及以前），
+    # 现金流量表的期初若把它们丢掉，两张表的货币资金就会差这一笔。
+    # 期初必须按**最终**窗口起点取：先按期算期初、再换窗口，会让「本年累计」的期初
+    # 仍停在月末那天，期末于是凭空多出几个月（实测多 1000 元，报表仍自证一致）。
     earlier = [e for e in rows
-               if (day := entry_date(e)) is not None and day < start_day]
+               if (day := entry_date(e)) is None or day < start_day]
+    if window is not None:
+        in_window = [e for e in rows
+                     if (day := entry_date(e)) is not None
+                     and start_day <= day < end_day]
+    else:
+        grain = _grain(period)
+        in_window = [e for e in rows if entry_period(e, grain) == period]
+    window = in_window
 
     def signed(entry: dict[str, Any]) -> Decimal:
         amount = _dec(entry.get("amount_base") or entry.get("amount"))
