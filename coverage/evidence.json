@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 107
+    "routes": 117
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -149,6 +149,78 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_assets",
+      "line": 1814,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/assets",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_register_asset",
+      "line": 1891,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/assets",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_depreciate",
+      "line": 1860,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/assets/depreciation/{period}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_void_depreciation",
+      "line": 1877,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/assets/depreciation/{period}/void",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_asset_summary",
+      "line": 1819,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/assets/summary",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_set_asset_threshold",
+      "line": 1828,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/assets/threshold",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_asset",
+      "line": 1920,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/assets/{asset_id}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_asset_book_value",
+      "line": 1935,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/assets/{asset_id}/book-value",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_asset_plan",
+      "line": 1929,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/assets/{asset_id}/plan",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_bad_debt_schedule",
       "line": 1750,
       "method": "GET",
@@ -174,7 +246,7 @@
     },
     {
       "function": "fi_accrue_bad_debt",
-      "line": 1793,
+      "line": 1792,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/accrue",
       "placeholder": false,
@@ -182,7 +254,7 @@
     },
     {
       "function": "fi_void_bad_debt",
-      "line": 1799,
+      "line": 1798,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/void",
       "placeholder": false,
@@ -409,6 +481,14 @@
       "line": 1419,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/closing-preview",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_depreciation_preview",
+      "line": 1851,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/depreciation-preview",
       "placeholder": false,
       "source": "faces.py"
     },

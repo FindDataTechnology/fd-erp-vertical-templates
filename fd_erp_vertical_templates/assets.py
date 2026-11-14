@@ -418,8 +418,14 @@ class FixedAssetLane:
     # ---- 期末计提 ----
 
     def depreciate(self, period: Any, *, units: dict[str, Any] | None = None,
-                   submitted_by: str = "asset-engine") -> dict[str, Any]:
-        """按期间计提折旧：生成一张**待确认** proposal（借费用 / 贷 1602）。"""
+                   submitted_by: str = "asset-engine",
+                   preview: bool = False) -> dict[str, Any]:
+        """按期间计提折旧：生成一张**待确认** proposal（借费用 / 贷 1602）。
+
+        `preview=True` 只算不写：不 submit、不落事件档，把「真计提会被什么挡住」列进
+        `blockers`（该期间已计提过 / 本期无可计提资产）。为什么预演不照抄那两条直接返回：
+        「这期该提多少」是月末最常见的一眼，看一眼就该拿到数，而不是先被「已计提过」挡住。
+        """
         key = _check_period(period)
         cfg = self._policy.current()["values"]
         owner = cfg["asset_ledger_owner"]
@@ -432,8 +438,8 @@ class FixedAssetLane:
 
         state = self._depreciation_state()
         existing = state["effective"].get(key)
-        if existing is not None:
-            return {"period": key, "duplicate": True,
+        if existing is not None and not preview:
+            return {"period": key, "duplicate": True, "proposed": False,
                     "proposal": existing.get("proposal"),
                     "total": existing.get("total"),
                     "assets": existing.get("assets") or [],
@@ -505,9 +511,26 @@ class FixedAssetLane:
                 + "；".join(parts),
                 detail=detail)
 
+        total = sum((_dec(i["amount"], "计提金额") for i in lines_out), Decimal(0))
+
+        if preview:
+            blockers: list[str] = []
+            if existing is not None:
+                blockers.append(
+                    f"该期间已计提过 {existing.get('total')}：真计提会返回首次结果，"
+                    "不会重复计提（因此本次可提为 0）")
+            if not lines_out:
+                blockers.append("本期无可计提资产（尚未起提、已提足或已过折旧期）")
+            return {"period": key, "preview": True, "proposed": False,
+                    "proposal": None, "total": _fmt(total), "assets": lines_out,
+                    "canSubmit": not blockers, "blockers": blockers,
+                    "method": cfg["depreciation_method"],
+                    "caliber_note": "预演只算不写：不生成提案、不落事件档；"
+                                    "真计提仍要过确认门"}
+
         if not lines_out:
-            return {"period": key, "duplicate": False, "proposal": None,
-                    "total": "0.00", "assets": [],
+            return {"period": key, "duplicate": False, "proposed": False,
+                    "proposal": None, "total": "0.00", "assets": [],
                     "note": "本期无可计提资产（尚未起提、已提足或已过折旧期）"}
 
         lines: list[dict[str, Any]] = []
@@ -516,7 +539,6 @@ class FixedAssetLane:
                           "amount": item["amount"], "currency": item["currency"]})
             lines.append({"account_code": ACCUMULATED, "direction": "credit",
                           "amount": item["amount"], "currency": item["currency"]})
-        total = sum((_dec(i["amount"], "计提金额") for i in lines_out), Decimal(0))
 
         # 作废后重提要换稳定键：内核同 stable_id 永远返回首次结果（哪怕那次被退回），
         # 用同一个键重提等于「什么都没发生」。故按本期间作废次数编号。
@@ -533,6 +555,7 @@ class FixedAssetLane:
                "recorded_at": _now(), "submitted_by": submitted_by}
         self._log.append(run)
         return {"period": key, "duplicate": bool(proposal and proposal.get("duplicate")),
+                "proposed": True, "stableId": stable_id,
                 "proposal": proposal, "total": _fmt(total), "assets": lines_out,
                 "method": cfg["depreciation_method"],
                 "caliber_note": "计提只生成待确认 proposal；过门后由内核落账"}

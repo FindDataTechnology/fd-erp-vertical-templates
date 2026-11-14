@@ -410,3 +410,47 @@ def test_non_platform_ledger_owner_is_not_wired(tmp_path, owner):
     assert ei.value.code == "NOT_WIRED"
     assert owner in ei.value.message
     assert kernel.calls == []                        # 一张 proposal 都不出
+
+
+# ---- 9) 预演：只算不写 ----
+
+def test_preview_computes_without_writing(tmp_path):
+    """月末「这期该提多少」是看一眼的事，看一眼不该在账上留提案。"""
+    kernel = _StubKernel()
+    lane = _lane(tmp_path, kernel=kernel)
+    _register(lane)                                 # 12000 / 12 月 = 1000/月
+    events_before = len(lane._log.events())
+
+    out = lane.depreciate("2026-02", preview=True)
+    assert out["preview"] is True and out["proposed"] is False
+    assert out["total"] == "1000.00"
+    assert out["proposal"] is None
+    assert out["blockers"] == [] and out["canSubmit"] is True
+    assert kernel.calls == []                        # 一张提案都没出
+    assert len(lane._log.events()) == events_before   # 事件档没多一行
+
+    # 预演过的这期真计提照样成立，且金额与预演逐值相同
+    real = lane.depreciate("2026-02")
+    assert real["proposed"] is True and real["total"] == out["total"]
+
+
+def test_preview_lists_blockers_instead_of_short_circuiting(tmp_path):
+    kernel = _StubKernel()
+    lane = _lane(tmp_path, kernel=kernel)
+    _register(lane, months=2, cost=2000)             # 只提两个月就提足
+    lane.depreciate("2026-02")
+
+    # ① 该期间已计提过：预演照样可用，但可提额如实为 0（这期不会再提），并讲清为什么
+    again = lane.depreciate("2026-02", preview=True)
+    assert again["canSubmit"] is False
+    assert any("已计提过" in b for b in again["blockers"]), again["blockers"]
+    assert any("1000.00" in b for b in again["blockers"]), again["blockers"]
+    assert again["total"] == "0.00"
+    assert len(kernel.calls) == 1                     # 没有第二张提案
+
+    # ② 本期无可计提资产（已提足）：blocker 说清原因，金额为 0
+    lane.depreciate("2026-03")
+    empty = lane.depreciate("2026-04", preview=True)
+    assert empty["total"] == "0.00"
+    assert empty["canSubmit"] is False
+    assert any("无可计提资产" in b for b in empty["blockers"]), empty["blockers"]
