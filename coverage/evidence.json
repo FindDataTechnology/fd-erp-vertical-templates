@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 120
+    "routes": 123
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -257,6 +257,30 @@
       "line": 1822,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/void",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_book_balances",
+      "line": 1997,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/books/balances",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_subsidiary_ledger",
+      "line": 2003,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/books/ledger/{account_code}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_party_statement",
+      "line": 2020,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/books/party-statement",
       "placeholder": false,
       "source": "faces.py"
     },
