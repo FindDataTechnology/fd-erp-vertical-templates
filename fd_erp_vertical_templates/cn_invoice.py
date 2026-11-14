@@ -164,7 +164,13 @@ class CnInvoiceBook:
                "counterparty": (str(counterparty).strip() or None),
                "issuedOn": day, "period": day[:7],
                "deductibleKind": bool(INVOICE_KINDS[kind_key]["deductible"]),
-               "certified": False, "submittedBy": str(submitted_by)}
+               # 红字标记与认证经办人一律显式落位（蓝字票是 `False`/`None`，**不是缺键**）：
+               # 缺键让消费侧 `row["red"]` 直接 KeyError，而「列表里有的行有、有的行没有」
+               # 是那种只在遇到红字票那天才炸的形状。台账事实照旧——只有红字票带
+               # `redOf`/`redReason` 的**值**，蓝字票带的是 `None`。
+               "red": False, "redOf": None, "redReason": None,
+               "certified": False, "certifiedBy": None, "certifiedOn": None,
+               "submittedBy": str(submitted_by)}
         self._log.append(rec)
         return {**rec, "duplicate": False,
                 "caliber_note": "台账事实；是否可抵由票种 + 认证共同决定"}
@@ -280,7 +286,8 @@ class CnInvoiceBook:
                "issuedOn": day, "period": day[:7],
                "redReason": (str(reason).strip() or None),
                "deductibleKind": bool(INVOICE_KINDS[kind_key]["deductible"]),
-               "certified": False, "submittedBy": str(submitted_by)}
+               "certified": False, "certifiedBy": None, "certifiedOn": None,
+               "submittedBy": str(submitted_by)}
         self._log.append(rec)
         return {**rec, "duplicate": False, "remainingAfter": _fmt(room - magnitude),
                 "caliber_note": "红字票是独立票据、负数记账；原票保留，"
