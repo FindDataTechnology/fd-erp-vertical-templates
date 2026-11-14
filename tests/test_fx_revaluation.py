@@ -231,3 +231,42 @@ def test_income_statement_lists_fx_separately():
     assert inc["operatingExpenses"] == "700.00"
     assert inc["operatingProfit"] == "-700.00"
     assert {"line": "汇兑损益", "amount": "200.00"} in inc["lines"]
+
+
+# ---- 6) 已关账期间在**提交前**就拒（change: add-fi-indirect-and-fx-endpoints）----
+
+class _Periods:
+    """期间台账替身（与 `PeriodClosing` 同一注入方式）。"""
+
+    def __init__(self, closed: bool):
+        self.closed = closed
+
+    def status(self, period):
+        return {"period": period, "closed": self.closed,
+                "closedAt": "2026-12-01T10:00:00+08:00" if self.closed else None}
+
+
+def test_closed_period_is_refused_before_submitting(tmp_path):
+    """提案不会撞期间闸（那只在落账时触发）⇒ 不预判就会留下一张永远确认不了的草案。"""
+    lane = FxRevaluation(TENANT, tmp_path, _StubKernel(_usd_receivable()),
+                         periods=_Periods(closed=True))
+    lane.register_rates(PERIOD, {"USD": "7.20"}, source="中行 11-30")
+    with pytest.raises(TemplateError) as err:
+        lane.revalue(PERIOD)
+    assert "已关账" in err.value.message
+    assert err.value.detail["period"] == PERIOD
+    assert err.value.detail["closedAt"]
+
+
+def test_open_period_still_passes_the_precheck(tmp_path):
+    lane = FxRevaluation(TENANT, tmp_path, _StubKernel(_usd_receivable()),
+                         periods=_Periods(closed=False))
+    lane.register_rates(PERIOD, {"USD": "7.20"}, source="中行 11-30")
+    assert lane.revalue(PERIOD)["lines"]
+
+
+def test_missing_period_binding_does_not_pretend_it_is_closed(tmp_path):
+    """没注入期间台账 ⇒ 不预判（真正的闸在落账），而不是「一律当已关」。"""
+    lane = FxRevaluation(TENANT, tmp_path, _StubKernel(_usd_receivable()))
+    lane.register_rates(PERIOD, {"USD": "7.20"}, source="中行 11-30")
+    assert lane.revalue(PERIOD)["noop"] is False

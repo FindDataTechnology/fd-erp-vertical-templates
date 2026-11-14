@@ -27,19 +27,22 @@ from fd_erp_vertical_templates.orchestration import (
 from fd_erp_vertical_templates.pricing import PricingRuleBook
 from fd_erp_vertical_templates.recon.kingdee import DemoKingdeeGateway, SettlementRecon
 from fd_erp_vertical_templates.wms_sync import DemoWmsAdapter
-from datetime import datetime, timezone
 
-#: 夹具业务日（单据日期、事件 occurred_at 等）。**不能写死成具体某天**：结账腿按
-#: `journal_entries.posted_at`（插入时 now()）切账期，写死日期会让「凭证面收取」在
-#: 第二天收到空集（2026-11-12 实测：全链 e2e 的 voucher_count 断言 5 → 0）。
-DAY = datetime.now(timezone.utc).date().isoformat()
+#: 夹具业务日来自 `book_day` 夹具（= 内核 `book_today` 的同一算法）。
+#: **不能写 `datetime.now(timezone.utc).date()` 自己算**：账面时区是 Asia/Shanghai，
+#: UTC 16:00 之后两者差一天，按业务日收凭证就会收到空集（2026-11-15 凌晨实测红）；
+#: 也不能写死成具体某天（2026-11-12 已有一次「全链 voucher_count 5 → 0」的实历）。
 
 
 def _post(kernel, tenant: str, stable_id: str, lines: list[dict],
-          source_ref: str) -> str:
-    """账务面：提交 proposal → 确认门落账，返回事务号。"""
+          source_ref: str, *, day: str) -> str:
+    """账务面：提交 proposal → 确认门落账，返回事务号。
+
+    `booked_on` 显式传：账期是业务日期，不该绑在运行那一刻的时钟上。
+    """
     prop = kernel.submit_proposal(stable_id=stable_id, lines=lines,
-                                  source_ref=source_ref, tenant_id=tenant)
+                                  source_ref=source_ref, tenant_id=tenant,
+                                  booked_on=day)
     confirmed = kernel.confirm_proposal(proposal_id=prop["proposal_id"],
                                         confirmed_by="owner")
     assert confirmed["status"] == "confirmed"
@@ -50,8 +53,9 @@ def _count_entries(kernel, tenant: str) -> list[dict]:
     return list(kernel.query_entries(tenant_id=tenant)["entries"])
 
 
-def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path):
+def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path, book_day):
     tenant = reset_db.tenant_id
+    DAY = book_day
     counts: dict[str, int] = {}
 
     # ---- 段 0：三主档建档确认（客户/供应商×2/商品×2，确认车道）----
@@ -112,7 +116,7 @@ def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path):
           "currency": "CNY"},
          {"account_code": "2000", "direction": "credit", "amount": "1440.00",
           "currency": "CNY"}],
-        source_ref="inv:P-WH:WH-EAST")
+        source_ref="inv:P-WH:WH-EAST", day=DAY)
     assert len(_count_entries(kernel, tenant)) == 2
 
     # ---- 段 3：订单受理（信用校验 → 取价 → 信用占用 → 订单确认）----
@@ -182,7 +186,7 @@ def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path):
           "currency": "CNY"},
          {"account_code": "1200", "direction": "credit", "amount": "300.00",
           "currency": "CNY"}],
-        source_ref="inv:P-WH:WH-EAST")
+        source_ref="inv:P-WH:WH-EAST", day=DAY)
     entries_after_ops = _count_entries(kernel, tenant)
     assert len(entries_after_ops) == 4
     # append-only 快照（此后任何阶段不得改写既有分录，只许追加）
@@ -233,7 +237,7 @@ def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path):
           "currency": "CNY"},
          {"account_code": "4000", "direction": "credit", "amount": "490.00",
           "currency": "CNY"}],
-        source_ref=f"order:{order_ref}")
+        source_ref=f"order:{order_ref}", day=DAY)
     release = kernel.release_credit(cid, res_stable)
     assert release["ok"] is True and release["already_released"] is False
     pos2 = kernel.query_credit(cid)
@@ -310,7 +314,8 @@ def test_supply_full_chain_e2e(kernel, reset_db, db_settings, tmp_path):
 
 
 def test_supply_chain_credit_fail_closed_in_chain(kernel, reset_db,
-                                                  db_settings, tmp_path):
+                                                  db_settings, tmp_path,
+                                                  book_day):
     """全链守界补例：额度不足 fail-closed 拒单（不落订单、不占额度、可解释）。"""
     from fd_erp_ledger_mcp import credit as kernel_credit
     from fd_erp_ledger_mcp.db import connection
@@ -337,7 +342,7 @@ def test_supply_chain_credit_fail_closed_in_chain(kernel, reset_db,
                               PricingRuleBook(reset_db.tenant_id,
                                               tmp_path / "data", master=md))
     out = board.accept_order(cid, [{"product_code": "P-P", "qty": 1,
-                                    "unit": "件"}], DAY)  # 100 > 50
+                                    "unit": "件"}], book_day)  # 100 > 50
     assert out["accepted"] is False and out["stage"] == "credit_check"
     assert out["explanation"]["shortfall"] == "50"
     assert board.pending_requests() == []

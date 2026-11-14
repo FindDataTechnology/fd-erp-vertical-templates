@@ -81,11 +81,30 @@ class FxRevaluation:
     """期末调汇：登记期末汇率 → 逐币种逐科目算差额 → 出待确认 proposal。"""
 
     def __init__(self, tenant_id: str, data_dir: str | Path, kernel: Any, *,
-                 base_currency: str = "CNY"):
+                 base_currency: str = "CNY", periods: Any = None):
         self._tenant = tenant_id
         self._log = EventLog(Path(data_dir) / f"fx-rates-{tenant_id}.jsonl")
         self._kernel = kernel
         self._base = base_currency
+        #: 期间台账（可选，与 `PeriodClosing` 同一个注入方式）。给了就在提交前拒掉已关期间；
+        #: 没给或查不到就不假装已关——真正的闸仍是落账时的 DB 触发器。
+        self._periods = periods
+
+    def _closed_check(self, period: str) -> dict[str, Any] | None:
+        """已关账就返回状态，否则 None。
+
+        为什么要在这里拦：提案不会撞期间闸（那只在**落账**时触发），于是「对已关期间出调汇」
+        会成功返回一张永远确认不了的提案；而下一次再跑又会被「本期已有待确认提案」挡住，
+        这条车道又没有作废——经办人只能去提案收件箱退回。**同一族的期末结转早就是提交前拒的**
+        （`PeriodClosing.transfer`），调汇不拒是没有理由的不一致。
+        """
+        if self._periods is None:
+            return None
+        try:
+            st = self._periods.status(period) or {}
+        except Exception:  # noqa: BLE001 查不到就不假装已关，交给 DB 触发器兜底
+            return None
+        return st if st.get("closed") else None
 
     # ---- 期末汇率（人工登记，追加式） ----
 
@@ -270,6 +289,13 @@ class FxRevaluation:
     def revalue(self, period: Any, *, submitted_by: str = "fx-revaluation") -> dict[str, Any]:
         """出调汇提案：科目 ↔ 6603 成对，借贷必平；差额为零即 noop。"""
         key = _check_period(period)
+        closed = self._closed_check(key)
+        if closed is not None:
+            raise TemplateError(
+                "INVALID_ARGUMENT",
+                f"{key} 已关账：调汇分录不能穿进已关期间——先重开（带理由），"
+                f"或在开放期间冲正",
+                detail={"period": key, "closedAt": closed.get("closedAt")})
         rates = self.rates(key)["rates"]
         rows = self._rows(key, rates)
         adjustments = self._adjustments(key, rates)

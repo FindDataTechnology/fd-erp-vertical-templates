@@ -58,6 +58,20 @@ def db_settings():
 
 
 @pytest.fixture()
+def book_day(db_settings) -> str:
+    """测试用的**业务日**：与内核 `booked_on` 缺省值同一算法（`book_today`）。
+
+    **不能用 `datetime.now(timezone.utc)` 自己算**：账面时区是 `Asia/Shanghai`，
+    UTC 16:00–24:00 这 8 小时里两者差一天，于是「按当日账期收凭证」收到空集，
+    断言静默变空——2026-11-15 凌晨实测 settlement 6 条 + supply-chain 1 条全红，
+    而前一天同一份代码全绿。账期是**业务日期**（`booked_on`），不是落账时刻
+    （`posted_at`），所以必须取与内核同一算法的那个日期。
+    """
+    from fd_erp_ledger_mcp.config import book_today
+    return book_today(db_settings).isoformat()
+
+
+@pytest.fixture()
 def reset_db(db_settings):
     conn = psycopg.connect(db_settings.database_url, autocommit=True)
     try:
@@ -84,14 +98,15 @@ class InProcessKernelClient:
     def submit_proposal(self, stable_id, lines, source_ref=None, kind="journal",
                         reversal_of=None, lane_fleet=None, lane_post=None,
                         lane_title=None, lane_target=None, tenant_id=None,
-                        submitted_by="agent"):
+                        dimensions=None, booked_on=None, submitted_by="agent"):
         with connection(self._s) as conn:
             return _proposals.submit_proposal(
                 conn, settings=self._s, tenant_id=self._tenant,
                 stable_id=stable_id, lines=lines, source_ref=source_ref,
                 kind=kind, reversal_of=reversal_of, lane_fleet=lane_fleet,
                 lane_post=lane_post, lane_title=lane_title,
-                lane_target=lane_target, submitted_by=submitted_by)
+                lane_target=lane_target, dimensions=dimensions,
+                booked_on=booked_on, submitted_by=submitted_by)
 
     def list_proposals(self, status=None, tenant_id=None, offset=0, limit=100):
         with connection(self._s) as conn:

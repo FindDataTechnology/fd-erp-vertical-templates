@@ -28,7 +28,8 @@ from .dates import entry_date, entry_period
 from .errors import TemplateError
 from .localization import CnPack
 from .cn_tax import vat_position
-from .statements import CHART, cash_flow_report, is_closing_entry
+from .statements import (CHART, WORKING_CAPITAL_ACCOUNTS, cash_flow_report,
+                         is_closing_entry, is_fx_revaluation_entry)
 
 Q2 = Decimal("0.01")
 SCHEMA = "fd-erp-vertical-templates/cn-statements/v1"
@@ -507,6 +508,113 @@ class CnStatements:
                 **self._cash_from(pool, key, window=(self._year_start(key), end),
                                   with_feet=False),
             }
+        return out
+
+    # ---- 补充资料（间接法，change: add-fi-indirect-and-fx-endpoints）----
+
+    @staticmethod
+    def _debit_signed(row: dict[str, Any]) -> Decimal:
+        """借 − 贷（金额口径）。
+
+        **不要用本模块顶层的 `_signed`**：那个是给资产负债表用的「按科目类别定正负」，
+        负债增加会算成正数。间接法里营运资本要的是纯「借 − 贷」再整体减去
+        （资产增加是占用、负债增加是来源）；两种符号混用会让「应付增加」变成减项，
+        而报表两边都「有数」、都对不上。
+        """
+        amount = _dec(row.get("amount_base") or row.get("amount"))
+        return amount if row.get("direction") == "debit" else -amount
+
+    def cash_flow_indirect(self, period: Any, *,
+                           rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """补充资料（间接法）：净利润 → 加回非现金 → 减营运资本占用 → 经营净额。
+
+        与**本准则**的直接法互证（`self.cash_flow`）。不拿通用引擎那版：那版的
+        `directOperating` 来自通用现金表（内核科目码口径），接在 CN 面上会出现
+        「同一个面上两个经营活动净额」——而两边各自的脚注都自洽。
+        """
+        key = _check_period(period)
+        pool = self._read_all() if rows is None else rows
+        window = [r for r in pool
+                  if entry_period(r) == key and not is_closing_entry(r)]
+
+        # 起点是**净利润**（含营业外收支与所得税费用），不是营业利润：从营业利润起算，
+        # 那两段在间接法里凭空消失，而直接法照常算它们——两条路径必然差一个数。
+        profit = _dec(self.income_statement(key, rows=pool)["totals"]["netProfit"])
+
+        sums: dict[str, Decimal] = {}
+        for row in window:
+            code = str(row.get("account_code") or "").strip()
+            sums[code] = sums.get(code, Decimal(0)) + self._debit_signed(row)
+        # 累计折旧在贷方增加（借−贷为负），加回额取正；处置转出会让它变负，如实保留。
+        depreciation = -sums.get("1602", Decimal(0))
+        impairment = sums.get("6602", Decimal(0))
+        fx = sums.get("6603", Decimal(0))
+        adjustments = [
+            {"line": "计提的资产减值准备", "accountCode": "6602",
+             "account": CHART.get("6602", ("", ""))[0], "amount": _fmt(impairment)},
+            {"line": "固定资产折旧", "accountCode": "1602",
+             "account": CHART.get("1602", ("", ""))[0], "amount": _fmt(depreciation)},
+            {"line": "汇兑损益", "accountCode": "6603",
+             "account": CHART.get("6603", ("", ""))[0], "amount": _fmt(fx)},
+        ]
+        adjust_total = impairment + depreciation + fx
+
+        wc_rows: list[dict[str, Any]] = []
+        wc_total = Decimal(0)
+        for code in WORKING_CAPITAL_ACCOUNTS:
+            change = Decimal(0)
+            for row in window:
+                if str(row.get("account_code") or "").strip() != code:
+                    continue
+                if is_fx_revaluation_entry(row):
+                    continue        # 调汇的影响在「汇兑损益」加回项里，不重复计
+                change += self._debit_signed(row)
+            wc_total += change
+            cn_code = str(self._map.get(code) or "")
+            cn_row = self._pack.account(cn_code) if cn_code else None
+            wc_rows.append({
+                "accountCode": code,
+                "cnCode": cn_code or None,
+                "account": (cn_row or {}).get("name") or CHART.get(code, (code, ""))[0],
+                "change": _fmt(change),
+            })
+
+        indirect = profit + adjust_total - wc_total
+        cash = self.cash_flow(key, prior_year=False, cumulative=False, rows=pool)
+        direct = _dec((cash.get("categories") or {}).get("operating", {}).get("net"))
+        difference = indirect - direct
+        unclassified = list(cash.get("unclassified") or [])
+        consistent = difference == 0 and not unclassified and not cash.get("fragments")
+
+        out: dict[str, Any] = {
+            "schema": SCHEMA, "chart": self._chart,
+            "period": key,
+            "netProfit": _fmt(profit),
+            "adjustments": adjustments,
+            "adjustmentsTotal": _fmt(adjust_total),
+            "workingCapital": wc_rows,
+            "workingCapitalTotal": _fmt(wc_total),
+            "indirectOperating": _fmt(indirect),
+            "directOperating": _fmt(direct),
+            "difference": _fmt(difference),
+            "consistent": consistent,
+            "caliber_note": "起点=本期净利润（含营业外收支与所得税费用）；营运资本按"
+                            "「借 − 贷」取本期变动并整体减去（资产增加是占用、负债增加是来源）；"
+                            "调汇分录不计入营运资本（已通过汇兑损益加回）；"
+                            "`directOperating` 取本准则直接法现金表的经营活动净额",
+        }
+        if unclassified:
+            out["unclassified"] = unclassified
+            out["note"] = (f"直接法有表外科目 {', '.join(unclassified)} 未归位，"
+                           f"两法不可能对上——先补归位表")
+        if not consistent:
+            if difference != 0:
+                out["error"] = (f"间接法经营净额 {_fmt(indirect)} ≠ 直接法 {_fmt(direct)}"
+                                f"（差 {_fmt(difference)}）——两条路径各自自洽但对不上，"
+                                f"先查未归类科目与非现金项是否漏列")
+            elif "error" not in out:
+                out["error"] = ("两法净额相同，但直接法有未归位科目或缺对手行的交易，"
+                                "现金变动无法归类——报表仍判不自证")
         return out
 
     def _cash_feet(self, period: str, flow: dict[str, Any],
