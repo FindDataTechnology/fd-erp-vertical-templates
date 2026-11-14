@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 83
+    "routes": 90
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -150,7 +150,7 @@
     },
     {
       "function": "fi_register_vat_return",
-      "line": 1479,
+      "line": 1596,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/filings/vat-return",
       "placeholder": false,
@@ -158,7 +158,7 @@
     },
     {
       "function": "fi_invoices",
-      "line": 1382,
+      "line": 1434,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices",
       "placeholder": false,
@@ -166,7 +166,7 @@
     },
     {
       "function": "fi_register_invoice",
-      "line": 1418,
+      "line": 1470,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices",
       "placeholder": false,
@@ -174,7 +174,7 @@
     },
     {
       "function": "fi_invoice_deduction",
-      "line": 1389,
+      "line": 1441,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/deduction",
       "placeholder": false,
@@ -182,15 +182,23 @@
     },
     {
       "function": "fi_invoice_reconciliation",
-      "line": 1395,
+      "line": 1447,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/reconciliation",
       "placeholder": false,
       "source": "faces.py"
     },
     {
+      "function": "fi_register_red",
+      "line": 1509,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/invoices/red",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_invoice",
-      "line": 1410,
+      "line": 1462,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}",
       "placeholder": false,
@@ -198,9 +206,57 @@
     },
     {
       "function": "fi_certify_invoice",
-      "line": 1444,
+      "line": 1496,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}/certify",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_post_invoice",
+      "line": 1530,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/invoices/{number}/post",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_post_red",
+      "line": 1554,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/invoices/{number}/post-red",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_proposals",
+      "line": 1393,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/proposals",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_proposal",
+      "line": 1400,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_confirm",
+      "line": 1410,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}/confirm",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_reject",
+      "line": 1417,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}/reject",
       "placeholder": false,
       "source": "faces.py"
     },
@@ -222,7 +278,7 @@
     },
     {
       "function": "fi_filing_summary",
-      "line": 1473,
+      "line": 1590,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/filing-summary",
       "placeholder": false,
@@ -238,7 +294,7 @@
     },
     {
       "function": "fi_income_tax_prepay",
-      "line": 1467,
+      "line": 1584,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/income-tax-prepay",
       "placeholder": false,
@@ -246,7 +302,7 @@
     },
     {
       "function": "fi_invoice_summary",
-      "line": 1404,
+      "line": 1456,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/invoice-summary",
       "placeholder": false,
@@ -254,7 +310,7 @@
     },
     {
       "function": "fi_surcharges",
-      "line": 1457,
+      "line": 1574,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/surcharges",
       "placeholder": false,
@@ -262,7 +318,7 @@
     },
     {
       "function": "fi_vat_return",
-      "line": 1493,
+      "line": 1610,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/vat-return",
       "placeholder": false,
