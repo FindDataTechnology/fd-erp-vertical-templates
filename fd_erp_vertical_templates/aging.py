@@ -207,10 +207,12 @@ class AgingReport:
         offset_total = sum(offset_balance.values(), Decimal(0))
         # 净额取「开放方向为正」的口径：应收 = 借−贷，应付 = 贷−借。两侧因此共用一条
         # 一致性断言，不必各自记一个符号翻转。
-        net = sum((_dec(e.get("amount_base") or e.get("amount"))
-                   if e.get("direction") == open_dir
-                   else -_dec(e.get("amount_base") or e.get("amount")))
-                  for e in entries)
+        # `start=Decimal(0)` 不能省：空账（一条分录都没有）时 `sum(空生成器)` 返回 **int 0**，
+        # 而下面 `_fmt` 调的是 `Decimal.quantize` —— 新客户第一天的账龄表就会 500。
+        net = Decimal(0)
+        for e in entries:
+            amount = _dec(e.get("amount_base") or e.get("amount"))
+            net += amount if e.get("direction") == open_dir else -amount
         # 净额 = 未结账龄 − 多收/多付。把多付漏掉会让「有多付的对象」永远不平，
         # 而那种不平看着像账错了。
         consistent = (bucket_total - offset_total) == net

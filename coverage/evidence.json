@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 99
+    "routes": 107
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -149,6 +149,46 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_bad_debt_schedule",
+      "line": 1750,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/bad-debts/schedule",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_set_bad_debt_schedule",
+      "line": 1755,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/bad-debts/schedule",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_bad_debt_status",
+      "line": 1773,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/bad-debts/status",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_accrue_bad_debt",
+      "line": 1793,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/accrue",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_void_bad_debt",
+      "line": 1799,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/void",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_closing_transfer",
       "line": 1425,
       "method": "POST",
@@ -253,6 +293,14 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_payable_aging",
+      "line": 1744,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/payables/aging",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_periods",
       "line": 1382,
       "method": "GET",
@@ -321,6 +369,22 @@
       "line": 1502,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}/reject",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_receivable_aging",
+      "line": 1734,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/receivables/aging",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_bad_debt_preview",
+      "line": 1780,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/bad-debt-preview",
       "placeholder": false,
       "source": "faces.py"
     },

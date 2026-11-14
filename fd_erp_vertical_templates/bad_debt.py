@@ -209,8 +209,15 @@ class BadDebtLane:
         return Decimal(0)
 
     def provision(self, period: Any, *, as_of: Any = None,
-                  submitted_by: str = "bad-debt-engine") -> dict[str, Any]:
-        """按账龄分档计提（增量）：出一张待确认 proposal，`booked_on` = 期间末日。"""
+                  submitted_by: str = "bad-debt-engine",
+                  preview: bool = False) -> dict[str, Any]:
+        """按账龄分档计提（增量）：出一张待确认 proposal，`booked_on` = 期间末日。
+
+        `preview=True` 只算不写：不算提案、不落事件档，并把「真计提会被什么挡住」列进
+        `blockers`。为什么预演不照抄那几条抛错：看数字本身不该被挡住——已经确认过一期
+        之后想知道「现在该提多少」正是最常见的问法，预演直接抛「跨期调整不允许」等于
+        逼人去别处算一遍。
+        """
         key = _check_period(period)
         method = self._method()
         if method not in IMPLEMENTED_METHODS:
@@ -258,11 +265,42 @@ class BadDebtLane:
         base = {"period": key, "asOf": cutoff, "method": method,
                 "bucketLabels": labels, "target": _fmt(target),
                 "existing": _fmt(existing), "delta": _fmt(delta), "rows": detail_rows}
+
+        if preview:
+            # 只算不写：先判「真计提会撞上什么」，但把结论当**事实**返回而不是抛错。
+            blockers: list[str] = []
+            prior = self._open_submissions(key)
+            if prior:
+                last = prior[-1]
+                last_target = _dec(last.get("target") or 0, "上次计提额")
+                if last_target == target:
+                    blockers.append(
+                        f"同期间同金额已提交（{last.get('target')}）：真计提会直接返回"
+                        "首次结果（幂等），不会新建提案")
+                elif self._proposal_status(str(last.get("stableId") or "")) == "confirmed":
+                    blockers.append(
+                        f"同期间已确认 {last.get('target')} 且金额不同：跨期调整不允许，"
+                        "真计提会被拒（先在内核冲正再重提）")
+                else:
+                    blockers.append(
+                        f"同期间有待确认计提且金额不同（{last.get('target')} → "
+                        f"{_fmt(target)}）：真计提会被拒，须先作废（void）再重提")
+            if delta == 0:
+                blockers.append("应计提额与账上准备一致：真计提为 noop，不生成提案")
+            return {**base, "noop": delta == 0, "preview": True, "proposed": False,
+                    "proposal": None, "stableId": None,
+                    "direction": None if delta == 0 else
+                    ("increase" if delta > 0 else "release"),
+                    "bookedOn": _period_end(key) if delta != 0 else None,
+                    "canSubmit": not blockers, "blockers": blockers,
+                    "caliber_note": "预演只算不写：不生成提案、不落事件档；"
+                                    "真计提仍要过确认门"}
+
         if delta == 0:
             rec = {**base, "kind": "provision", "result": "noop",
                    "recorded_at": _now()}
             self._log.append(rec)
-            return {**base, "noop": True, "proposal": None,
+            return {**base, "noop": True, "proposed": False, "proposal": None,
                     "caliber_note": "应计提额与账上准备一致，不生成 proposal"}
 
         # 同一期间已有提交：先分清三种情形，别把「还没确认」也报成跨期。
@@ -270,7 +308,7 @@ class BadDebtLane:
         if prior:
             last = prior[-1]
             if _dec(last.get("target") or 0, "上次计提额") == target:
-                return {**base, "noop": True, "duplicate": True,
+                return {**base, "noop": True, "duplicate": True, "proposed": False,
                         "proposal": last.get("proposal"),
                         "stableId": last.get("stableId"),
                         "caliber_note": "同期间同金额已提交过，返回首次结果（幂等）"}
@@ -318,7 +356,7 @@ class BadDebtLane:
                "stableId": stable_id, "proposal": proposal,
                "bookedOn": _period_end(key), "recorded_at": _now()}
         self._log.append(rec)
-        return {**base, "noop": False, "proposal": proposal,
+        return {**base, "noop": False, "proposed": True, "proposal": proposal,
                 "stableId": stable_id, "bookedOn": _period_end(key),
                 "direction": "increase" if delta > 0 else "release",
                 "caliber_note": "计提只生成待确认 proposal（借 6602 / 贷 1231）；"

@@ -168,3 +168,39 @@ def test_aging_starts_from_booked_on_when_it_differs_from_posting_time():
     row = _rows(out)["C-A"]
     assert _bucket(out, row, "91天以上") == "100.00"
     assert _bucket(out, row, "0-30天") == "0.00"
+
+
+# ---- 5) 空账：一条分录都没有时也必须出得来表（回归）----
+
+def test_empty_ledger_reports_zeroes_instead_of_crashing():
+    """空账曾 500：`sum(空生成器)` 返回 **int 0**，而 `_fmt` 调的是 `Decimal.quantize`。
+
+    新客户第一天、或刚切到应付侧还没有往来时，账龄表一定跑在空账上——这条不是边角。
+    """
+    out = _report([])
+    assert out["rows"] == []
+    # 桶清单照常给（前端要渲染表头），只是每桶 0
+    assert [b["amount"] for b in out["totals"]] == ["0.00"] * len(out["totals"])
+    assert out["totalOutstanding"] == "0.00"
+    assert out["accountNetBalance"] == "0.00"
+    assert out["consistent"] is True
+    assert "error" not in out
+
+
+# ---- 6) 不平必须如实报（红证）----
+
+def test_imbalance_is_reported_not_papered_over():
+    """`consistent=false` + `error` 这条分支的**红证**。
+
+    注意它的可达性：内核 `validate_lines` 拒 `amount <= 0`，所以正常记账造不出不平——
+    这个分支是**防御性断言**（万一将来有人放开负数分录、或 replace 掉核销实现），
+    替身内核绕过校验才能造出它。写这条是为了让「不调桶凑平」这句话有能被证伪的形状：
+    若有人把 `consistent` 改成恒 True、或把差额摊进桶里，这里会立刻红。
+    """
+    out = _report([_e("debit", "100", "2026-11-10", "C-A"),
+                   _e("debit", "-30", "2026-11-10", "C-A")])
+    assert out["consistent"] is False
+    assert "不调桶凑合计数" in out["error"]
+    # 桶里只有正的 100（负额项被跳过、没被摊掉），差额如实留在 error 里
+    assert out["totalOutstanding"] == "100.00"
+    assert out["accountNetBalance"] == "70.00"

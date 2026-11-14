@@ -239,3 +239,58 @@ def test_status_reports_coverage_and_net(tmp_path):
     assert st["netReceivable"] == "11350.00"
     assert st["coverage"] == "0.0542"
     assert st["method"] == "aging-rate"
+
+
+# ---- 5) 预演：只算不写 ----
+
+def test_preview_computes_without_writing(tmp_path):
+    """读接口绝不在账上留提案：预演前后事件档与提案数都不变。"""
+    rows = [_row("C-A", ["10000", "0", "0", "2000"], "12000")]
+    lane, kernel, _policy = _lane(tmp_path, rows=rows)
+    lane.set_schedule(BANDS, registered_by="cfo")
+    events_before = len(lane._events())
+
+    out = lane.provision("2026-10", preview=True)
+    assert out["preview"] is True and out["proposed"] is False
+    assert out["target"] == "650.00" and out["delta"] == "650.00"
+    assert out["direction"] == "increase"
+    assert out["proposal"] is None and out["stableId"] is None
+    assert out["blockers"] == [] and out["canSubmit"] is True
+    assert kernel.submitted == []
+    assert len(lane._events()) == events_before
+
+    # 预演过之后真计提照样成立，且金额与预演逐值相同
+    real = lane.provision("2026-10")
+    assert real["proposed"] is True
+    assert (real["target"], real["delta"]) == (out["target"], out["delta"])
+
+
+def test_preview_lists_blockers_instead_of_raising(tmp_path):
+    """看数字本身不该被挡住：真计提会撞上的三件事，预演当事实报出来。"""
+    rows = [_row("C-A", ["10000", "0", "0", "2000"], "12000")]
+    lane, kernel, _policy = _lane(tmp_path, rows=rows)
+    lane.set_schedule(BANDS, registered_by="cfo")
+    lane.provision("2026-10")
+
+    # ① 同期间待确认且金额不同 → 须先作废
+    lane._aging = _StubAging([_row("C-A", ["0", "0", "0", "10000"], "10000")], "10000")
+    out = lane.provision("2026-10", preview=True)
+    assert out["canSubmit"] is False
+    assert any("作废" in b for b in out["blockers"]), out["blockers"]
+    assert out["target"] == "3000.00"
+    assert len(kernel.submitted) == 1          # 预演没有多提一张
+
+    # ② 同期间已确认且金额不同 → 跨期调整不允许
+    kernel.proposal_status = "confirmed"
+    out = lane.provision("2026-10", preview=True)
+    assert any("跨期调整" in b for b in out["blockers"]), out["blockers"]
+
+    # ③ 应计提额与账上准备一致 → noop
+    lane._aging = _StubAging([_row("C-A", ["10000", "0", "0", "2000"], "12000")], "12000")
+    lane2, _k2, _p2 = _lane(tmp_path / "noop", rows=[_row("C-A", [], "0")],
+                            total="0", allowance="0")
+    lane2.set_schedule(BANDS, registered_by="cfo")
+    out = lane2.provision("2026-10", preview=True)
+    assert out["noop"] is True and out["delta"] == "0.00"
+    assert out["proposed"] is False and out["bookedOn"] is None
+    assert any("noop" in b for b in out["blockers"]), out["blockers"]
