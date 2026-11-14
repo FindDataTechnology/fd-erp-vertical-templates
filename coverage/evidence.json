@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 117
+    "routes": 120
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -54,7 +54,7 @@
   "routes": [
     {
       "function": "cp_dock_slots",
-      "line": 1152,
+      "line": 1154,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/dock-slots",
       "placeholder": true,
@@ -62,7 +62,7 @@
     },
     {
       "function": "cp_freight_statements",
-      "line": 1269,
+      "line": 1271,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements",
       "placeholder": false,
@@ -70,7 +70,7 @@
     },
     {
       "function": "cp_freight_detail",
-      "line": 1292,
+      "line": 1294,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}",
       "placeholder": false,
@@ -78,7 +78,7 @@
     },
     {
       "function": "cp_freight_confirm",
-      "line": 1306,
+      "line": 1308,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/freight-statements/{statement_id}/confirm",
       "placeholder": false,
@@ -86,7 +86,7 @@
     },
     {
       "function": "cp_waybills",
-      "line": 1083,
+      "line": 1085,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills",
       "placeholder": false,
@@ -94,7 +94,7 @@
     },
     {
       "function": "cp_waybill_detail",
-      "line": 1107,
+      "line": 1109,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}",
       "placeholder": false,
@@ -102,7 +102,7 @@
     },
     {
       "function": "cp_waybill_accept",
-      "line": 1133,
+      "line": 1135,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/accept",
       "placeholder": false,
@@ -110,7 +110,7 @@
     },
     {
       "function": "cp_dock_reserve",
-      "line": 1161,
+      "line": 1163,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/dock-reservation",
       "placeholder": false,
@@ -118,7 +118,7 @@
     },
     {
       "function": "cp_waybill_events",
-      "line": 1237,
+      "line": 1239,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/events",
       "placeholder": false,
@@ -126,7 +126,7 @@
     },
     {
       "function": "cp_pickup_checkin",
-      "line": 1193,
+      "line": 1195,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pickup-checkin",
       "placeholder": false,
@@ -134,7 +134,7 @@
     },
     {
       "function": "cp_pod_report",
-      "line": 1210,
+      "line": 1212,
       "method": "POST",
       "path": "/erp/supply-chain/v1/cp/waybills/{waybill_id}/pod",
       "placeholder": false,
@@ -142,7 +142,7 @@
     },
     {
       "function": "cp_workspace",
-      "line": 1049,
+      "line": 1051,
       "method": "GET",
       "path": "/erp/supply-chain/v1/cp/workspace",
       "placeholder": false,
@@ -150,7 +150,7 @@
     },
     {
       "function": "fi_assets",
-      "line": 1814,
+      "line": 1838,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/assets",
       "placeholder": false,
@@ -158,7 +158,7 @@
     },
     {
       "function": "fi_register_asset",
-      "line": 1891,
+      "line": 1915,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/assets",
       "placeholder": false,
@@ -166,7 +166,7 @@
     },
     {
       "function": "fi_depreciate",
-      "line": 1860,
+      "line": 1884,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/assets/depreciation/{period}",
       "placeholder": false,
@@ -174,7 +174,7 @@
     },
     {
       "function": "fi_void_depreciation",
-      "line": 1877,
+      "line": 1901,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/assets/depreciation/{period}/void",
       "placeholder": false,
@@ -182,7 +182,7 @@
     },
     {
       "function": "fi_asset_summary",
-      "line": 1819,
+      "line": 1843,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/assets/summary",
       "placeholder": false,
@@ -190,7 +190,7 @@
     },
     {
       "function": "fi_set_asset_threshold",
-      "line": 1828,
+      "line": 1852,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/assets/threshold",
       "placeholder": false,
@@ -198,7 +198,7 @@
     },
     {
       "function": "fi_asset",
-      "line": 1920,
+      "line": 1944,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/assets/{asset_id}",
       "placeholder": false,
@@ -206,7 +206,7 @@
     },
     {
       "function": "fi_asset_book_value",
-      "line": 1935,
+      "line": 1959,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/assets/{asset_id}/book-value",
       "placeholder": false,
@@ -214,7 +214,7 @@
     },
     {
       "function": "fi_asset_plan",
-      "line": 1929,
+      "line": 1953,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/assets/{asset_id}/plan",
       "placeholder": false,
@@ -222,7 +222,7 @@
     },
     {
       "function": "fi_bad_debt_schedule",
-      "line": 1750,
+      "line": 1774,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/bad-debts/schedule",
       "placeholder": false,
@@ -230,7 +230,7 @@
     },
     {
       "function": "fi_set_bad_debt_schedule",
-      "line": 1755,
+      "line": 1779,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/schedule",
       "placeholder": false,
@@ -238,7 +238,7 @@
     },
     {
       "function": "fi_bad_debt_status",
-      "line": 1773,
+      "line": 1797,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/bad-debts/status",
       "placeholder": false,
@@ -246,7 +246,7 @@
     },
     {
       "function": "fi_accrue_bad_debt",
-      "line": 1792,
+      "line": 1816,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/accrue",
       "placeholder": false,
@@ -254,7 +254,7 @@
     },
     {
       "function": "fi_void_bad_debt",
-      "line": 1798,
+      "line": 1822,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/bad-debts/{period}/void",
       "placeholder": false,
@@ -262,7 +262,7 @@
     },
     {
       "function": "fi_closing_transfer",
-      "line": 1425,
+      "line": 1449,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/closing/{period}/transfer",
       "placeholder": false,
@@ -270,7 +270,7 @@
     },
     {
       "function": "fi_register_vat_return",
-      "line": 1681,
+      "line": 1705,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/filings/vat-return",
       "placeholder": false,
@@ -278,7 +278,7 @@
     },
     {
       "function": "fi_invoices",
-      "line": 1519,
+      "line": 1543,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices",
       "placeholder": false,
@@ -286,7 +286,7 @@
     },
     {
       "function": "fi_register_invoice",
-      "line": 1555,
+      "line": 1579,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices",
       "placeholder": false,
@@ -294,7 +294,7 @@
     },
     {
       "function": "fi_invoice_deduction",
-      "line": 1526,
+      "line": 1550,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/deduction",
       "placeholder": false,
@@ -302,7 +302,7 @@
     },
     {
       "function": "fi_invoice_reconciliation",
-      "line": 1532,
+      "line": 1556,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/reconciliation",
       "placeholder": false,
@@ -310,7 +310,7 @@
     },
     {
       "function": "fi_register_red",
-      "line": 1594,
+      "line": 1618,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices/red",
       "placeholder": false,
@@ -318,7 +318,7 @@
     },
     {
       "function": "fi_invoice",
-      "line": 1547,
+      "line": 1571,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}",
       "placeholder": false,
@@ -326,7 +326,7 @@
     },
     {
       "function": "fi_certify_invoice",
-      "line": 1581,
+      "line": 1605,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}/certify",
       "placeholder": false,
@@ -334,7 +334,7 @@
     },
     {
       "function": "fi_post_invoice",
-      "line": 1615,
+      "line": 1639,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}/post",
       "placeholder": false,
@@ -342,15 +342,39 @@
     },
     {
       "function": "fi_post_red",
-      "line": 1639,
+      "line": 1663,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/invoices/{number}/post-red",
       "placeholder": false,
       "source": "faces.py"
     },
     {
+      "function": "fi_month_end",
+      "line": 1968,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/month-end/{period}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_month_end_close",
+      "line": 1984,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/month-end/{period}/close",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_month_end_run",
+      "line": 1974,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/month-end/{period}/run",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_opening",
-      "line": 1393,
+      "line": 1417,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/opening",
       "placeholder": false,
@@ -358,7 +382,7 @@
     },
     {
       "function": "fi_register_opening",
-      "line": 1398,
+      "line": 1422,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/opening",
       "placeholder": false,
@@ -366,7 +390,7 @@
     },
     {
       "function": "fi_payable_aging",
-      "line": 1744,
+      "line": 1768,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/payables/aging",
       "placeholder": false,
@@ -374,7 +398,7 @@
     },
     {
       "function": "fi_periods",
-      "line": 1382,
+      "line": 1406,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/periods",
       "placeholder": false,
@@ -382,7 +406,7 @@
     },
     {
       "function": "fi_period",
-      "line": 1387,
+      "line": 1411,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/periods/{period}",
       "placeholder": false,
@@ -390,7 +414,7 @@
     },
     {
       "function": "fi_close_period",
-      "line": 1431,
+      "line": 1455,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/periods/{period}/close",
       "placeholder": false,
@@ -398,7 +422,7 @@
     },
     {
       "function": "fi_reopen_period",
-      "line": 1445,
+      "line": 1469,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/periods/{period}/reopen",
       "placeholder": false,
@@ -406,7 +430,7 @@
     },
     {
       "function": "fi_period_report",
-      "line": 1459,
+      "line": 1483,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/periods/{period}/report",
       "placeholder": false,
@@ -414,7 +438,7 @@
     },
     {
       "function": "fi_proposals",
-      "line": 1478,
+      "line": 1502,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/proposals",
       "placeholder": false,
@@ -422,7 +446,7 @@
     },
     {
       "function": "fi_proposal",
-      "line": 1485,
+      "line": 1509,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}",
       "placeholder": false,
@@ -430,7 +454,7 @@
     },
     {
       "function": "fi_confirm",
-      "line": 1495,
+      "line": 1519,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}/confirm",
       "placeholder": false,
@@ -438,7 +462,7 @@
     },
     {
       "function": "fi_reject",
-      "line": 1502,
+      "line": 1526,
       "method": "POST",
       "path": "/erp/supply-chain/v1/fi/proposals/{proposal_id}/reject",
       "placeholder": false,
@@ -446,7 +470,7 @@
     },
     {
       "function": "fi_receivable_aging",
-      "line": 1734,
+      "line": 1758,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/receivables/aging",
       "placeholder": false,
@@ -454,7 +478,7 @@
     },
     {
       "function": "fi_bad_debt_preview",
-      "line": 1780,
+      "line": 1804,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/bad-debt-preview",
       "placeholder": false,
@@ -462,7 +486,7 @@
     },
     {
       "function": "fi_balance_sheet",
-      "line": 1362,
+      "line": 1386,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/balance-sheet",
       "placeholder": false,
@@ -470,7 +494,7 @@
     },
     {
       "function": "fi_cash_flow",
-      "line": 1374,
+      "line": 1398,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/cash-flow",
       "placeholder": false,
@@ -478,7 +502,7 @@
     },
     {
       "function": "fi_closing_preview",
-      "line": 1419,
+      "line": 1443,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/closing-preview",
       "placeholder": false,
@@ -486,7 +510,7 @@
     },
     {
       "function": "fi_depreciation_preview",
-      "line": 1851,
+      "line": 1875,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/depreciation-preview",
       "placeholder": false,
@@ -494,7 +518,7 @@
     },
     {
       "function": "fi_filing_summary",
-      "line": 1675,
+      "line": 1699,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/filing-summary",
       "placeholder": false,
@@ -502,7 +526,7 @@
     },
     {
       "function": "fi_income_statement",
-      "line": 1368,
+      "line": 1392,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/income-statement",
       "placeholder": false,
@@ -510,7 +534,7 @@
     },
     {
       "function": "fi_income_tax_prepay",
-      "line": 1669,
+      "line": 1693,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/income-tax-prepay",
       "placeholder": false,
@@ -518,7 +542,7 @@
     },
     {
       "function": "fi_invoice_summary",
-      "line": 1541,
+      "line": 1565,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/invoice-summary",
       "placeholder": false,
@@ -526,7 +550,7 @@
     },
     {
       "function": "fi_surcharges",
-      "line": 1659,
+      "line": 1683,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/surcharges",
       "placeholder": false,
@@ -534,7 +558,7 @@
     },
     {
       "function": "fi_vat_return",
-      "line": 1695,
+      "line": 1719,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/vat-return",
       "placeholder": false,
@@ -550,7 +574,7 @@
     },
     {
       "function": "se_alerts",
-      "line": 544,
+      "line": 546,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/alerts",
       "placeholder": false,
@@ -558,7 +582,7 @@
     },
     {
       "function": "se_alert_handle",
-      "line": 554,
+      "line": 556,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/alerts/{alert_id}/handle",
       "placeholder": false,
@@ -566,7 +590,7 @@
     },
     {
       "function": "se_customers",
-      "line": 239,
+      "line": 241,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers",
       "placeholder": false,
@@ -574,7 +598,7 @@
     },
     {
       "function": "se_customer_360",
-      "line": 267,
+      "line": 269,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers/{customer_id}",
       "placeholder": false,
@@ -582,7 +606,7 @@
     },
     {
       "function": "se_customer_orders",
-      "line": 292,
+      "line": 294,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/customers/{customer_id}/orders",
       "placeholder": false,
@@ -590,7 +614,7 @@
     },
     {
       "function": "se_list_invoice_requests",
-      "line": 367,
+      "line": 369,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/invoice-requests",
       "placeholder": false,
@@ -598,7 +622,7 @@
     },
     {
       "function": "se_decide_invoice_request",
-      "line": 388,
+      "line": 390,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/invoice-requests/{request_id}/decide",
       "placeholder": false,
@@ -606,7 +630,7 @@
     },
     {
       "function": "se_list_leads",
-      "line": 308,
+      "line": 310,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/leads",
       "placeholder": false,
@@ -614,7 +638,7 @@
     },
     {
       "function": "se_create_lead",
-      "line": 320,
+      "line": 322,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/leads",
       "placeholder": false,
@@ -622,7 +646,7 @@
     },
     {
       "function": "se_orders",
-      "line": 469,
+      "line": 471,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/orders",
       "placeholder": false,
@@ -630,7 +654,7 @@
     },
     {
       "function": "se_order_proxy",
-      "line": 429,
+      "line": 431,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/orders/proxy",
       "placeholder": false,
@@ -638,7 +662,7 @@
     },
     {
       "function": "se_order_detail",
-      "line": 497,
+      "line": 499,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/orders/{order_id}",
       "placeholder": false,
@@ -646,7 +670,7 @@
     },
     {
       "function": "se_statements",
-      "line": 578,
+      "line": 580,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/statements",
       "placeholder": false,
@@ -654,7 +678,7 @@
     },
     {
       "function": "se_statement_push",
-      "line": 592,
+      "line": 594,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/statements/{statement_id}/push",
       "placeholder": true,
@@ -662,7 +686,7 @@
     },
     {
       "function": "se_list_visits",
-      "line": 344,
+      "line": 346,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/visits",
       "placeholder": false,
@@ -670,7 +694,7 @@
     },
     {
       "function": "se_create_visit",
-      "line": 326,
+      "line": 328,
       "method": "POST",
       "path": "/erp/supply-chain/v1/se/visits",
       "placeholder": false,
@@ -678,7 +702,7 @@
     },
     {
       "function": "se_workspace",
-      "line": 209,
+      "line": 211,
       "method": "GET",
       "path": "/erp/supply-chain/v1/se/workspace",
       "placeholder": false,
@@ -686,7 +710,7 @@
     },
     {
       "function": "sp_arrival_notices",
-      "line": 852,
+      "line": 854,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/arrival-notices",
       "placeholder": false,
@@ -694,7 +718,7 @@
     },
     {
       "function": "sp_arrival_notice_create",
-      "line": 870,
+      "line": 872,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/arrival-notices",
       "placeholder": false,
@@ -702,7 +726,7 @@
     },
     {
       "function": "sp_inventory",
-      "line": 888,
+      "line": 890,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/inventory",
       "placeholder": false,
@@ -710,7 +734,7 @@
     },
     {
       "function": "sp_invoice_list",
-      "line": 955,
+      "line": 957,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -718,7 +742,7 @@
     },
     {
       "function": "sp_invoice_upload",
-      "line": 947,
+      "line": 949,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/invoices",
       "placeholder": true,
@@ -726,7 +750,7 @@
     },
     {
       "function": "sp_purchase_orders",
-      "line": 750,
+      "line": 752,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/purchase-orders",
       "placeholder": false,
@@ -734,7 +758,7 @@
     },
     {
       "function": "sp_po_detail",
-      "line": 781,
+      "line": 783,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}",
       "placeholder": false,
@@ -742,7 +766,7 @@
     },
     {
       "function": "sp_po_accept",
-      "line": 809,
+      "line": 811,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}/accept",
       "placeholder": false,
@@ -750,7 +774,7 @@
     },
     {
       "function": "sp_delivery_feedback",
-      "line": 831,
+      "line": 833,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/purchase-orders/{po_id}/delivery-feedback",
       "placeholder": false,
@@ -758,7 +782,7 @@
     },
     {
       "function": "sp_settlements",
-      "line": 963,
+      "line": 965,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/settlements",
       "placeholder": true,
@@ -766,7 +790,7 @@
     },
     {
       "function": "sp_statements",
-      "line": 921,
+      "line": 923,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements",
       "placeholder": true,
@@ -774,7 +798,7 @@
     },
     {
       "function": "sp_statement_detail",
-      "line": 928,
+      "line": 930,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}",
       "placeholder": true,
@@ -782,7 +806,7 @@
     },
     {
       "function": "sp_statement_confirm",
-      "line": 933,
+      "line": 935,
       "method": "POST",
       "path": "/erp/supply-chain/v1/sp/statements/{statement_id}/confirm",
       "placeholder": true,
@@ -790,7 +814,7 @@
     },
     {
       "function": "sp_workspace",
-      "line": 716,
+      "line": 718,
       "method": "GET",
       "path": "/erp/supply-chain/v1/sp/workspace",
       "placeholder": false,
