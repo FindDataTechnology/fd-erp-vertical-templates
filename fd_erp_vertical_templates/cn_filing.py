@@ -152,11 +152,15 @@ class CnFilingLane:
     def _require(self, period: str) -> dict[str, str]:
         got = self.rates(period)
         if got["missing"]:
+            # 配置缺失报 400，不报 501：能力是好的，缺的是这个租户的登记。
+            # 501 会被只看状态码的监控当成服务降级，也会让人以为「附加税功能没做」，
+            # 还会污染「501 = 我们确实没实现」这条信号。
             raise TemplateError(
-                "NOT_WIRED",
+                "INVALID_ARGUMENT",
                 f"{period} 缺税率：{'、'.join(got['missing'])}——先 register_rates 登记"
                 "（地区/政策不同，不拿默认值顶）",
-                detail={"period": period, "missing": got["missing"]})
+                detail={"period": period, "missing": got["missing"],
+                        "fix": "POST /fi/filings/rates 或直接调车道 register_rates"})
         return got["rates"]
 
     # ---- 增值税申报数（外部事实，带出处登记） ----

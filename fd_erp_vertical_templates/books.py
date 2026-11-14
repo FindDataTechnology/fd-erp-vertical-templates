@@ -234,6 +234,34 @@ class LedgerBooks:
         return out
 
 
+    # ---- 2b) 期间活动（change: fix-fi-surface-audit）----
+
+    def period_activity(self) -> list[dict[str, Any]]:
+        """有哪些期间**真的有分录**（按期间 → 凭证数 / 行数 / 最近业务日期）。
+
+        为什么需要它：内核 `list_periods` 的口径是「关过或重开过的期间」。只拿它当期间清单，
+        会让「有业务但没关账」的月份**整月消失**——财务进后台想选哪个月来关账，看到空列表，
+        分不清是「没业务」还是「没关过」。这两件事的处置完全不同。
+        """
+        slots: dict[str, dict[str, Any]] = {}
+        for entry in read_entries(self._kernel):
+            which = entry_period(entry)
+            if which == "unknown":
+                continue
+            slot = slots.setdefault(which, {"period": which, "_txns": set(), "lines": 0,
+                                            "lastBookedOn": None})
+            txn = str(entry.get("txn_id") or "").strip()
+            if txn:
+                slot["_txns"].add(txn)
+            slot["lines"] += 1
+            day = str(entry.get("booked_on") or "")[:10] or None
+            if day and (slot["lastBookedOn"] is None or day > slot["lastBookedOn"]):
+                slot["lastBookedOn"] = day
+        return [{"period": r["period"], "vouchers": len(r["_txns"]),
+                 "lines": r["lines"], "lastBookedOn": r["lastBookedOn"],
+                 "hasEntries": True}
+                for r in sorted(slots.values(), key=lambda x: x["period"])]
+
     # ---- 3) 序时账与凭证（change: add-fi-voucher-and-journal）----
 
     def journal(self, period: Any = None, *, limit: int = 0) -> dict[str, Any]:

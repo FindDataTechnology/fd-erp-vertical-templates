@@ -281,3 +281,29 @@ def test_voucher_requires_a_txn_id():
     with pytest.raises(TemplateError) as ei:
         _books([]).voucher("  ")
     assert ei.value.code == "INVALID_ARGUMENT"
+
+
+# ---- 7) 期间活动（change: fix-fi-surface-audit）----
+
+def test_period_activity_counts_vouchers_and_lines_per_period():
+    """内核 `list_periods` 只答「关过账的期间」，有业务没关账的月份要靠这个。"""
+    entries = [
+        _e("1100", "debit", "1130", booked_on="2026-11-05", txn="T1", line_no=1),
+        _e("4000", "credit", "1000", booked_on="2026-11-05", txn="T1", line_no=2),
+        _e("2221", "credit", "130", booked_on="2026-11-05", txn="T1", line_no=3),
+        _e("5000", "debit", "300", booked_on="2026-11-20", txn="T2", line_no=1),
+        _e("1200", "credit", "300", booked_on="2026-11-20", txn="T2", line_no=2),
+        _e("1100", "debit", "500", booked_on="2026-12-01", txn="T3", line_no=1),
+        _e("4000", "credit", "500", booked_on="2026-12-01", txn="T3", line_no=2),
+    ]
+    out = _books(entries).period_activity()
+    assert [r["period"] for r in out] == ["2026-11", "2026-12"]
+    nov = out[0]
+    assert nov["vouchers"] == 2 and nov["lines"] == 5
+    assert nov["lastBookedOn"] == "2026-11-20"
+    assert nov["hasEntries"] is True
+    assert out[1]["vouchers"] == 1 and out[1]["lines"] == 2
+
+
+def test_period_activity_on_an_empty_ledger_is_empty():
+    assert _books([]).period_activity() == []

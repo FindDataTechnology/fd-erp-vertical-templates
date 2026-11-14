@@ -106,12 +106,17 @@ def test_rates_are_taken_by_effective_period(tmp_path):
 
 
 def test_missing_rates_are_refused_not_defaulted(tmp_path):
+    """缺税率报 **400 INVALID_ARGUMENT**，不是 501 NOT_WIRED。
+
+    能力是好的，缺的是这个租户的登记；501 会让只看状态码的监控当成服务降级，
+    也会让人以为「附加税功能没做」，还会污染「501 = 确实没实现」这条信号。
+    """
     lane, _k = _lane(tmp_path, rates=None)
     lane.register_rates({"city_construction": "7"}, effective_from="2026-01",
                         source="税法")
     with pytest.raises(TemplateError) as ei:
         lane.surcharges(P1)
-    assert ei.value.code == "NOT_WIRED"
+    assert ei.value.code == "INVALID_ARGUMENT"
     assert set(ei.value.detail["missing"]) == {"education_surcharge",
                                                "local_education_surcharge",
                                                "income_tax"}
