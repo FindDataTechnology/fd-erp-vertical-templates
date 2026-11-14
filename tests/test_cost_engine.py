@@ -368,3 +368,85 @@ def test_post_cogs_with_no_costed_issues_posts_nothing(tmp_path):
     out = engine.post_cogs("2026-11")
     assert out["proposal"] is None and out["total"] == "0.000000"
     assert kernel.calls == []
+
+
+# ---- 5) 结转预演：只算不写 ----
+
+def test_cogs_preview_computes_without_writing(tmp_path):
+    events = [_ev(1, "goods_received", 10, cost=10),
+              _ev(2, "goods_issued", 3),
+              _ev(3, "goods_issued", 2)]
+    engine, kernel = _cogs_engine(tmp_path, events)
+    events_before = len(engine._cogs_log.events())
+
+    out = engine.post_cogs("2026-11", preview=True)
+    assert out["preview"] is True and out["proposed"] is False
+    # 本车道金额精度是 6 位（cost._fmt 用 Q6），与报表的 2 位不同源
+    assert out["total"] == "50.000000" and out["issues"] == 2
+    assert out["proposal"] is None
+    assert out["blockers"] == [] and out["canSubmit"] is True
+    assert kernel._seen == {}                                # 一张提案都没出
+    assert len(engine._cogs_log.events()) == events_before   # 本层记录没多一行
+
+    # 预演过的这期真结转照样成立，金额与预演逐值相同
+    real = engine.post_cogs("2026-11")
+    assert real["proposed"] is True and real["total"] == out["total"]
+
+
+def test_cogs_preview_blocks_on_unknown_cost_and_empty_period(tmp_path):
+    """① 成本未知 ② 本期无已计价出库——两条都不抛错，以 blockers 报出。"""
+    eng, _k = _cogs_engine(tmp_path / "a", [
+        _ev(1, "goods_received", 10, cost=None),   # provisional=reject ⇒ 层成本未知
+        _ev(2, "goods_issued", 3)])
+    out = eng.post_cogs("2026-11", preview=True)
+    assert out["canSubmit"] is False
+    assert any("成本未知" in b for b in out["blockers"]), out["blockers"]
+    assert any("没有已计价" in b for b in out["blockers"]), out["blockers"]
+    assert out["total"] == "0.000000"
+
+    eng2, _k2 = _cogs_engine(tmp_path / "b", [_ev(1, "goods_received", 10, cost=10)])
+    out2 = eng2.post_cogs("2026-11", preview=True)
+    assert out2["canSubmit"] is False
+    assert any("没有已计价" in b for b in out2["blockers"]), out2["blockers"]
+
+
+def test_cogs_preview_blocks_on_idempotent_and_changed_amount(tmp_path):
+    """③ 已按同额结转过 ④ 已结转但金额变了（跨期调整）。"""
+    # ③ 同额：结转过再预演，可提额仍是同一个数，但会重复提交
+    eng, _k = _cogs_engine(tmp_path / "c", [
+        _ev(1, "goods_received", 10, cost=10), _ev(2, "goods_issued", 3)])
+    eng.post_cogs("2026-11")
+    same = eng.post_cogs("2026-11", preview=True)
+    assert same["canSubmit"] is False
+    assert any("同一金额" in b for b in same["blockers"]), same["blockers"]
+    assert same["total"] == "30.000000"
+
+    # ④ 金额变了：同一份结转记录（同一 data_dir）+ 多一笔出库的新事实 ⇒ 预演报跨期调整
+    data_dir = tmp_path / "c" / "data"
+    eng_changed = CostEngine(TENANT, data_dir, _ProposalKernel([
+        _ev(1, "goods_received", 10, cost=10), _ev(2, "goods_issued", 3),
+        _ev(3, "goods_issued", 2, when="2026-11-10T09:00:00")]),
+        eng._policy)
+    changed = eng_changed.post_cogs("2026-11", preview=True)
+    assert changed["canSubmit"] is False
+    assert any("跨期调整" in b for b in changed["blockers"]), changed["blockers"]
+    assert changed["total"] == "50.000000"
+    # 真结转确实被拒（预演说的是实话）
+    with pytest.raises(TemplateError) as ei:
+        eng_changed.post_cogs("2026-11")
+    assert "跨期调整" in ei.value.message
+
+
+def test_insufficient_layers_reports_the_real_available_quantity(tmp_path):
+    """报错里的「可用」必须是**消耗前**的量。
+
+    `_consume` 就地消耗并裁掉空层；若在它之后再求和，可用会恒为 0——那句
+    「可用 0.000000」会把人送去查「是不是入库没投影」，而真相是「出库数量填错了」。
+    """
+    eng = _engine(tmp_path, [_ev(1, "goods_received", 10, cost=10),
+                             _ev(2, "goods_issued", 4)])
+    with pytest.raises(TemplateError) as ei:
+        eng.issue_cost("P-1", "999", warehouse=WH)
+    assert ei.value.detail["available"] == "6.000000"     # 10 − 4，不是 0
+    assert ei.value.detail["requested"] == "999.000000"
+    assert "6.000000" in ei.value.message

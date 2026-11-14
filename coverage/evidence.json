@@ -6,7 +6,7 @@
     ],
     "mcp_tools": 37,
     "placeholder_routes": 8,
-    "routes": 123
+    "routes": 128
   },
   "mcp_tools": [
     "approve_billing_rule",
@@ -293,6 +293,38 @@
       "source": "faces.py"
     },
     {
+      "function": "fi_post_cogs",
+      "line": 2066,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/cost/cogs/{period}",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_cost_issue_price",
+      "line": 2046,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/cost/issue-price",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_cost_replay",
+      "line": 2037,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/cost/replay",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_set_standard_cost",
+      "line": 2076,
+      "method": "POST",
+      "path": "/erp/supply-chain/v1/fi/cost/standard",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
       "function": "fi_register_vat_return",
       "line": 1705,
       "method": "POST",
@@ -529,6 +561,14 @@
       "line": 1443,
       "method": "GET",
       "path": "/erp/supply-chain/v1/fi/reports/closing-preview",
+      "placeholder": false,
+      "source": "faces.py"
+    },
+    {
+      "function": "fi_cogs_preview",
+      "line": 2059,
+      "method": "GET",
+      "path": "/erp/supply-chain/v1/fi/reports/cogs-preview",
       "placeholder": false,
       "source": "faces.py"
     },

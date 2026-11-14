@@ -366,14 +366,18 @@ class CostEngine:
             raise TemplateError("INVALID_ARGUMENT",
                                 "口径为批次实际，但该出库批次未知——不按均价顶替",
                                 detail={"sku": code, "lot": lot_v})
+        # 可用量必须在 `_consume` **之前**取：它会就地消耗并裁掉空层，之后再用剩下的层
+        # 求和只能得到 0——那句「可用 0.000000」会把人送去查「是不是入库没投影」，
+        # 而真相是「出库数量填错了」。诊断说谎比没有诊断更坏。
+        available_before = sum((l.qty for l in layers), Decimal(0))
         cost, consumed, gap = self._consume(layers, need, cfg["cost_method"])
         if gap == "insufficient_layers":
-            have = sum((l.qty for l in layers), Decimal(0))
             raise TemplateError("INVALID_ARGUMENT",
-                                f"成本层不足：{code}@{wh} 可用 {_fmt(have)}，"
+                                f"成本层不足：{code}@{wh} 可用 {_fmt(available_before)}，"
                                 f"需要 {_fmt(need)}",
                                 detail={"sku": code, "warehouse": wh, "lot": lot_v,
-                                        "available": _fmt(have), "requested": _fmt(need)})
+                                        "available": _fmt(available_before),
+                                        "requested": _fmt(need)})
         if gap == "cost_unknown":
             raise TemplateError(
                 "INVALID_ARGUMENT",
@@ -389,13 +393,17 @@ class CostEngine:
     # ---- 成本结转（出库成本 → 营业成本）----
 
     def post_cogs(self, period: str, *, partial: bool = False,
-                  submitted_by: str = "cost-engine") -> dict[str, Any]:
+                  submitted_by: str = "cost-engine",
+                  preview: bool = False) -> dict[str, Any]:
         """把某期间已计价的出库成本汇成一张**待确认** proposal（借营业成本 / 贷存货）。
 
         - 金额直接取 `replay()` 的 issues：同一批事实、同一方法，不另算一遍；
         - **成本未知的出库默认整期拒绝**：结转一个偏小的营业成本会让毛利虚高，而报表上看不出来。
           `partial=True` 只结已计价的，但必须自报其名（标 `partial` + 列出跳过项）；
-        - 期间已结转过且金额变了 → 拒绝：期间结账后新增出库属于跨期调整，要走作废/冲正。
+        - 期间已结转过且金额变了 → 拒绝：期间结账后新增出库属于跨期调整，要走作废/冲正；
+        - `preview=True` 只算不写：不 submit、不落本层结转记录，把上面几条「会不会被挡」
+          列进 `blockers` 当**事实**返回。理由同其它三条预演：月末想知道「这期成本多少」是最
+          常见的问法，拿拒绝把人挡在门外等于逼人另算一遍。
         """
         cfg = self._policy.current()["values"]
         grain = cfg["close_grain"]
@@ -419,6 +427,31 @@ class CostEngine:
             costed += 1
             total += _dec(rec["cost"], "出库成本")
 
+        if preview:
+            blockers: list[str] = []
+            if uncosted:
+                blockers.append(
+                    f"本期有 {len(uncosted)} 笔成本未知的出库：真结转会被整期拒"
+                    "（只结已计价的会让营业成本偏小、毛利虚高）")
+            if total <= 0:
+                blockers.append("本期没有已计价的出库成本：真结转不生成分录")
+            prior_preview = self._cogs_prior(key)
+            if prior_preview is not None:
+                if _dec(prior_preview, "已结转金额") == total:
+                    blockers.append(f"该期间已按同一金额结转过（{prior_preview}）："
+                                    "真结转幂等返回首次结果，不会新增提案")
+                else:
+                    blockers.append(
+                        f"该期间已结转 {prior_preview}，本次算出 {_fmt(total)}："
+                        "跨期调整不允许，真结转会被拒（先作废/冲正上期结转）")
+            return {"period": key, "grain": grain, "method": cfg["cost_method"],
+                    "preview": True, "proposed": False, "proposal": None,
+                    "total": _fmt(total), "issues": costed, "skipped": uncosted,
+                    "partial": bool(uncosted),
+                    "canSubmit": not blockers, "blockers": blockers,
+                    "caliber_note": "预演只算不写：不生成提案、不落结转记录；"
+                                    "真结转仍要过确认门"}
+
         if uncosted and not partial:
             raise TemplateError(
                 "INVALID_ARGUMENT",
@@ -428,6 +461,7 @@ class CostEngine:
 
         if total <= 0:
             out = {"period": key, "grain": grain, "proposal": None,
+                   "proposed": False,
                    "total": _fmt(Decimal(0)), "issues": costed,
                    "skipped": uncosted, "partial": bool(uncosted),
                    "note": "本期没有已计价的出库成本，未生成分录"}
@@ -445,7 +479,8 @@ class CostEngine:
                 f"跨期调整，请先作废/冲正上期结转再重结（不允许静默改金额）",
                 detail={"period": key, "posted": prior, "current": _fmt(total)})
         if prior is not None:
-            return {"period": key, "proposal": None, "total": _fmt(total),
+            return {"period": key, "proposal": None, "proposed": False,
+                    "total": _fmt(total),
                     "issues": costed, "skipped": uncosted,
                     "partial": bool(uncosted), "duplicate": True,
                     "note": "该期间已按同一金额结转过（幂等，不重复提交）"}
@@ -468,7 +503,8 @@ class CostEngine:
                                "submitted_by": submitted_by,
                                "recorded_at": _now()})
         out = {"period": key, "grain": grain, "proposal": proposal,
-               "stableId": stable_id, "total": _fmt(total), "issues": costed,
+               "proposed": True, "stableId": stable_id, "total": _fmt(total),
+               "issues": costed,
                "skipped": uncosted, "partial": bool(uncosted),
                "duplicate": bool(proposal and proposal.get("duplicate")),
                "method": cfg["cost_method"],
