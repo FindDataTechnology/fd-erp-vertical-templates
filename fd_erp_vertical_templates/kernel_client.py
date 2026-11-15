@@ -28,8 +28,15 @@ class KernelClient(Protocol):
                         lane_fleet: str | None = None, lane_post: str | None = None,
                         lane_title: str | None = None, lane_target: str | None = None,
                         tenant_id: str | None = None,
-                        submitted_by: str = "agent") -> dict[str, Any]:
-        """提交拟落账事件（proposal）——不改变账本状态。"""
+                        dimensions: dict[str, str] | None = None,
+                        submitted_by: str = "agent",
+                        booked_on: str | None = None) -> dict[str, Any]:
+        """提交拟落账事件（proposal）——不改变账本状态。
+
+        `booked_on` 是**业务记账日**（模板按业务日期归期后传下来）。它必须出现在这一层：
+        14 处模板调用点带它，而传输实现此前没有这个参数 ⇒ MCP 形态直接 `TypeError`
+        （同进程形态正常，因为 in-process 客户端早就加了它）。
+        """
         ...
 
     def list_proposals(self, status: str | None = None,
@@ -273,13 +280,13 @@ class McpKernelClient:
     def submit_proposal(self, stable_id, lines, source_ref=None, kind="journal",
                         reversal_of=None, lane_fleet=None, lane_post=None,
                         lane_title=None, lane_target=None, tenant_id=None,
-                        dimensions=None, submitted_by="agent"):
+                        dimensions=None, submitted_by="agent", booked_on=None):
         return self._call("submit_proposal", {
             "stable_id": stable_id, "lines": lines, "source_ref": source_ref,
             "kind": kind, "reversal_of": reversal_of, "lane_fleet": lane_fleet,
             "lane_post": lane_post, "lane_title": lane_title,
             "lane_target": lane_target, "dimensions": dimensions,
-            "submitted_by": submitted_by,
+            "submitted_by": submitted_by, "booked_on": booked_on,
         })
 
     def list_proposals(self, status=None, tenant_id=None, offset=0, limit=100):

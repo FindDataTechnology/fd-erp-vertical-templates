@@ -159,3 +159,39 @@ def test_query_events_forwards_producer() -> None:
     tool, args = client.sent[-1]
     assert tool == "query_events"
     assert args["producer"] == "erp"
+
+
+def test_submit_proposal_accepts_and_forwards_booked_on() -> None:
+    """`booked_on`（业务记账日）必须在传输面且真发出去（2026-11-15 第三个同族缺陷）。
+
+    **红证（修前，本机直接调用，不需要起服务）**：
+
+        TypeError: McpKernelClient.submit_proposal() got an unexpected keyword argument 'booked_on'
+
+    而模板编排有 14 处调用点在传它（`opening` / `closing` / `bad_debt` / `cn_filing`×2 /
+    `cn_invoice` / `cn_tax`×4 / `consolidation` / `fx_revaluation` / `manufacturing`×2），
+    生产 api 跑的是 `ERP_KERNEL_TRANSPORT=mcp` ⇒ 这些模板的提交路径在生产形态下必炸，
+    而同进程形态一直正常（`InProcessKernelClient` 早就加了这个参数）。与
+    `ingest_event.provenance` 完全同族：**内部函数收、工具面不收**。
+    """
+    sig = inspect.signature(McpKernelClient.submit_proposal)
+    assert "booked_on" in sig.parameters, (
+        "传输面没有 booked_on ⇒ 14 处模板调用点在 MCP 形态下 TypeError")
+
+    client = _RecordingMcp()
+    client.submit_proposal("exp:2026-11",
+                           [{"account_code": "5200", "direction": "debit",
+                             "amount": "1"}],
+                           source_ref="opening", kind="journal",
+                           booked_on="2026-11-15")
+    tool, args = client.sent[-1]
+    assert tool == "submit_proposal"
+    assert args["booked_on"] == "2026-11-15", f"收下却没发出去（静默不生效）：{args}"
+
+
+def test_submit_proposal_omits_booked_on_when_not_given() -> None:
+    """不给就不发：`None` 由内核按事件时刻推，别替调用方编一个业务日期。"""
+    client = _RecordingMcp()
+    client.submit_proposal("exp:2026-12", [])
+    _, args = client.sent[-1]
+    assert args.get("booked_on") is None
