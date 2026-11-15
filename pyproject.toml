@@ -20,13 +20,32 @@ dev = [
     # 内核包（sys.path 引入，未进打包依赖）自 optimize-erp-solution 6.1 起在 import
     # 时就需要 prometheus_client；不声明则 dev 安装后跑测试直接 ImportError。
     "prometheus_client>=0.20",
+    # 打包级回归（tests/test_localization_ships_with_package.py）要**真造 wheel**：
+    # 只断言「源码树里读得到国别包」抓不到 2026-11-15 那次事故（镜像里缺文件）。
+    # 缺这两个包时那条用例会跳过并打印原因，不假装通过。
+    "setuptools>=68",
+    "wheel>=0.42",
 ]
 
 [project.scripts]
 fd-erp-vertical-templates = "fd_erp_vertical_templates.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["fd_erp_vertical_templates*"]
+# `localization*` 不是「多装一个业务包」，是修 2026-11-15 的生产事故：
+#   `fd_erp_vertical_templates/localization.py` 用
+#   `Path(__file__).resolve().parents[1] / "localization" / "cn"` 定位国别包，
+#   这个表达式在**源码树**里成立、在 `pip install` 后的 site-packages 里不成立
+#   （`parents[1]` 是 site-packages，而仓根 `localization/` 此前不是包、不进 wheel）。
+# 镜像里因此缺 `manifest.json`，启动即 `ERP_CN_CHART … 国别包缺文件`。
+# 把本目录声明成包 + 下面的 package-data，两种布局下同一个表达式都成立，代码零改动。
+# 钉住这件事的是 tests/test_localization_ships_with_package.py（真造 wheel 再查内容）。
+include = ["fd_erp_vertical_templates*", "localization*"]
+
+[tool.setuptools.package-data]
+# 数据文件按后缀全收：cn/ 下目前是 8 个 .json + 1 个 PROVENANCE.md
+# （用通配而不是逐个列名，避免以后加一份国别包数据忘了改这里——漏掉的形态和这次
+#  事故一模一样：本地跑测试全绿、镜像里读不到）。
+localization = ["cn/*.json", "cn/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
