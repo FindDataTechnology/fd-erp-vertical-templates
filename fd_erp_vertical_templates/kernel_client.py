@@ -179,6 +179,33 @@ class KernelClient(Protocol):
         """查事件（带完整性声明）。`producer` 不暴露：模板层不关心板块归属。"""
         ...
 
+    # ---- 期间关账（add-period-close；内核工具 33-37）----
+    #
+    # 契约为**内核工具面的同形签名**：`period` 是 `YYYY-MM`，`actor` 是人工经办工号，
+    # `note`/`reason` 只追加不覆盖。是否「顺序关账」「只重开最近一期」「快照复算」
+    # 全在内核 `periods` 模块判定，客户端只转发——在这里复制一份判定就是第二份口径。
+
+    def close_period(self, period: str, actor: str,
+                     note: str | None = None) -> dict[str, Any]:
+        """关账（YYYY-MM）；已关重复调用幂等。"""
+        ...
+
+    def reopen_period(self, period: str, actor: str, reason: str) -> dict[str, Any]:
+        """重开：只认最近一个已关期间，且必须给理由（追加记录）。"""
+        ...
+
+    def period_status(self, period: str) -> dict[str, Any]:
+        """某期间是否关账 + 最近一次动作。"""
+        ...
+
+    def period_report(self, period: str) -> dict[str, Any]:
+        """关账快照 vs 当前复算（一致 verified=true，否则逐科目点名差额）。"""
+        ...
+
+    def list_periods(self) -> dict[str, Any]:
+        """列出有记录的期间及其当前状态（按期间升序）。"""
+        ...
+
 
 class McpKernelClient:
     """生产实现：经 MCP 工具面调用内核（http/sse transport）。
@@ -392,3 +419,34 @@ class McpKernelClient:
         return self._call("query_events", {
             "event_type": event_type, "lane": lane, "status": status,
             "limit": limit, "after_event_id": after_event_id})
+
+    # ---- 期间关账（add-period-close；内核工具 33-37）----
+    #
+    # 2026-11-15 补：内核侧这 5 个工具早就在（`tools.py` 33-37，`add-period-close`
+    # 已归档），而 MCP 形态的客户端**一个都没转发** ⇒ 生产上 `/fi/periods` 直接
+    # `NOT_WIRED: 当前传输形态未开期间关账工具（list_periods）`，而同进程形态是好的。
+    # 断链之所以能挂很久：单测全走 InProcess，`NOT_WIRED` 又是「如实报未接线」的
+    # 合法语义，于是「没实现」在日志里长得像「设计如此」。
+    #
+    # 只转发，不在这里判「顺序关账 / 只重开最近一期」——那些判定在内核 `periods`
+    # 模块里，复制一份就是第二份口径。参数按内核工具签名逐字对齐（`note` 可省）。
+    # `_call` 已统一把值为 None 的参数落成「不出现」，所以 `note=None` 不会变成
+    # `note: null` 传给内核。
+
+    def close_period(self, period, actor, note=None):
+        return self._call("close_period", {
+            "period": period, "actor": actor, "note": note})
+
+    def reopen_period(self, period, actor, reason):
+        return self._call("reopen_period", {
+            "period": period, "actor": actor, "reason": reason})
+
+    def period_status(self, period):
+        return self._call("period_status", {"period": period})
+
+    def period_report(self, period):
+        return self._call("period_report", {"period": period})
+
+    def list_periods(self):
+        return self._call("list_periods", {})
+
