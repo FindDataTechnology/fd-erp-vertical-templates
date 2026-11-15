@@ -81,10 +81,14 @@ def test_all_period_tools_are_forwarded() -> None:
     missing = [n for n in PERIOD_TOOLS if not hasattr(McpKernelClient, n)]
     assert missing == [], f"McpKernelClient 缺期间关账方法：{missing}（会回 NOT_WIRED）"
 
-    # 反命题：Protocol 也必须声明它们——只实现不声明，类型面与消费方对不上，
-    # 下一轮「按协议实现」的人会以为这档能力不存在。
-    undeclared = [n for n in PERIOD_TOOLS if not hasattr(KernelClient, n)]
-    assert undeclared == [], f"KernelClient 协议缺声明：{undeclared}"
+    # 反命题在这一侧：协议（编排面）**不该**声明它们——模板编排层不代任何一方关账，
+    # 这是 `shared/kernel-client-contract.json` 的 `intentionally_absent`。
+    # 2026-11-15 订正：初版把这五方法同时加进了协议，契约闸当场判红（CLIENT_DRIFT），
+    # 因为闸按「协议 + 传输类并集」比对。分层之后协议 = 编排面纪律、传输类 = 1:1 适配器。
+    declared = [n for n in PERIOD_TOOLS if hasattr(KernelClient, n)]
+    assert declared == [], (
+        f"KernelClient 协议不该声明期间关账方法：{declared}（编排层不关账；"
+        "它们只属于传输面 McpKernelClient）")
 
 
 @pytest.mark.parametrize("method,kwargs", [

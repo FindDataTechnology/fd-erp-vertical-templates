@@ -179,32 +179,14 @@ class KernelClient(Protocol):
         """查事件（带完整性声明）。`producer` 不暴露：模板层不关心板块归属。"""
         ...
 
-    # ---- 期间关账（add-period-close；内核工具 33-37）----
+    # ---- 编排面到此为止：期间关账 / 拍板 / 规则族**故意不在协议上** ----
     #
-    # 契约为**内核工具面的同形签名**：`period` 是 `YYYY-MM`，`actor` 是人工经办工号，
-    # `note`/`reason` 只追加不覆盖。是否「顺序关账」「只重开最近一期」「快照复算」
-    # 全在内核 `periods` 模块判定，客户端只转发——在这里复制一份判定就是第二份口径。
-
-    def close_period(self, period: str, actor: str,
-                     note: str | None = None) -> dict[str, Any]:
-        """关账（YYYY-MM）；已关重复调用幂等。"""
-        ...
-
-    def reopen_period(self, period: str, actor: str, reason: str) -> dict[str, Any]:
-        """重开：只认最近一个已关期间，且必须给理由（追加记录）。"""
-        ...
-
-    def period_status(self, period: str) -> dict[str, Any]:
-        """某期间是否关账 + 最近一次动作。"""
-        ...
-
-    def period_report(self, period: str) -> dict[str, Any]:
-        """关账快照 vs 当前复算（一致 verified=true，否则逐科目点名差额）。"""
-        ...
-
-    def list_periods(self) -> dict[str, Any]:
-        """列出有记录的期间及其当前状态（按期间升序）。"""
-        ...
+    # 这是**纪律**，不是缺口：模板编排层不代任何一方关账、不代任何一方过门
+    # （`shared/kernel-client-contract.json` 的 `intentionally_absent` 逐条记着理由）。
+    # 但 api 的 MCP 内层复用本仓的 `McpKernelClient` 作**传输适配器**，它必须 1:1
+    # 覆盖内核工具面（含这些工具），否则 api 对应端点在生产上直接 AttributeError。
+    # 所以：协议 = 编排层被允许调用的方法集；`McpKernelClient` = 传输层，逐名覆盖
+    # 内核 37 工具。两者由契约闸分别校验（2026-11-15 `decide_event` 生产 500 的订正）。
 
 
 class McpKernelClient:
@@ -415,10 +397,11 @@ class McpKernelClient:
             "source_ref": source_ref})
 
     def query_events(self, event_type=None, lane=None, status=None,
-                     limit=100, after_event_id=0):
+                     producer=None, limit=100, after_event_id=0):
         return self._call("query_events", {
             "event_type": event_type, "lane": lane, "status": status,
-            "limit": limit, "after_event_id": after_event_id})
+            "producer": producer, "limit": limit,
+            "after_event_id": after_event_id})
 
     # ---- 期间关账（add-period-close；内核工具 33-37）----
     #
@@ -449,4 +432,46 @@ class McpKernelClient:
 
     def list_periods(self):
         return self._call("list_periods", {})
+
+    # ---- 传输面补齐：编排面故意不盖的七个工具（2026-11-15 decide 生产 500）----
+    #
+    # 这七个别当成「模板层能力扩张」：`KernelClient` 协议上一个都没有（纪律不变），
+    # 它们存在的唯一理由是 api 的 MCP 内层就是这个类。api 的 SE 审核端点
+    # （`faces.py` 的 `/se/invoice-requests/{id}/decide`）经 `KernelProxy` 直接调
+    # `decide_event`，而这里没有它 ⇒ `AttributeError` ⇒ 裸 500，且 `faces.py` 只兜
+    # `ApiError` 所以连 4xx 都不是。
+    #
+    # 参数**按内核工具签名逐字对齐**（`fd-erp-ledger-mcp/tools.py`）：少一个名字
+    # 就是 `unexpected_keyword_argument`，多一个名字就是 `TypeError`。内核
+    # `decide_event` 不收 `lane`/`actor`（工具内硬编码 draft/human），所以这里
+    # 也不收——api 侧传了就由 api 侧显式拒绝，不许静默丢弃。
+
+    def decide_event(self, stable_id, decision, note=""):
+        return self._call("decide_event", {
+            "stable_id": stable_id, "decision": decision, "note": note})
+
+    def submit_posting_rule(self, event_type, lines, source_ref=None):
+        return self._call("submit_posting_rule", {
+            "event_type": event_type, "lines": lines,
+            "source_ref": source_ref})
+
+    def approve_posting_rule(self, event_type, version, approved_by):
+        return self._call("approve_posting_rule", {
+            "event_type": event_type, "version": version,
+            "approved_by": approved_by})
+
+    def list_posting_rules(self, event_type=None):
+        return self._call("list_posting_rules", {"event_type": event_type})
+
+    def list_posting_gaps(self):
+        return self._call("list_posting_gaps", {})
+
+    def bill_period_snapshot(self, period, snapshots, source_ref=None):
+        return self._call("bill_period_snapshot", {
+            "period": period, "snapshots": snapshots,
+            "source_ref": source_ref})
+
+    def list_billing_rules(self, status=None, offset=0, limit=100):
+        return self._call("list_billing_rules", {
+            "status": status, "offset": offset, "limit": limit})
 
