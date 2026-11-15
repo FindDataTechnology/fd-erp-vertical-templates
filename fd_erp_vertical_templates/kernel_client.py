@@ -221,6 +221,15 @@ class McpKernelClient:
         from fastmcp import Client  # 惰性导入：仅生产路径需要
 
         args.setdefault("tenant_id", self._tenant_id)
+        # **丢掉值为 None 的参数**（2026-11-15 生产事故的第二层）。
+        # 内核工具的 MCP schema 由 fastmcp 从函数签名生成，**在役镜像可能比仓内源码
+        # 旧**（实测在役 `query_entries` 的 schema 只有 account_code/txn_id/tenant_id/
+        # offset/limit，没有仓内已有的 `dimensions`）。显式传 `dimensions=None` 会被
+        # pydantic 判 `unexpected_keyword_argument`，内核包成 `ToolError`、api 再兜成
+        # `500 INTERNAL`。而省略该键时内核用自己的默认值，语义完全等价。
+        # 所以「None = 不传」是这条链路上唯一稳定的口径：调用方照旧传 None 表达
+        # 「这一维不筛」，由这里统一落成「不出现」。
+        args = {k: v for k, v in args.items() if v is not None}
 
         # 只在有钥匙时构造 auth：`Client(url, auth=None)` 与 `Client(url)` 在
         # 各版本 fastmcp 上并不总等价，显式分支避开这个不确定性。
