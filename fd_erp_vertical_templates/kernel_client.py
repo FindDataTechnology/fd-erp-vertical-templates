@@ -185,11 +185,25 @@ class McpKernelClient:
 
     fastmcp Client 惰性导入；凭证零落库（内核 BYOK 面经环境变量注入，
     本类不接触任何凭证）。
+
+    **`token`：内核自己那道 bearer 门的钥匙（2026-11-15 生产事故的修复）。**
+    内核 `fd_erp_ledger_mcp/auth.py` 在 `MCP_BEARER_TOKEN` 非空时给整条数据面
+    （`/mcp`，`/health`/`/metrics`/`/.well-known` 豁免）挂 bearer 门；门一开，
+    **不带 Authorization 的调用一律 401**。本类原实现是 `Client(self._url)`，
+    一个头都不带 ⇒ 所有碰内核的端点被统一壳兜成 `500 INTERNAL: MCPError`，
+    而 `/health`、`/pagesets` 这些不经内核的面照常 200 —— 于是「服务健康」与
+    「账本取不到数」同时成立，静默了约 38 小时（2026-11-15 实历：开通财务后台
+    才把这个既有断链显形）。
+
+    传 `token` 就用 `BearerAuth` 带上它；不传则**保持原样**（内核没开门的环境、
+    单测与 demo 行为逐字节不变）。**不要**在这里读环境变量：钥匙由进程配置注入
+    （api 侧 `ERP_KERNEL_TOKEN`），本类只负责把它送到请求头上。
     """
 
-    def __init__(self, url: str, tenant_id: str):
+    def __init__(self, url: str, tenant_id: str, token: str | None = None):
         self._url = url
         self._tenant_id = tenant_id
+        self._token = (str(token).strip() if token else "") or None
 
     def _call(self, tool: str, args: dict[str, Any]) -> Any:
         """同步阻塞调用（fleet 车道是同步代码）：内部走 async MCP 会话。
@@ -208,8 +222,15 @@ class McpKernelClient:
 
         args.setdefault("tenant_id", self._tenant_id)
 
+        # 只在有钥匙时构造 auth：`Client(url, auth=None)` 与 `Client(url)` 在
+        # 各版本 fastmcp 上并不总等价，显式分支避开这个不确定性。
+        client_kwargs: dict[str, Any] = {}
+        if self._token:
+            from fastmcp.client import BearerAuth
+            client_kwargs["auth"] = BearerAuth(self._token)
+
         async def _run() -> Any:
-            async with Client(self._url) as client:
+            async with Client(self._url, **client_kwargs) as client:
                 result = await client.call_tool(tool, args)
                 data = getattr(result, "data", None)
                 if data is not None:
