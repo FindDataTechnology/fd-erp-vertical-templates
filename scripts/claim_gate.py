@@ -12,7 +12,7 @@
 3. **对外能力清单**（4.4）：`claims/capability-list.md` 两段（已交付 / 规划中）
    由 claims + 挂账清单 + 缺口登记生成；规划中的条数只认挂账清单（20 条），
    不认文档里手写的旧数（15）。
-4. **发布口径与不可宣称清单**（4.5/4.6）：`docs/erp/README.md` 第 4、6 节里的
+4. **发布口径与不可宣称清单**（4.5/4.6）：`fd-erp/docs/README.md` 第 4、6 节里的
    「不可宣称」与发布状态段落由本脚本从 claims + publish-record 生成，夹在
    `<!-- claim-gate:begin:… -->` 标记之间；内容与生成器输出不一致即判红——
    手写的 live 断言没有生存空间。
@@ -43,7 +43,7 @@ CLAIMS_DIR = REPO / "claims"
 CLAIMS_PATH = CLAIMS_DIR / "claims.json"
 PLANNED_MIRROR = CLAIMS_DIR / "planned-surfaces.json"
 CAPABILITY_LIST = CLAIMS_DIR / "capability-list.md"
-BOARD_DOC = FINDDATA / "docs" / "erp" / "README.md"
+BOARD_DOC = FINDDATA / "fd-erp" / "docs" / "README.md"
 API_PACKAGE = FINDDATA / "fd-erp-vertical-api" / "fd_erp_vertical_api"
 API_PLANNED = FINDDATA / "fd-erp-vertical-api" / "planned-surfaces.json"
 TOOL_SURFACE = FINDDATA / "fd-erp-ledger-mcp" / "tool-surface.json"
@@ -588,9 +588,15 @@ def _scan_targets(claims: dict[str, Any], doc: Path, workspace: Path
     patterns = [(c["id"], re.compile(p)) for c in claims["claims"]
                 for p in (c.get("patterns") or [])]
     targets: list[Path] = []
-    for rel in (claims.get("surfaces") or {}).values():
+    for key, rel in (claims.get("surfaces") or {}).items():
         # 板文档由调用方（--board-doc）决定；其余面相对 finddata 工作区解析。
-        if rel.endswith("docs/erp/README.md"):
+        # 判据按 **surface 键名**，不按路径后缀（2026-11-16）：板文档那天从
+        # `docs/erp/README.md` 搬进 `fd-erp/docs/README.md`，旧口径
+        # `rel.endswith("docs/erp/README.md")` 搬完就不匹配 ⇒ 该面会落进 else 分支
+        # 去解析工作区里的真实文件，**静默绕过 `--board-doc` 注入**——而测试正是用
+        # 夹具板文档喂违规文案来证明这道门会红（绕开＝扫描真实文件并「通过」＝假绿）。
+        # 键名不随路径漂移，这也正是本仓那一族「路径指认改成身份指认」的修法。
+        if key == "board-doc":
             targets.append(doc)
         else:
             targets.append((workspace / rel).resolve())
@@ -657,7 +663,8 @@ def _claim_targets(claim: dict[str, Any], claims: dict[str, Any], doc: Path
         rel = (claims.get("surfaces") or {}).get(name)
         if not rel:
             continue
-        if rel.endswith("docs/erp/README.md"):
+        # 与 _scan_targets 同一口径：认键名，不认路径后缀（见那里的注释）。
+        if name == "board-doc":
             out.add(doc.resolve())
         else:
             out.add((FINDDATA / rel).resolve())
@@ -1019,7 +1026,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--mirror")
     ap.add_argument("--record")
     ap.add_argument("--board-doc", default=None,
-                    help="板块文档（缺省 finddata/docs/erp/README.md）")
+                    help="板块文档（缺省 finddata/fd-erp/docs/README.md）")
     ap.add_argument("--api-package", default=str(API_PACKAGE))
     ap.add_argument("--api-planned", default=str(API_PLANNED))
     ap.add_argument("--tool-surface", default=str(TOOL_SURFACE))

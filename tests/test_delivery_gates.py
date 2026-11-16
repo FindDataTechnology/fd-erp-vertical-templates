@@ -17,10 +17,13 @@ from fd_erp_vertical_templates.gaps import load_gaps
 
 REPO = Path(__file__).resolve().parent.parent
 FINDDATA = REPO.parent
-BOARD_DOC = FINDDATA / "docs" / "erp" / "README.md"
 #: 机制用例用的板块文档快照：CI 只有本仓 checkout，读不到 finddata 根的 docs/。
 #: 漂移探测由「生产材料」那条用例负责（需要真文档，缺则 skip）。
 BOARD_DOC_FIXTURE = REPO / "tests" / "fixtures" / "board-doc-erp-README.md"
+# 板文档 2026-11-16 从 finddata 根 docs/erp/README.md 搬进 fd-erp/docs/README.md。
+# 写死旧路径的后果不是红而是 **skip** —— `_require()` 会如实报「证据源不在位」，
+# 于是唯一验生产材料的那条用例静默消失（跳过与通过是两件事）。
+BOARD_DOC = FINDDATA / "fd-erp" / "docs" / "README.md"
 API_PLANNED = FINDDATA / "fd-erp-vertical-api" / "planned-surfaces.json"
 API_PACKAGE = FINDDATA / "fd-erp-vertical-api" / "fd_erp_vertical_api"
 TOOL_SURFACE = FINDDATA / "fd-erp-ledger-mcp" / "tool-surface.json"

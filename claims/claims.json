@@ -3,7 +3,7 @@
   "note": "对外能力声明 → 证据引用（optimize-erp-solution task 4.1）。这是「我们能说什么」的唯一出处：官网文案、方案文档与市场描述里的每条能力主张都必须能回指到这里的一条 claim，claim 的每条证据都必须能在仓内解析到。status=not_claimable 的条目可以出现在「不可宣称」清单里，但不得以肯定句式出现在对外材料中。",
   "updated_at": "2026-11-16",
   "surfaces": {
-    "board-doc": "docs/erp/README.md",
+    "board-doc": "fd-erp/docs/README.md",
     "official-web": "fd-official-web/src/components/ErpLanding.astro",
     "official-web-products": "fd-official-web/src/pages/products.astro",
     "official-web-products-zh": "fd-official-web/src/pages/zh/products.astro",

@@ -1,9 +1,9 @@
-<!-- 测试夹具：docs/erp/README.md 的快照副本（optimize-erp-solution 4.x）。
+<!-- 测试夹具：fd-erp/docs/README.md（原 docs/erp/README.md）的快照副本（optimize-erp-solution 4.x）。
      CI 只有本仓 checkout，机制用例（生成块漂移/声明扫描）读这份夹具；
      「生产材料零无证据声明」那条用真文档，兄弟仓或多仓工作区在位时才跑。
      刷新：scripts/claim_gate.py render 之后 cp 过去。 -->
 
-# docs/erp — ERP 板块章程与如实口径
+# fd-erp/docs — ERP 板块章程与如实口径
 
 > OpenSpec change：`add-erp-domain`（spec：`erp-board`）task 7.3「如实口径落档」。
 > 本文件是 ERP 板块对内/对外**文字口径的单一出处**，与本次 apply 的命名与守界终裁
