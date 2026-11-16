@@ -36,6 +36,8 @@
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0009_posting_rules.sql；mcp_tool:post_event；mcp_tool:approve_posting_rule
 - **事件与分录互为两套真相，二者逐笔对齐可核：以同一 stable_id 比两侧，差异四类（缺失/多余/金额不符/状态不符）各带双侧引用；只读、对外部系统零写入。**  
   证据：code:fd-erp-ledger-mcp/fd_erp_ledger_mcp/recon/adapters.py；mcp_tool:run_reconciliation
+- **库存作业车道：入库/出库/调拨/盘点的提交与查询走内核拟稿车道——提交只落 pending 事实、不投影不过账，拍板（确认门 + 投影 + 过账）是独立权限档；出库与调拨先整单核可用量，不足整单拒绝并点名行号与缺口，一行都不写；调拨同单两笔事实（源仓出 + 目的仓入，数量守恒），只拍一侧时整单状态不推进；盘点只对有差异的行出调整事实（盘盈正、盘亏负），账面数读本板块数量面、不接受调用方递来的账面数；单张读面给逐行当前状态（内核车道，不是提交时快照）与按侧汇总，调拨的「半边已确认」看得见。数量面余额是唯一出处，本面不回写外部 WMS。**  
+  证据：endpoint:POST /erp/supply-chain/v1/wh/receipts；endpoint:POST /erp/supply-chain/v1/wh/issues；endpoint:POST /erp/supply-chain/v1/wh/transfers；endpoint:POST /erp/supply-chain/v1/wh/stocktakes；endpoint:GET /erp/supply-chain/v1/wh/documents/{ref}；endpoint:POST /erp/supply-chain/v1/wh/documents/{ref}/confirm；code:fd-erp-vertical-api/fd_erp_vertical_api/faces.py；code:fd-erp-vertical-api/fd_erp_vertical_api/pagesets.py
 
 ## 二、规划中（8 条，全部来自挂账清单）
 
