@@ -106,7 +106,7 @@ python3 scripts/release_readiness.py --write               # 刷新 releases/REA
 | `releases/READINESS.md` | 上架就绪（语言/台账/下一步） |
 | `releases/MARKET-SUBMISSION.md` | 贴市场后台的四语文案 |
 | `releases/ENTRY-MATRIX.md` | 哪些入口能给客户（built ≠ published） |
-| `collateral-erp/scripts/demo_recon_only.py` | 无内核双轨演示（`--track shopify\|domestic`） |
+| `fd-erp/collateral/scripts/demo_recon_only.py` | 无内核双轨演示（`--track shopify\|domestic`） |
 
 ## 三条踩过的坑，别再踩
 

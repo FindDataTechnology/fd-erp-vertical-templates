@@ -5,8 +5,8 @@
 ## 演示前 5 分钟
 
 ```bash
-bash collateral-erp/scripts/demo_env.sh          # 幂等：port-forward + 两内核 + fx 种子
-.venv/bin/python collateral-erp/scripts/demo_crossborder.py   # (内核 venv) 预跑一遍确认全绿
+bash fd-erp/collateral/scripts/demo_env.sh          # 幂等：port-forward + 两内核 + fx 种子
+.venv/bin/python fd-erp/collateral/scripts/demo_crossborder.py   # (内核 venv) 预跑一遍确认全绿
 ```
 
 开场白（一句话定调）：

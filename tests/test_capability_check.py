@@ -18,7 +18,7 @@ WORKSPACE = REPO.parent
 DOCS = [
     WORKSPACE / "docs" / "crossborder-supply-map.md",
     WORKSPACE / "docs" / "presales-yichang" / "bossai.md",
-    WORKSPACE / "collateral-erp" / "demo-guide-crossborder.md",
+    WORKSPACE / "fd-erp" / "collateral" / "demo-guide-crossborder.md",
     WORKSPACE / "collateral-solution" / "00-方案说明.md",
 ]
 

@@ -8,12 +8,12 @@
 | `crossborder-supply-map.md` | `finddata/docs/crossborder-supply-map.md` |
 | `bossai.md` | `finddata/docs/presales-yichang/bossai.md` |
 | `collateral-solution-00-方案说明.md` | `finddata/collateral-solution/00-方案说明.md` |
-| `demo-guide-crossborder.md` | `finddata/collateral-erp/demo-guide-crossborder.md` |
+| `demo-guide-crossborder.md` | `finddata/fd-erp/collateral/demo-guide-crossborder.md` |
 
 ## 为什么要放在这里
 
 `finddata/` 根不是 git 仓（`git rev-parse` 在 `docs/`、`collateral-solution/`、
-`collateral-erp/` 均返回非仓库）。这些文件承载了本次电商改造的**对外口径**
+`collateral-erp/`（已于 2026-11-16 移入 `fd-erp/collateral/`）当时均返回非仓库）。这些文件承载了本次电商改造的**对外口径**
 （能力三态的说法、发布状态、演示的合成数据标注），却没有任何版本历史——
 一旦被覆盖就无法回答「上个月对客户说的是什么」。
 

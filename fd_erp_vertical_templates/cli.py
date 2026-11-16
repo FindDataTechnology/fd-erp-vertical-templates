@@ -308,7 +308,7 @@ def _default_capability_docs(workspace: Path | None = None,
     pairs = (
         ("docs/crossborder-supply-map.md", "crossborder-supply-map.md"),
         ("docs/presales-yichang/bossai.md", "bossai.md"),
-        ("collateral-erp/demo-guide-crossborder.md", "demo-guide-crossborder.md"),
+        ("fd-erp/collateral/demo-guide-crossborder.md", "demo-guide-crossborder.md"),
         ("collateral-solution/00-方案说明.md", "collateral-solution-00-方案说明.md"),
     )
     out: list[Path] = []

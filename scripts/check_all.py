@@ -83,9 +83,12 @@ GATES: tuple[Gate, ...] = (
          "公开面守卫 + 数据源红线（跨仓）"),
     # 演示脚本是销售要现场跑的东西，改坏 demo_tracks/矩阵/夹具只有到客户面前才暴露。
     # 两轨各跑一次（合计 <0.2s，无内核依赖），缺腿/合成数据标注都在断言范围内。
-    Gate("演示双轨", ("../collateral-erp/scripts/demo_recon_only.py", "--track", "shopify"),
+    # 路径 2026-11-16 随 collateral-erp/ → fd-erp/collateral/ 搬迁更新。旧路径残留时
+    # `_available()` 会把这两门记成「不可用」而不是红——那正是「闸静默收窄人口」的形态，
+    # 所以路径本身没有判据守着，只能靠这次搬完把人口宽度实测出来（下面 --self-check 输出）。
+    Gate("演示双轨", ("../fd-erp/collateral/scripts/demo_recon_only.py", "--track", "shopify"),
          "shopify 轨：真实矩阵说缺腿 + 假设形状"),
-    Gate("演示双轨-国内", ("../collateral-erp/scripts/demo_recon_only.py", "--track", "domestic"),
+    Gate("演示双轨-国内", ("../fd-erp/collateral/scripts/demo_recon_only.py", "--track", "domestic"),
          "domestic 轨：经商家 ERP 三腿"),
 )
 
@@ -120,6 +123,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {'ok ' if ok else 'x  '} {name:<{width}}  {summary}")
     failed = [r[0] for r in rows if not r[1]]
     print()
+    # 零覆盖不算通过（2026-11-16 补）：argv 是**门名过滤器**，写错名字/传 `--help`
+    # 会筛出 0 道门，而旧版照样打「共 0 道门，全部通过」并退 0 —— 与「判据为空却报绿」
+    # 同族。没跑任何门时唯一诚实的结论是「没验」。
+    if not rows:
+        print(f"共 0 道门：过滤条件没匹配到任何门（入参 {sorted(only)}），这不是通过")
+        print("可用门名：" + "、".join(g.name for g in GATES))
+        return 1
     if failed:
         print(f"共 {len(rows)} 道门，{len(failed)} 道红：{'、'.join(failed)}")
         return 1

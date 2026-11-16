@@ -23,7 +23,7 @@ PAIRS = (
     ("collateral-solution-00-方案说明.md",
      WORKSPACE / "collateral-solution" / "00-方案说明.md"),
     ("demo-guide-crossborder.md",
-     WORKSPACE / "collateral-erp" / "demo-guide-crossborder.md"),
+     WORKSPACE / "fd-erp" / "collateral" / "demo-guide-crossborder.md"),
 )
 
 
