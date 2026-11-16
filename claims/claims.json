@@ -1,17 +1,18 @@
 {
   "schema": "erp-capability-claims/v1",
   "note": "对外能力声明 → 证据引用（optimize-erp-solution task 4.1）。这是「我们能说什么」的唯一出处：官网文案、方案文档与市场描述里的每条能力主张都必须能回指到这里的一条 claim，claim 的每条证据都必须能在仓内解析到。status=not_claimable 的条目可以出现在「不可宣称」清单里，但不得以肯定句式出现在对外材料中。",
-  "updated_at": "2026-11-16",
+  "updated_at": "2026-11-17",
   "surfaces": {
     "board-doc": "fd-erp/docs/README.md",
     "official-web": "fd-official-web/src/components/ErpLanding.astro",
     "official-web-products": "fd-official-web/src/pages/products.astro",
     "official-web-products-zh": "fd-official-web/src/pages/zh/products.astro",
     "erp-site": "fd-erp/site/index.html",
+    "erp-site-en": "fd-erp/site/en/index.html",
     "erp-ownership-readme": "fd-erp/README.md"
   },
   "scan": {
-    "note": "对外材料的声明扫描：命中 assertion 句式且未被任何 claim 的 patterns 覆盖即判红。negative_markers 用于识别否定语境（「不自研」「不宣称」「挂账」），限定在同句或紧邻前缀内——否定列表不是声明。",
+    "note": "对外材料的声明扫描：命中 assertion 句式且未被任何 claim 的 patterns 覆盖即判红。negative_markers 用于识别否定语境（「不自研」「不宣称」「挂账」），限定在同句或紧邻前缀内——否定列表不是声明。「Not claimed」是英文站（erp-site-en）的否定形态：生成器按行首写 `site_i18n.STRINGS['en']['nc_prefix']`（当前 \"Not claimed: \"），而英文页里的能力名是**中文数据原样**，没有它那七行会被读成肯定声明。改了那个前缀就得同步改这里——不改就会红，这是刻意的。",
     "assertions": [
       {
         "id": "invoice",
@@ -40,7 +41,8 @@
       "挂账",
       "不可",
       "DO NOT",
-      "免"
+      "免",
+      "Not claimed"
     ],
     "generated_block_markers": {
       "not-claimable": [
@@ -375,7 +377,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -396,7 +399,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -422,7 +426,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -445,7 +450,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -467,7 +473,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -489,7 +496,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
@@ -511,7 +519,8 @@
       "targets": [
         "board-doc",
         "official-web",
-        "erp-site"
+        "erp-site",
+        "erp-site-en"
       ]
     },
     {
