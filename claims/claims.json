@@ -1,7 +1,7 @@
 {
   "schema": "erp-capability-claims/v1",
   "note": "对外能力声明 → 证据引用（optimize-erp-solution task 4.1）。这是「我们能说什么」的唯一出处：官网文案、方案文档与市场描述里的每条能力主张都必须能回指到这里的一条 claim，claim 的每条证据都必须能在仓内解析到。status=not_claimable 的条目可以出现在「不可宣称」清单里，但不得以肯定句式出现在对外材料中。",
-  "updated_at": "2026-11-12",
+  "updated_at": "2026-11-16",
   "surfaces": {
     "board-doc": "docs/erp/README.md",
     "official-web": "fd-official-web/src/components/ErpLanding.astro",
@@ -621,6 +621,57 @@
         {
           "kind": "mcp_tool",
           "ref": "run_reconciliation"
+        }
+      ],
+      "targets": [
+        "board-doc"
+      ]
+    },
+    {
+      "id": "inventory.operations-lane",
+      "capability": "库存作业车道：入库/出库/调拨/盘点的提交与查询走内核拟稿车道——提交只落 pending 事实、不投影不过账，拍板（确认门 + 投影 + 过账）是独立权限档；出库与调拨**先整单核可用量**，不足整单拒绝并点名行号与缺口，一行都不写；调拨同单两笔事实（源仓出 + 目的仓入，数量守恒），只拍一侧时整单状态不推进；盘点只对有差异的行出调整事实（盘盈正、盘亏负），账面数读本板块数量面、不接受调用方递来的账面数；单张读面给逐行**当前**状态（内核车道，不是提交时快照）与按侧汇总，调拨的「半边已确认」看得见。数量面余额是唯一出处，本面不回写外部 WMS。",
+      "status": "delivered",
+      "patterns": [
+        "库存作业",
+        "收发货",
+        "调拨",
+        "盘点",
+        "半边已确认"
+      ],
+      "evidence": [
+        {
+          "kind": "endpoint",
+          "ref": "POST /erp/supply-chain/v1/wh/receipts"
+        },
+        {
+          "kind": "endpoint",
+          "ref": "POST /erp/supply-chain/v1/wh/issues"
+        },
+        {
+          "kind": "endpoint",
+          "ref": "POST /erp/supply-chain/v1/wh/transfers"
+        },
+        {
+          "kind": "endpoint",
+          "ref": "POST /erp/supply-chain/v1/wh/stocktakes"
+        },
+        {
+          "kind": "endpoint",
+          "ref": "GET /erp/supply-chain/v1/wh/documents/{ref}"
+        },
+        {
+          "kind": "endpoint",
+          "ref": "POST /erp/supply-chain/v1/wh/documents/{ref}/confirm"
+        },
+        {
+          "kind": "code",
+          "ref": "fd-erp-vertical-api/fd_erp_vertical_api/faces.py",
+          "contains": "register_wh_face"
+        },
+        {
+          "kind": "code",
+          "ref": "fd-erp-vertical-api/fd_erp_vertical_api/pagesets.py",
+          "contains": "supply-chain.wh"
         }
       ],
       "targets": [
