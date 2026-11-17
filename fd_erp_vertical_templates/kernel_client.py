@@ -467,8 +467,12 @@ class McpKernelClient:
             "event_type": event_type, "version": version,
             "approved_by": approved_by})
 
-    def list_posting_rules(self, event_type=None):
-        return self._call("list_posting_rules", {"event_type": event_type})
+    def list_posting_rules(self, event_type=None, offset=0, limit=100):
+        # offset/limit 与内核签名同步（2026-11-17）：内核的 paginate 要求两者，
+        # 客户端少传不是「用默认值」而是让调用方传了必 TypeError —— 同族缺陷见
+        # fd-erp/tools/check_all.py 的 TRANSPORT_PARAM_MISSING 判据。
+        return self._call("list_posting_rules", {
+            "event_type": event_type, "offset": offset, "limit": limit})
 
     def list_posting_gaps(self):
         return self._call("list_posting_gaps", {})
