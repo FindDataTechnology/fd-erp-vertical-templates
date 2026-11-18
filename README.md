@@ -1,5 +1,7 @@
 # fd-erp-vertical-templates
 
+> **Part of the [Base line (寻数·壹座)](https://www.finddatatech.cloud/products/base) of [FindData](https://www.finddatatech.cloud)** — ERP vertical templates — industry-specific record layouts and vocabularies.
+
 ERP 行业模板层（OpenSpec change `add-erp-vertical-templates` 的实施产物；电商方案四件补充变更已于 2026-11-10 全部归档，主规格见 `ecommerce-capability-matrix` / `ecommerce-merchant-channel-wiring` / `ecommerce-board-publication` / `ecommerce-release-gates`）：
 「一个内核 + 行业模板工厂」落到两个已点名行业——**跨境电商**与**餐饮连锁**。
 
