@@ -74,8 +74,16 @@ def _load_from_read_face(fetch: "Callable[[str], Any] | None" = None):
 
     # The read face is per-domain; the connector surface spans verticals, so we
     # ask for the one domain this package's templates anchor to.
+    #
+    # Path is the MACHINE route (`/api/v1/distribution/...`), not the console's
+    # `/d/<domain>/crosswalks`: that one is gated by a Logto session + a
+    # `content:read` scope, which a generator or a cron job can never satisfy.
+    # The machine route takes the same `X-Consumer-Token` the pull API uses. The
+    # two routes return the same guarantee at an earlier stage of this change;
+    # pointed at the console route the seam was unreachable BY CONSTRUCTION and
+    # the fallback hid it perfectly.
     domain = os.environ.get("BENCH_CROSSWALK_DOMAIN", "erp")
-    url = f"{base}/d/{domain}/crosswalks"
+    url = f"{base}/api/v1/distribution/{domain}/crosswalks"
     try:
         payload = fetch(url)
     except Exception:  # noqa: BLE001 - an unreachable read face is a fallback, not a crash

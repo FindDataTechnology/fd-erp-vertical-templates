@@ -100,3 +100,26 @@ def test_unreachable_read_face_never_yields_an_empty_success(local_snapshot, mon
     status = bindings.load_status(fetch=boom)
     assert status["source"] == "local-fallback"
     assert status["integrations"], "an unreachable read face is not an empty answer"
+
+
+def test_read_face_uses_the_machine_route_not_the_console_route(monkeypatch):
+    """The generator can never satisfy a Logto session — the URL must be the
+    machine route.
+
+    Pointed at ``/d/<domain>/crosswalks`` the seam was unreachable *by
+    construction*: that route carries ``require_scope("content:read")`` +
+    ``get_current_user``, so a cron job or a connector runtime gets a 401/302
+    and ``_load_from_read_face`` treats it as "unreachable" and falls back. The
+    fallback is honest; it just made a permanently-broken seam look healthy.
+
+    Pinned here because the URL is a one-line string that nothing else checks.
+    """
+    monkeypatch.setenv(bindings.READ_FACE_ENV, "http://bench.invalid")
+    seen: list[str] = []
+
+    def fetch(url: str):
+        seen.append(url)
+        return {"crosswalks": []}
+
+    bindings.load_status(fetch=fetch)
+    assert seen == ["http://bench.invalid/api/v1/distribution/erp/crosswalks"]
