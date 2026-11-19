@@ -13,17 +13,133 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .errors import TemplateError
 
 DEFAULT_STATUS_PATH = Path(__file__).resolve().parent.parent / "connector-status.json"
 
 
-def load_status(path: str | Path | dict[str, Any] | None = None) -> dict[str, Any]:
+def load_status(
+    path: str | Path | dict[str, Any] | None = None,
+    *,
+    fetch: "Callable[[str], Any] | None" = None,
+) -> dict[str, Any]:
+    """Load the connector status surface.
+
+    An explicit ``path``/dict is returned as-is (tests and callers that already
+    have a snapshot). Otherwise the **bench read face is tried first**: the
+    platform is the authority for crosswalk connectivity, and this file is its
+    mirror. When the read face is unreachable we fall back to the local file,
+    **and say so** — `source: local-fallback` plus a `stale` flag when the file
+    is older than the configured max age. Silently using an old snapshot is the
+    failure mode the three-state discipline exists to prevent: it looks
+    identical to a live one.
+    """
     if isinstance(path, dict):
         return path
+    if path is None:
+        remote = _load_from_read_face(fetch)
+        if remote is not None:
+            return remote
+    body = _load_local(path)
+    return body
+
+
+#: Where the bench read face lives. Unset means "never call out" — the honest
+#: default for a library imported by tests and offline tooling.
+READ_FACE_ENV = "BENCH_CROSSWALK_READ_FACE"
+
+
+def _load_from_read_face(fetch: "Callable[[str], Any] | None" = None):
+    """The platform's connectivity answer, or ``None`` when it cannot be read.
+
+    **This module never performs the request itself.** The template layer has a
+    hard boundary — no direct HTTP, no vendor URLs — enforced mechanically by
+    ``scripts/check_delivery_gates`` (``PAYMENT_DIRECT_HTTP_IMPORT``): a mapping
+    layer that can reach out on its own is one commit away from writing to an
+    external system. So the caller injects a ``fetch(url) -> dict`` callable, and
+    every connector runtime already owns exactly one of those.
+
+    ``None`` is not an error here: the caller falls back to the local mirror and
+    marks the source. What must never happen is a silent empty answer that looks
+    like "nothing is connected".
+    """
+    base = os.environ.get(READ_FACE_ENV, "").strip().rstrip("/")
+    if not base or fetch is None:
+        return None
+
+    # The read face is per-domain; the connector surface spans verticals, so we
+    # ask for the one domain this package's templates anchor to.
+    domain = os.environ.get("BENCH_CROSSWALK_DOMAIN", "erp")
+    url = f"{base}/d/{domain}/crosswalks"
+    try:
+        payload = fetch(url)
+    except Exception:  # noqa: BLE001 - an unreachable read face is a fallback, not a crash
+        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("crosswalks"), list):
+        return None
+    return _status_from_crosswalks(payload)
+
+
+def _status_from_crosswalks(payload: dict[str, Any]) -> dict[str, Any]:
+    """Project the read face's crosswalk list onto this package's status shape.
+
+    The projection exists so consumers never have to know the platform's shape;
+    and so a change on the platform side is one function to update, not N call
+    sites. `role_bindings` comes from the local template declarations, which the
+    platform does not own.
+    """
+    states: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in payload.get("crosswalks") or []:
+        peer = (row or {}).get("peer") or {}
+        system = peer.get("system")
+        if peer.get("kind") != "external_id" or not system:
+            continue
+        bucket = states.setdefault(system, {})
+        for state, value in ((row or {}).get("connectivity") or {}).items():
+            if isinstance(value, dict) and value.get("ok"):
+                bucket[state] = value
+    integrations = []
+    for system, cleared in sorted(states.items()):
+        missing = [s for s in ("catalog", "executor_tests", "live") if s not in cleared]
+        integrations.append({
+            "external_system": system,
+            "provider": system,
+            "state": "not_connected" if missing else "connected",
+            "missing": missing,
+            "states": {
+                s: {"ok": s in cleared, "evidence": cleared.get(s, {}).get("evidence")}
+                for s in ("catalog", "executor_tests", "live")
+            },
+        })
+    return {
+        "source": "bench-read-face",
+        "role_bindings": _local_role_bindings(),
+        "integrations": integrations,
+    }
+
+
+def _local_role_bindings() -> list[dict[str, Any]]:
+    """Role declarations live on the template, not on the platform."""
+    try:
+        body = json.loads(DEFAULT_STATUS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    bindings = body.get("role_bindings")
+    return bindings if isinstance(bindings, list) else []
+
+
+#: A local snapshot older than this is reported `stale: true`. Overridable so a
+#: deployment can declare its own expiry; absent means "no expiry declared", and
+#: the loader then says exactly that rather than inventing a number.
+STALE_AFTER_DAYS_ENV = "ERP_CONNECTOR_STATUS_MAX_AGE_DAYS"
+
+
+def _load_local(path: str | Path | None) -> dict[str, Any]:
     target = Path(path) if path else DEFAULT_STATUS_PATH
     try:
         body = json.loads(target.read_text(encoding="utf-8"))
@@ -38,7 +154,31 @@ def load_status(path: str | Path | dict[str, Any] | None = None) -> dict[str, An
     if not isinstance(body, dict) or not isinstance(body.get("role_bindings"), list):
         raise TemplateError("MANIFEST_INVALID",
                             f"连接器状态面缺 role_bindings（{target}）")
+    # Only annotate when we actually fell back: an explicit path is the caller's
+    # own snapshot and calling it a fallback would be a lie.
+    if path is None:
+        body = dict(body)
+        body.setdefault("source", "local-fallback")
+        stale = _is_stale(target)
+        if stale is not None:
+            body["stale"] = stale
     return body
+
+
+def _is_stale(target: Path) -> bool | None:
+    """Whether the snapshot exceeds its declared max age; ``None`` = no expiry set."""
+    raw = os.environ.get(STALE_AFTER_DAYS_ENV, "").strip()
+    if not raw:
+        return None
+    try:
+        max_days = float(raw)
+    except ValueError:
+        return None
+    try:
+        age_days = (time.time() - target.stat().st_mtime) / 86400
+    except OSError:
+        return None
+    return age_days > max_days
 
 
 def role_bindings_for(status: dict[str, Any], vertical: str) -> list[dict[str, Any]]:
