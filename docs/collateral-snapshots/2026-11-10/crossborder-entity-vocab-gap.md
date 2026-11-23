@@ -12,7 +12,7 @@
 
 | 属性 | 值 | 备注 |
 |------|-----|------|
-| **真实存放库** | PostgreSQL `fd_open_data` (guangzhou-xinru:30432) | 生产真源；本地 SQLite (`fd_wire_entities.db`、`fd_wire_dev.db`) **不含**此词表，仅为开发副本 |
+| **真实存放库** | PostgreSQL `fd_open_data` (canonical PG，mesh 地址见部署 env) | 生产真源；本地 SQLite (`fd_wire_entities.db`、`fd_wire_dev.db`) **不含**此词表，仅为开发副本 |
 | **物理表** | `public.entities` | `entity_type='industry'` 的记录 |
 | **实体总数** | **55 个** | 经 2026-10-20 裁决确认：「库里已有 55 个 industry 实体」 |
 | **分类来源** | 申万一级 31 个 + GICS 10 个 + 财务报表分类法 14 个 | 三套分类法合并去重后的唯一值 |
