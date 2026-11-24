@@ -6,7 +6,7 @@
 | 资产 | 版本 | 台账 | 上架单元 | 语言 | 缺语言 | 待办 |
 |---|---|---|---|---|---|---|
 | capability-matrix | v1.1.1 | draft v1.1.1 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
-| connector-pack | v1.5.4 | draft v1.5.4 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
+| connector-pack | v1.5.8 | published v1.5.8 | 是 | en/es/fr/ja/zh | — | bump 版本（v1.5.8 内容已变） |
 | report-preset | v1.1.3 | draft v1.1.3 | 否（随模板） | zh | en/ja/es/fr | 就绪 |
 | account-mapping-pack | v1.1.3 | draft v1.1.3 | 是 | en/es/fr/ja/zh | — | 走市场上架 |
 | recon-fleet | v1.1.4 | draft v1.1.4 | 是 | en/es/fr/ja/zh | — | 走市场上架 |

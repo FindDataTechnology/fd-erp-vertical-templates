@@ -10,7 +10,7 @@
   "connector_pack": {
    "kind": "pack",
    "path": "connector-pack/pack.json",
-   "version": "1.5.4"
+   "version": "1.5.8"
   },
   "fleet_blueprint": {
    "kind": "fleet-blueprint",

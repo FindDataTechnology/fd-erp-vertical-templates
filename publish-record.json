@@ -1,7 +1,7 @@
 {
  "schema": "erp-template-publish-record/v1",
  "note": "发布状态唯一出处（design D4）。pack 内三处注记（顶层 notes / i18n.en.notes / _casting.note）由 `publish-notes` 从本文件派生，校验器逐处比对。市场版本与 packId 的实测出处见 evidence：兄弟仓 fleet-packs/README.md 的机器台账是 cast 脚本与漂移哨共用的那张表；`publish_gate` 逐包对拍。未上架的包也必须显式写 published=false（不许用缺省值冒充）。",
- "updated_at": "2026-11-10",
+ "updated_at": "2026-11-24",
  "surfaces": {
   "note": "发布面（非 pack 类）：官网 deploy / 网关 rollout / registry 写入的 live 状态只能写在这里，且必须带证据。claims 里 assert_live 指向本段——宣称已 live 而这里为空或 live=false 即判红（task 4.5）。",
   "official-web.deploy": {
@@ -25,9 +25,9 @@
   "supply-chain/connector-pack": {
    "asset": "connector-pack/pack.json",
    "published": true,
-   "market_version": 3,
+   "market_version": 11,
    "pack_id": "y8gnMHFMze-Mylsd6JXpkA",
-   "published_at": "2026-11-08",
+   "published_at": "2026-11-24",
    "channel": "facet-market",
    "evidence": [
     "fleet-packs/README.md#机器台账: supply-chain-connector-pack v3",
@@ -40,14 +40,15 @@
     "notes": "只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED",
     "notes_en": "Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted; an unconnected provider is reported as NOT_WIRED",
     "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id；无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）"
-   }
+   },
+   "pack_version": "1.1.4"
   },
   "restaurant-chain/connector-pack": {
    "asset": "connector-pack/pack.json",
    "published": true,
-   "market_version": 2,
+   "market_version": 10,
    "pack_id": "3RZRBdc66rKdLV5I8tuKIg",
-   "published_at": "2026-11-08",
+   "published_at": "2026-11-24",
    "channel": "facet-market",
    "evidence": [
     "fleet-packs/README.md#机器台账: restaurant-chain-connector-pack v2（面级纠错：删 delivery-settlement / payments 备选去 meituan）",
@@ -59,14 +60,15 @@
     "notes": "只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；POS 用角色绑定（客户自己选厂商），支付写真 id；未适配厂商如实报出 + 导出文件替代通道",
     "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: POS uses a role binding (the customer picks the vendor) and payments use real ids; unadapted vendors are reported honestly with a file-export fallback",
     "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付写真 id；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
-   }
+   },
+   "pack_version": "1.2.4"
   },
   "crossborder/connector-pack": {
    "asset": "connector-pack/pack.json",
    "published": true,
-   "market_version": 2,
+   "market_version": 10,
    "pack_id": "cv0kj9mRHGrz6nNMA7glVg",
-   "published_at": "2026-11-08",
+   "published_at": "2026-11-24",
    "channel": "facet-market",
    "evidence": [
     "fleet-packs/README.md#机器台账: crossborder-connector-pack v2（市场仍为 v2，源已到 pack 1.5.1 / manifest 1.4.1，待上架）",
@@ -80,7 +82,8 @@
     "notes": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志",
     "notes_en": "Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged",
     "casting": "连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录；能力面以包内 capability-matrix.json 为准，对外说「需一次接入」而不是「已支持」；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）"
-   }
+   },
+   "pack_version": "1.5.8"
   }
  }
 }

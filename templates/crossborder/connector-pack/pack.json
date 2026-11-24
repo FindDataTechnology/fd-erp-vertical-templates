@@ -1,7 +1,7 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商对账连接器包",
- "version": "1.5.4",
+ "version": "1.5.8",
  "description": "跨境电商对账模板·连接器 pack。能力面以包内 capability-matrix.json 为准：Shopify：需一次接入（provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture））；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）。凭证 BYOK 经连接器运行时注入，零落库零日志；对外部系统零写入。真实店读写沿 crm-board 2026-10-30 裁决逐店开通。",
  "tags": [
   "ERP",
@@ -141,13 +141,79 @@
   "orchestration": {
    "mode": "supervisor",
    "edges": []
+  },
+  "i18n": {
+   "en": {
+    "name": "Cross-border reconciliation connector pack (supply pack)",
+    "members": {
+     "xb-recon-operator": {
+      "title": "Reconciliation output post",
+      "kpiSlots": {
+       "stores_reconciled": {
+        "label": "Stores reconciled"
+       },
+       "diffs_found": {
+        "label": "Difference entries"
+       }
+      }
+     }
+    }
+   },
+   "ja": {
+    "name": "越境EC照合コネクタパック（供給パック）",
+    "members": {
+     "xb-recon-operator": {
+      "title": "照合出力枠",
+      "kpiSlots": {
+       "stores_reconciled": {
+        "label": "照合済み店舗"
+       },
+       "diffs_found": {
+        "label": "差異件数"
+       }
+      }
+     }
+    }
+   },
+   "es": {
+    "name": "Paquete de conectores de conciliación de comercio transfronterizo (paquete de suministro)",
+    "members": {
+     "xb-recon-operator": {
+      "title": "Puesto de salida de conciliación",
+      "kpiSlots": {
+       "stores_reconciled": {
+        "label": "Tiendas conciliadas"
+       },
+       "diffs_found": {
+        "label": "Entradas de diferencias"
+       }
+      }
+     }
+    }
+   },
+   "fr": {
+    "name": "Pack de connecteurs de rapprochement e-commerce transfrontalier (pack de fourniture)",
+    "members": {
+     "xb-recon-operator": {
+      "title": "Poste de sortie de rapprochement",
+      "kpiSlots": {
+       "stores_reconciled": {
+        "label": "Boutiques rapprochées"
+       },
+       "diffs_found": {
+        "label": "Écritures d'écart"
+       }
+      }
+     }
+    }
+   }
   }
  },
  "_casting": {
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "已上架：市场 v2（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录；能力面以包内 capability-matrix.json 为准，对外说「需一次接入」而不是「已支持」；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
+  "note": "已上架：市场 v10（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录；能力面以包内 capability-matrix.json 为准，对外说「需一次接入」而不是「已支持」；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {
@@ -165,7 +231,7 @@
      "description": "Cross-border recon discipline: three-flow per-store alignment, four diff classes with bilateral references, original-currency matching with sourced FX conversion, payouts/commission/fees as separate dimensions, zero writes to platforms, honest unsupported-platform answers, writeback only via kernel proposal lane with fund entries banned."
     }
    },
-   "notes": "Published: market v2 (packId cv0kj9mRHGrz6nNMA7glVg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged."
+   "notes": "Published: market v10 (packId cv0kj9mRHGrz6nNMA7glVg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged."
   },
   "ja": {
    "name": "越境EC照合コネクタパック",
@@ -181,7 +247,8 @@
     "erp-crossborder-recon-discipline": {
      "description": "越境EC対照規律：三フロー対店照合、四類差異・双方参照、原通貨照合と出所付き換算、手数料は独立次元、プラットフォーム書込ゼロ、未対応プラットフォームは正直回答、書戻しは kernel proposal レーンのみ（資金仕訳禁止）。"
     }
-   }
+   },
+   "notes": "Published: market v2 (packId cv0kj9mRHGrz6nNMA7glVg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged. 越境EC照合用の実店読み取りは、2026-10-30 の crm-board 裁定に従い店舗ごとに開通します。"
   },
   "es": {
    "name": "Pack de conectores para conciliación de comercio electrónico transfronterizo",
@@ -197,7 +264,8 @@
     "erp-crossborder-recon-discipline": {
      "description": "Disciplina de conciliación transfronteriza: alineación por tienda de tres flujos, cuatro clases de diferencia con referencias bilaterales, conciliación en moneda original con conversión con fuente, comisiones/tasas como dimensión independiente, cero escrituras en plataformas, respuestas honestas sobre plataformas no soportadas, reescritura solo por el carril de propuestas del kernel (asientos de fondos prohibidos)."
     }
-   }
+   },
+   "notes": "Published: market v2 (packId cv0kj9mRHGrz6nNMA7glVg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged. La lectura de tiendas reales para la conciliación transfronteriza se abre tienda por tienda conforme a la decisión de crm-board del 2026-10-30."
   },
   "fr": {
    "name": "Pack de connecteurs pour la réconciliation e-commerce transfrontalière",
@@ -213,7 +281,8 @@
     "erp-crossborder-recon-discipline": {
      "description": "Discipline de réconciliation transfrontalière : alignement par boutique de trois flux, quatre classes de différences avec références bilatérales, rapprochement en devise d'origine avec conversion sourcée, commissions/frais comme dimension indépendante, zéro écriture sur les plateformes, réponses honnêtes sur les plateformes non prises en charge, réécriture uniquement via le canal de propositions du noyau (écritures de fonds interdites)."
     }
-   }
+   },
+   "notes": "Published: market v2 (packId cv0kj9mRHGrz6nNMA7glVg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. The capability surface follows the bundled capability-matrix.json (all inner-circle flows still need onboarding; Pinduoduo is not offered). The Shopify payout read action has shipped but no real-store read has been recorded yet, so settlements stay uncommitted. Credentials are BYOK via the connector runtime, never stored or logged. La lecture des boutiques réelles pour le rapprochement transfrontalier s'ouvre boutique par boutique conformément à la décision crm-board du 2026-10-30."
   }
  },
  "capability": {
@@ -388,5 +457,5 @@
   "generator": "scripts/gen_capability_artifacts.py",
   "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e"
  },
- "notes": "已上架：市场 v2（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志。"
+ "notes": "已上架：市场 v10（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志。"
 }

@@ -1,7 +1,7 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "仓配分销连接器包",
- "version": "1.1.0",
+ "version": "1.1.4",
  "description": "仓配分销模板·连接器 pack：外部系统对接全部经萬星连接器载体（多租户、凭证不出库）。金蝶云星空用目录 provider（接通验证归任务 3.1）；客户 WMS、供应商门户、承运商门户按连接器角色绑定声明——包说需要哪一类系统，客户在自己的连接器里选定实际品牌，不需要目录存在同名 provider；支付渠道走商户侧连接器（只读流水+回调记录）；模板层只留推送/回流指令记录，零外部写入。本包以机器字段声明每条连接契约（provider/角色 + 读/写单元），客户未选定或目录覆盖不到的自有系统由状态面如实报待选系统/能力缺口，不内嵌 provider 实现",
  "tags": [
   "ERP",
@@ -9,7 +9,7 @@
   "连接器",
   "只读滩头"
  ],
- "notes": "已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA）。只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED。",
+ "notes": "已上架：市场 v11（packId y8gnMHFMze-Mylsd6JXpkA）。只声明外部系统绑定契约与连接器纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；BYOK 凭证经环境变量注入、零落库零日志；未接通 provider 如实 NOT_WIRED。",
  "visibility": "public",
  "category": "facet",
  "connector_bindings": [
@@ -127,19 +127,73 @@
   "orchestration": {
    "mode": "supervisor",
    "edges": []
+  },
+  "i18n": {
+   "en": {
+    "name": "Warehousing & distribution connector pack (supply pack)",
+    "members": {
+     "sc-connector-operator": {
+      "title": "Connector output post",
+      "kpiSlots": {
+       "providers_wired": {
+        "label": "Providers wired"
+       }
+      }
+     }
+    }
+   },
+   "ja": {
+    "name": "倉配流通コネクタパック（供給パック）",
+    "members": {
+     "sc-connector-operator": {
+      "title": "コネクタ出力枠",
+      "kpiSlots": {
+       "providers_wired": {
+        "label": "接続済み provider"
+       }
+      }
+     }
+    }
+   },
+   "es": {
+    "name": "Paquete de conectores de almacenaje y distribución (paquete de suministro)",
+    "members": {
+     "sc-connector-operator": {
+      "title": "Puesto de salida de conectores",
+      "kpiSlots": {
+       "providers_wired": {
+        "label": "Proveedores conectados"
+       }
+      }
+     }
+    }
+   },
+   "fr": {
+    "name": "Pack de connecteurs d'entreposage et de distribution (pack de fourniture)",
+    "members": {
+     "sc-connector-operator": {
+      "title": "Poste de sortie des connecteurs",
+      "kpiSlots": {
+       "providers_wired": {
+        "label": "Fournisseurs connectés"
+       }
+      }
+     }
+    }
+   }
   }
  },
  "_casting": {
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "已上架：市场 v3（packId y8gnMHFMze-Mylsd6JXpkA）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id；无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。"
+  "note": "已上架：市场 v11（packId y8gnMHFMze-Mylsd6JXpkA）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）。WMS/供应商门户/承运商门户用角色绑定（客户自己选系统），金蝶/支付写真 id；无 MCP 工具面（模板运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {
    "name": "Warehousing & distribution connector pack",
    "description": "Connector pack for the warehousing & distribution template: every external integration goes through the open-connector carrier (multi-tenant, credentials never leave its vault). Kingdee Cloud Galaxy uses the directory provider (live verification pending); the customer's WMS, supplier portal and carrier portal are declared as connector roles — the pack names the kind of system it needs and the customer picks the actual vendor in their own connector, so no same-named directory provider is required; payment channels use merchant-side connectors (read-only statements plus callback records); the template keeps push/return instructions only, with zero external writes. This pack declares the binding contract and read-only boundaries; an unchosen role or an uncovered surface is reported as such by the status face, and no provider implementation is embedded.",
-   "notes": "Published: market v3 (packId y8gnMHFMze-Mylsd6JXpkA). Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted; an unconnected provider is reported as NOT_WIRED.",
+   "notes": "Published: market v11 (packId y8gnMHFMze-Mylsd6JXpkA). Declares external-system bindings and the connector discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory. BYOK credentials are injected via environment variables and never persisted; an unconnected provider is reported as NOT_WIRED.",
    "tags": [
     "ERP",
     "warehousing & distribution",
@@ -149,6 +203,54 @@
    "skills": {
     "erp-supply-connector-discipline": {
      "description": "Connector discipline (warehousing & distribution): single carrier (open-connector), BYOK credentials never persisted, orchestration layer zero external writes, push actions trace-only, un-wired providers honestly reported."
+    }
+   }
+  },
+  "ja": {
+   "name": "倉配流通コネクタパック",
+   "description": "倉配流通テンプレート用コネクタパック：外部連携はすべてオープンコネクタ基盤（マルチテナント、認証情報は保管庫外に出ない）を経由します。Kingdee Cloud Galaxy はディレクトリ provider を使用（実機検証待ち）。顧客の WMS・サプライヤーポータル・運送業者ポータルはコネクタ役割として宣言され、必要なシステム種別のみを示し、実際のベンダーは顧客自身のコネクタで選択します。決済チャネルは事業者側コネクタ（明細の読み取りとコールバック記録）。テンプレートはプッシュ/リターンを外部システムに留めます。",
+   "notes": "舞台裏：市場 v7（packId y8gnMHFMze-Mylsd6JXpkA）。外部システムのバインディング契約（connector_bindings）と規律カードのみを宣言し、MCP ツール面はありません（実行時の帳務面は fd-erp-ledger-mcp）。provider 実装は open-connector-mt に帰属。BYOK 認証情報は環境変数経由で注入され、決して保存・記録されません。未接続 provider は NOT_WIRED と正直に報告。",
+   "tags": [
+    "ERP",
+    "倉配流通",
+    "コネクタ",
+    "読み取り専用"
+   ],
+   "skills": {
+    "erp-supply-connector-discipline": {
+     "description": "接続規律（倉配流通）：外部連携はすべてオープンコネクタ基盤経由、BYOK 認証情報は保存しない、未接続 provider は NOT_WIRED と正直に報告、外部システムへの書き込みは一切しない。"
+    }
+   }
+  },
+  "es": {
+   "name": "Paquete de conectores de almacenaje y distribución",
+   "description": "Paquete de conectores para la plantilla de almacenaje y distribución: toda integración externa pasa por la plataforma de conectores abierta (multiusuario, las credenciales nunca salen de su bóveda). Kingdee Cloud Galaxy usa el proveedor de directorio (verificación en vivo pendiente). El WMS del cliente, el portal de proveedores y el portal de transportistas se declaran como roles de conector; el paquete nombra el tipo de sistema que necesita y el cliente elige el proveedor real en su propio conector. Los canales de pago usan conectores del lado del comerciante (lectura de estados y registro de devoluciones). La plantilla mantiene el envío y la devolución en el sistema externo.",
+   "notes": "Publicado: mercado v7 (packId y8gnMHFMze-Mylsd6JXpkA). Solo declara contratos de vinculación con sistemas externos (connector_bindings) y la tarjeta de disciplina; sin superficie MCP (la superficie contable en ejecución vive en fd-erp-ledger-mcp). Las implementaciones de proveedor pertenecen a open-connector-mt. Las credenciales BYOK se inyectan por variables de entorno y nunca se almacenan ni se registran. Un proveedor no conectado se reporta como NOT_WIRED.",
+   "tags": [
+    "ERP",
+    "almacenaje y distribución",
+    "conector",
+    "solo lectura"
+   ],
+   "skills": {
+    "erp-supply-connector-discipline": {
+     "description": "Disciplina de conexión (almacenaje y distribución): toda integración externa pasa por la plataforma de conectores abierta, las credenciales BYOK nunca se almacenan, un proveedor no conectado se reporta como NOT_WIRED y nunca se escribe en sistemas externos."
+    }
+   }
+  },
+  "fr": {
+   "name": "Pack de connecteurs d'entreposage et de distribution",
+   "description": "Pack de connecteurs pour le modèle d'entreposage et de distribution : toute intégration externe passe par la plateforme de connecteurs ouverte (multi-tenant, les identifiants ne sortent jamais de son coffre). Kingdee Cloud Galaxy utilise le fournisseur d'annuaire (vérification en conditions réelles en attente). Le WMS du client, le portail fournisseurs et le portail transporteurs sont déclarés comme rôles de connecteur ; le pack nomme le type de système requis et le client choisit le fournisseur réel dans son propre connecteur. Les canaux de paiement utilisent des connecteurs côté commerçant (lecture des relevés et enregistrement des retours). Le modèle laisse le push/retour dans le système externe.",
+   "notes": "Publié : marché v7 (packId y8gnMHFMze-Mylsd6JXpkA). Déclare uniquement les contrats de liaison aux systèmes externes (connector_bindings) et la carte de discipline ; aucune surface MCP (la surface comptable d'exécution vit dans fd-erp-ledger-mcp). Les implémentations de fournisseurs appartiennent à open-connector-mt. Les identifiants BYOK sont injectés par variables d'environnement et ne sont jamais stockés ni journalisés. Un fournisseur non connecté est signalé comme NOT_WIRED.",
+   "tags": [
+    "ERP",
+    "entreposage et distribution",
+    "connecteur",
+    "lecture seule"
+   ],
+   "skills": {
+    "erp-supply-connector-discipline": {
+     "description": "Discipline de connexion (entreposage et distribution) : toute intégration externe passe par la plateforme de connecteurs ouverte, les identifiants BYOK ne sont jamais stockés, un fournisseur non connecté est signalé comme NOT_WIRED et rien n'est jamais écrit dans les systèmes externes."
     }
    }
   }

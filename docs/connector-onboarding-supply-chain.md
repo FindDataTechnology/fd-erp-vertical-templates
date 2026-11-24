@@ -347,9 +347,9 @@ restaurant-chain 的连接器包副本都已落后于模板）。现已扩到三
 
 | 包 | packId | 首版 | 现状 |
 | --- | --- | --- | --- |
-| 供应链连接器包 | `y8gnMHFMze-Mylsd6JXpkA` | v1 → 现 v3 | 角色绑定 + 纠正声明 |
-| 餐饮连锁连接器包 | `3RZRBdc66rKdLV5I8tuKIg` | v1 → 现 v2 | 角色 `pos` + 支付真 id（v2 面级纠错：删 `delivery-settlement`、备选去 `meituan`） |
-| 跨境电商连接器包 | `cv0kj9mRHGrz6nNMA7glVg` | v1 → 现 v2 | 真 id `shopify_admin` + 角色 `cn-commerce`（v2 面级纠错：`shopify` → `shopify_admin`） |
+| 供应链连接器包 | `y8gnMHFMze-Mylsd6JXpkA` | v1 → 现 v11 | 角色绑定 + 纠正声明；v8 补五语展示面（ja/es/fr + fleet.i18n） |
+| 餐饮连锁连接器包 | `3RZRBdc66rKdLV5I8tuKIg` | v1 → 现 v10 | 角色 `pos` + 支付真 id（v2 面级纠错：删 `delivery-settlement`、备选去 `meituan`）；v7 补五语展示面 |
+| 跨境电商连接器包 | `cv0kj9mRHGrz6nNMA7glVg` | v1 → 现 v10 | 真 id `shopify_admin` + 角色 `cn-commerce`（v2 面级纠错：`shopify` → `shopify_admin`）；v7 补五语展示面 |
 
 > 本表与 §8.1 的口径同源：`publish-record.json` 是唯一出处，改市场版本先改记录、
 > 再跑 `publish-notes` 重写 pack 三处注记；文档、记录、市场台账（兄弟仓
@@ -411,7 +411,7 @@ checkout 逐个核对动作真的存在。角色绑定不在此列（面由客�
 
 ### 8.1 连接器绑定（有门，绿）
 
-三个包都上了市场（supply-chain v3 / restaurant v2 / crossborder v2），
+三个包都上了市场（supply-chain v11 / restaurant v10 / crossborder v10），
 `fleet-packs/scripts/check_drift.py` 逐字段一致；解析侧由 paas
 `test-connector-role-mapping` / `test-industry-connector-packs` 覆盖。
 

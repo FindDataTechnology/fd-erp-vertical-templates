@@ -1,32 +1,53 @@
 {
-  "schema": "erp-vertical-template/v1",
-  "vertical": "restaurant-chain",
-  "name_zh": "餐饮连锁对账模板",
-  "name_en": "Restaurant Chain Reconciliation Template",
-  "version": "1.0.0",
-  "description_zh": "行业模板四件套：连接器 pack（POS BYOK 适配器框架 + 收款渠道商户侧适配 + 外卖结算）+ 门店日结舰队蓝图（巡检/核对/拍板，多门店错峰）+ 科目映射 pack（门店营业收入/平台佣金等对齐内核通用科目）+ 报表 preset（日报三段/佣金核对/分成核对单/映射看板）。资金红线模板层落死：分成只出核对对账单与核对指令，无任何资金执行工具面。重域（中央厨房/BOM/排班/会员/采购）如实挂账不在范围。",
-  "description_en": "Four-piece vertical template: connector pack (POS BYOK adapter framework + merchant-side payment channels + delivery settlement) + daily-close fleet blueprint (staggered per-store cadence) + account mapping pack + report preset (three-section daily close, commission check, share verification statement). Fund red line enforced at template layer: verification data only, zero fund-execution surface. Heavy domains honestly out of scope.",
-  "assets": {
-    "connector_pack": {"kind": "pack", "path": "connector-pack/pack.json", "version": "1.2.0"},
-    "fleet_blueprint": {"kind": "fleet-blueprint", "path": "dailyclose-fleet/template.json", "version": "1.0.0"},
-    "account_mapping_pack": {"kind": "pack", "path": "account-mapping/pack.json", "version": "1.0.0"},
-    "report_preset": {"kind": "report-preset", "path": "report-preset/preset.json", "version": "1.0.0"}
+ "schema": "erp-vertical-template/v1",
+ "vertical": "restaurant-chain",
+ "name_zh": "餐饮连锁对账模板",
+ "name_en": "Restaurant Chain Reconciliation Template",
+ "version": "1.0.0",
+ "description_zh": "行业模板四件套：连接器 pack（POS BYOK 适配器框架 + 收款渠道商户侧适配 + 外卖结算）+ 门店日结舰队蓝图（巡检/核对/拍板，多门店错峰）+ 科目映射 pack（门店营业收入/平台佣金等对齐内核通用科目）+ 报表 preset（日报三段/佣金核对/分成核对单/映射看板）。资金红线模板层落死：分成只出核对对账单与核对指令，无任何资金执行工具面。重域（中央厨房/BOM/排班/会员/采购）如实挂账不在范围。",
+ "description_en": "Four-piece vertical template: connector pack (POS BYOK adapter framework + merchant-side payment channels + delivery settlement) + daily-close fleet blueprint (staggered per-store cadence) + account mapping pack + report preset (three-section daily close, commission check, share verification statement). Fund red line enforced at template layer: verification data only, zero fund-execution surface. Heavy domains honestly out of scope.",
+ "assets": {
+  "connector_pack": {
+   "kind": "pack",
+   "path": "connector-pack/pack.json",
+   "version": "1.2.4"
   },
-  "constraints": {
-    "ledger_access": "kernel-tools-only",
-    "bypass_ledger_forbidden": true,
-    "writeback_lane": "kernel-proposal-whitelist",
-    "external_write": "none"
+  "fleet_blueprint": {
+   "kind": "fleet-blueprint",
+   "path": "dailyclose-fleet/template.json",
+   "version": "1.0.0"
   },
-  "pack_v2": {
-    "compatible": true,
-    "note": "连接器/映射 pack 均为 pack v2 形状（fleet 段免自指）；谦面市场安装模板 = 四件一并到位、各件独立升级。"
+  "account_mapping_pack": {
+   "kind": "pack",
+   "path": "account-mapping/pack.json",
+   "version": "1.0.0"
   },
-  "i18n": {"en": {"name": "Restaurant Chain Reconciliation Template", "description": "Four-piece vertical template: POS/payment connectors + daily-close fleet + account mapping + report preset."}},
-  "boundaries_zh": {
-    "pos": "厂商适配器逐个上线（首单客户驱动，不预设名单）；未适配厂商如实报出 + 导出文件替代通道；不以人工补录冒充自动接入",
-    "payment_channels": "微信支付/支付宝/美团商户侧框架就绪；live 面以实测为准（未实测不宣称）",
-    "fund_red_line": "二清红线：无资金池/代收代付/分账执行任何工具面；分成=核对对账单+核对指令，划转走持牌通道",
-    "heavy_domains": "中央厨房/采购/BOM/排班/会员：当前不提供（后续渐进模板资产）"
+  "report_preset": {
+   "kind": "report-preset",
+   "path": "report-preset/preset.json",
+   "version": "1.0.0"
   }
+ },
+ "constraints": {
+  "ledger_access": "kernel-tools-only",
+  "bypass_ledger_forbidden": true,
+  "writeback_lane": "kernel-proposal-whitelist",
+  "external_write": "none"
+ },
+ "pack_v2": {
+  "compatible": true,
+  "note": "连接器/映射 pack 均为 pack v2 形状（fleet 段免自指）；谦面市场安装模板 = 四件一并到位、各件独立升级。"
+ },
+ "i18n": {
+  "en": {
+   "name": "Restaurant Chain Reconciliation Template",
+   "description": "Four-piece vertical template: POS/payment connectors + daily-close fleet + account mapping + report preset."
+  }
+ },
+ "boundaries_zh": {
+  "pos": "厂商适配器逐个上线（首单客户驱动，不预设名单）；未适配厂商如实报出 + 导出文件替代通道；不以人工补录冒充自动接入",
+  "payment_channels": "微信支付/支付宝/美团商户侧框架就绪；live 面以实测为准（未实测不宣称）",
+  "fund_red_line": "二清红线：无资金池/代收代付/分账执行任何工具面；分成=核对对账单+核对指令，划转走持牌通道",
+  "heavy_domains": "中央厨房/采购/BOM/排班/会员：当前不提供（后续渐进模板资产）"
+ }
 }

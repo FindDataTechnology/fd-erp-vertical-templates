@@ -1,7 +1,7 @@
 {
  "schema": "erp-vertical-connector-pack/v1",
  "name": "餐饮连锁对账连接器包",
- "version": "1.2.0",
+ "version": "1.2.4",
  "description": "餐饮连锁对账模板·连接器 pack：POS BYOK 适配器框架（框架一个、厂商逐个插拔；首个适配厂商由首单客户的实际厂商决定，不预设名单；未适配厂商如实报出 + 导出文件替代通道）+ 收款渠道商户侧适配（微信支付/支付宝/美团商户侧 API 结算流水拉取，可用面以实测为准，未实测不宣称 live）+ 外卖结算读取暂无目录覆盖（美团在目录里只有酒旅查询，故不声明）。凭证逐店授权 BYOK 环境变量注入零落库。只读滩头：对渠道/平台侧零写入；无资金执行面（二清红线）。",
  "tags": [
   "ERP",
@@ -120,13 +120,79 @@
   "orchestration": {
    "mode": "supervisor",
    "edges": []
+  },
+  "i18n": {
+   "en": {
+    "name": "Restaurant chain reconciliation connector pack (supply pack)",
+    "members": {
+     "rest-recon-operator": {
+      "title": "Reconciliation output post",
+      "kpiSlots": {
+       "stores_closed": {
+        "label": "Stores closed"
+       },
+       "diffs_found": {
+        "label": "Difference entries"
+       }
+      }
+     }
+    }
+   },
+   "ja": {
+    "name": "飲食チェーン照合コネクタパック（供給パック）",
+    "members": {
+     "rest-recon-operator": {
+      "title": "照合出力枠",
+      "kpiSlots": {
+       "stores_closed": {
+        "label": "日次締め済み店舗"
+       },
+       "diffs_found": {
+        "label": "差異件数"
+       }
+      }
+     }
+    }
+   },
+   "es": {
+    "name": "Paquete de conectores de conciliación para cadenas de restaurantes (paquete de suministro)",
+    "members": {
+     "rest-recon-operator": {
+      "title": "Puesto de salida de conciliación",
+      "kpiSlots": {
+       "stores_closed": {
+        "label": "Tiendas cerradas"
+       },
+       "diffs_found": {
+        "label": "Entradas de diferencias"
+       }
+      }
+     }
+    }
+   },
+   "fr": {
+    "name": "Pack de connecteurs de rapprochement pour chaînes de restaurants (pack de fourniture)",
+    "members": {
+     "rest-recon-operator": {
+      "title": "Poste de sortie de rapprochement",
+      "kpiSlots": {
+       "stores_closed": {
+        "label": "Boutiques clôturées"
+       },
+       "diffs_found": {
+        "label": "Écritures d'écart"
+       }
+      }
+     }
+    }
+   }
   }
  },
  "_casting": {
   "packDependencies": {
    "fleet-board-contribution": "Mo3_aWe7tF2eFVzkqFT9mA"
   },
-  "note": "已上架：市场 v2（packId 3RZRBdc66rKdLV5I8tuKIg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付写真 id；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
+  "note": "已上架：市场 v10（packId 3RZRBdc66rKdLV5I8tuKIg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡；provider 实现归萬星连接器目录。POS 用角色绑定（客户自己选厂商），支付写真 id；无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）。"
  },
  "i18n": {
   "en": {
@@ -144,8 +210,59 @@
      "description": "Restaurant chain reconciliation discipline: three-way store reconciliation, the three stages of daily close, unadapted vendors reported honestly, an export-file fallback channel, zero writes to the channel side, and the fund red line."
     }
    },
-   "notes": "Published: market v2 (packId 3RZRBdc66rKdLV5I8tuKIg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: POS uses a role binding (the customer picks the vendor) and payments use real ids; unadapted vendors are reported honestly with a file-export fallback."
+   "notes": "Published: market v10 (packId 3RZRBdc66rKdLV5I8tuKIg). Declares external-system bindings (connector_bindings) and the discipline card only; no MCP tool face (the runtime ledger face lives in fd-erp-ledger-mcp). Provider implementations belong to the open-connector directory: POS uses a role binding (the customer picks the vendor) and payments use real ids; unadapted vendors are reported honestly with a file-export fallback."
+  },
+  "ja": {
+   "name": "飲食チェーン照合コネクタパック",
+   "description": "飲食チェーン照合テンプレート用コネクタパック：POS BYOK アダプタフレームワーク（フレームワークは1つ、ベンダーは1社ずつ接続。最初のアダプタは最初の顧客の実際のベンダーで決まり、ベンダーリストは想定しません。未対応ベンダーは正直に報告し、エクスポートファイルのフォールバック経路で対応します）と事業者側の決済読み取り（WeChat Pay / Alipay / Meituan の決済明細。実測済みの場合のみ利用可能と表明）を提供します。配達プラットフォームの決済読み取りはまだ宣言していません。認証情報は店舗ごとに BYOK 環境変数で注入され、保存も記録もされません。読み取り専用の橋頭堡です。",
+   "notes": "舞台裏：市場 v7（packId 3RZRBdc66rKdLV5I8tuKIg）。外部システムのバインディング契約と規律カードのみを宣言し、MCP ツール面はありません。provider 実装は open-connector-mt に帰属。BYOK 認証情報は環境変数経由で注入され、決して保存・記録されません。未接続 provider は NOT_WIRED と正直に報告。",
+   "tags": [
+    "ERP",
+    "飲食チェーン",
+    "照合",
+    "POS",
+    "BYOK"
+   ],
+   "skills": {
+    "erp-restaurant-recon-discipline": {
+     "description": "照合規律（飲食チェーン）：店舗ごとの日次締め、差異は双方参照付きで分類、未対応ベンダーは正直に報告してエクスポートファイル経路を使う、外部システムへの書き込みは一切しない。"
+    }
+   }
+  },
+  "es": {
+   "name": "Paquete de conectores de conciliación para cadenas de restaurantes",
+   "description": "Paquete de conectores para la plantilla de conciliación de cadenas de restaurantes: un marco de adaptadores POS BYOK (un marco, los proveedores se conectan uno a uno; el primer adaptador lo decide el proveedor real del primer cliente, no se presume ninguna lista de proveedores; los proveedores no adaptados se reportan con honestidad y se atienden con un canal de respaldo por archivo de exportación) más lecturas de liquidación del lado del comerciante (estados de liquidación de WeChat Pay / Alipay / Meituan, superficie en vivo solo declarada cuando está medida); las lecturas de liquidación de plataformas de reparto aún no se declaran. Las credenciales se conceden por tienda mediante variables de entorno BYOK inyectadas, nunca almacenadas ni registradas. Cabeza de puente de solo lectura.",
+   "notes": "Publicado: mercado v7 (packId 3RZRBdc66rKdLV5I8tuKIg). Solo declara contratos de vinculación con sistemas externos y la tarjeta de disciplina; sin superficie MCP. Las implementaciones de proveedor pertenecen a open-connector-mt. Las credenciales BYOK se inyectan por variables de entorno y nunca se almacenan ni se registran. Un proveedor no conectado se reporta como NOT_WIRED.",
+   "tags": [
+    "ERP",
+    "cadenas de restaurantes",
+    "conciliación",
+    "POS",
+    "BYOK"
+   ],
+   "skills": {
+    "erp-restaurant-recon-discipline": {
+     "description": "Disciplina de conciliación (cadenas de restaurantes): cierre diario por tienda, diferencias clasificadas con referencias bilaterales, proveedores no adaptados reportados con honestidad usando el canal de archivo de exportación, y cero escrituras en sistemas externos."
+    }
+   }
+  },
+  "fr": {
+   "name": "Pack de connecteurs de rapprochement pour chaînes de restaurants",
+   "description": "Pack de connecteurs pour le modèle de rapprochement des chaînes de restaurants : un cadre d'adaptateurs POS BYOK (un cadre, les fournisseurs se branchent un par un — le premier adaptateur est décidé par le fournisseur réel du premier client, aucune liste de fournisseurs n'est présumée ; les fournisseurs non adaptés sont signalés honnêtement et traités par un canal de repli par fichier d'export) ainsi que des lectures de règlement côté commerçant (relevés de règlement WeChat Pay / Alipay / Meituan, surface en direct déclarée uniquement une fois mesurée) ; les lectures de règlement des plateformes de livraison ne sont pas encore déclarées. Les identifiants sont accordés par boutique via des variables d'environnement BYOK injectées, jamais stockés ni journalisés. Tête de pont en lecture seule.",
+   "notes": "Publié : marché v7 (packId 3RZRBdc66rKdLV5I8tuKIg). Déclare uniquement les contrats de liaison aux systèmes externes et la carte de discipline ; aucune surface MCP. Les implémentations de fournisseurs appartiennent à open-connector-mt. Les identifiants BYOK sont injectés par variables d'environnement et ne sont jamais stockés ni journalisés. Un fournisseur non connecté est signalé comme NOT_WIRED.",
+   "tags": [
+    "ERP",
+    "chaînes de restaurants",
+    "rapprochement",
+    "POS",
+    "BYOK"
+   ],
+   "skills": {
+    "erp-restaurant-recon-discipline": {
+     "description": "Discipline de rapprochement (chaînes de restaurants) : clôture quotidienne par boutique, écarts classés avec références bilatérales, fournisseurs non adaptés signalés honnêtement via le canal de fichier d'export, et aucune écriture dans les systèmes externes."
+    }
+   }
   }
  },
- "notes": "已上架：市场 v2（packId 3RZRBdc66rKdLV5I8tuKIg）。只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；POS 用角色绑定（客户自己选厂商），支付写真 id；未适配厂商如实报出 + 导出文件替代通道。"
+ "notes": "已上架：市场 v10（packId 3RZRBdc66rKdLV5I8tuKIg）。只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录（open-connector-mt 独立 openspec 根）；POS 用角色绑定（客户自己选厂商），支付写真 id；未适配厂商如实报出 + 导出文件替代通道。"
 }
