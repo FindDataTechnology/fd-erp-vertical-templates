@@ -82,7 +82,7 @@
 
 - **账本内核**：8 件 MCP 工具（写路径只出 proposal、确认门唯一落账）；借贷必平由数据库约束强制、分录 append-only；真 Postgres 测试 44+2 用例全绿。
 - **通用科目最小集**：12 个内核科目（资产 4 / 负债 2 / 权益 2 / 收入 1 / 费用 3），行业无关；行业科目经映射 pack 在呈现层对齐，**替换映射不改账**（分录逐字一致，仅报表口径重算）。
-- **跨境电商模板**：Shopify 读面（复用已采纳 a1-x-tech/mcp-shopify-admin）+ 国内平台经营数据（淘宝/天猫/京东经连接器实名 provider；拼多多如实不提供）；订单-收款-库存按**能力矩阵**决定几方对账——不可得腿显式标「不可得」并给原因，**不出零差异冒充已核对**；四类差异双侧原始引用；折算汇率须 ecb-exr 出处，无出处不折算；payouts/佣金/手续费独立维度。**当前能力实底**：内圈全部为「需一次接入」而非已接通（Shopify 有动作无真实读取记录 <!-- capability:shopify.orders=unavailable -->，结算面待补 payout 动作 <!-- capability:shopify.settlements=unavailable -->，国内平台需先有一次接入 <!-- capability:taobao.orders=unmapped -->，拼多多不提供 <!-- capability:pinduoduo.orders=unavailable -->）；测试店合成数据全链真跑（接入→对账→差异→拍板→回写落账）可计数断言全过。
+- **跨境电商模板**：Shopify 读面（复用已采纳 a1-x-tech/mcp-shopify-admin）+ 国内平台经营数据（淘宝/天猫/京东经连接器实名 provider；拼多多如实不提供）；订单-收款-库存按**能力矩阵**决定几方对账——不可得腿显式标「不可得」并给原因，**不出零差异冒充已核对**；四类差异双侧原始引用；折算汇率须 ecb-exr 出处，无出处不折算；payouts/佣金/手续费独立维度。**当前能力实底**：内圈全部为「需一次接入」而非已接通（Shopify 有动作无真实读取记录 <!-- capability:shopify.orders=available -->，结算面待补 payout 动作 <!-- capability:shopify.settlements=unavailable -->，国内平台需先有一次接入 <!-- capability:taobao.orders=unmapped -->，拼多多不提供 <!-- capability:pinduoduo.orders=unavailable -->）；测试店合成数据全链真跑（接入→对账→差异→拍板→回写落账）可计数断言全过。
 - **餐饮连锁模板**：门店主数据确认车道（门店/POS 终端/收款商户号/外卖店铺 + 开停业生命周期 + 加盟/直营标注）；POS BYOK 适配器框架（厂商逐个上线、未适配如实报出 + 导出文件替代通道）；门店三方对账与日结日报三段（流水/收款/差异）；分成只出双方可核对的**分成对账单与核对指令**（对接持牌分账通道的输入数据）。
 - **模板边界（机械化审计）**：模板层零旁路账本、零直连库表、回写仅经内核 proposal 白名单车道（确认门只在拍板席位）、连接器对外部系统零写入——四条边界由边界审计器静态证明，随测试全绿。
 

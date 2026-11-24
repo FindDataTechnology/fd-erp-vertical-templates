@@ -1,7 +1,7 @@
 # 待补复核清单（能力矩阵）
 
-> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:ecadd43de033a1bd61a66c54681d3e9fb6ed3077f00fb198c3cd2f6d98cfe3ce`）。
-> 生成时刻的矩阵状态：{'available': 1, 'unavailable': 6, 'unmapped': 21}。
+> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:b6e21615a5339f4a67e61340132220caccf0dfb2ad2b82c15b685d540c58b3fe`）。
+> 生成时刻的矩阵状态：{'available': 2, 'unavailable': 5, 'unmapped': 21}。
 
 ## 未接通（unmapped）：21 格
 

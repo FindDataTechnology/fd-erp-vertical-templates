@@ -17,7 +17,7 @@
    "connector": "shopify_admin",
    "flows": {
     "orders": {
-     "status": "unavailable",
+     "status": "available",
      "channel": "shopify_admin.list_orders（Admin GraphQL orders 查询）",
      "evidence": [
       {
@@ -28,17 +28,17 @@
       {
        "kind": "runtime_read",
        "ref": "runtime:POST https://finddata-recon-poc.myshopify.com/admin/api/2026-10/graphql.json (orders)",
-       "note": "店里有 1 笔真实订单（#1001 Paid $2,629.95），但读取被拒：This app is not approved to access the Order object（protected-customer-data 门）"
+       "note": "读到 1 笔真实订单 #1001 / PAID / 2629.95 USD / 2026-11-24T14:43:40Z，金额与状态字段逐项可解析（开通 Protected Customer Data Level 1 之后）"
       },
       {
        "kind": "measured_record",
        "ref": "fd-erp-vertical-templates/coverage/shopify-live/orders.json",
-       "note": "实测落盘：ACCESS_DENIED；date 2026-11-24"
+       "note": "实测落盘（1 行，含真响应体）；date 2026-11-24"
       }
      ],
      "measured_at": "2026-11-24",
      "review_window_days": 90,
-     "reason": "app 未获 Protected Customer Data 批准 ⇒ 订单面不可得。此前空数组是「确实没有订单」，不是通道问题；有订单后才暴露这道门。解：Partner App → API access → Protected customer data 申请批准"
+     "reason": ""
     },
     "settlements": {
      "status": "unavailable",

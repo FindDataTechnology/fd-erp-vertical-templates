@@ -1,21 +1,43 @@
 {
  "schema": "shopify-live-read/v1",
- "measured_at": "2026-11-24T14:49:14+00:00",
+ "measured_at": "2026-11-24T15:24:46+00:00",
  "shop": "finddata-recon-poc.myshopify.com",
  "surface": "orders",
- "count": null,
- "note": "店铺已有 1 笔真实订单（#1001，Paid，$2,629.95），但 Admin API 读取被拒：`This app is not approved to access the Order object`（protected-customer-data 门）。此前返回空数组是因为当时确实没有订单，不是被拦——现在有订单才暴露这道门。",
+ "count": 1,
+ "note": "Protected Customer Data 已开通（Level 1 Customer data / Reason: App functionality）后读到真实订单；Level 2 保护字段（姓名/邮箱/电话/地址）**未申请**——对账只需订单金额与状态，不取 PII",
+ "pii_requested": false,
  "response": {
-  "errors": [
-   {
-    "message": "This app is not approved to access the Order object. See https://shopify.dev/docs/apps/launch/protected-customer-data",
-    "extensions": {
-     "code": "ACCESS_DENIED"
+  "data": {
+   "orders": {
+    "edges": [
+     {
+      "node": {
+       "id": "gid://shopify/Order/7806420844700",
+       "name": "#1001",
+       "createdAt": "2026-11-24T14:43:40Z",
+       "displayFinancialStatus": "PAID",
+       "displayFulfillmentStatus": "UNFULFILLED",
+       "totalPriceSet": {
+        "shopMoney": {
+         "amount": "2629.95",
+         "currencyCode": "USD"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  "extensions": {
+   "cost": {
+    "requestedQueryCost": 7,
+    "actualQueryCost": 3,
+    "throttleStatus": {
+     "maximumAvailable": 2000.0,
+     "currentlyAvailable": 1997,
+     "restoreRate": 100.0
     }
    }
-  ],
-  "data": null
- },
- "shop_order_count_via_admin_ui": 1,
- "blocking": "需要为 app 申请 Protected Customer Data 访问批准（Partner Dashboard → App → API access → Protected customer data），或改用 legacy custom app 的 shpat_ token。"
+  }
+ }
 }
