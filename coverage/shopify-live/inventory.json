@@ -1,0 +1,209 @@
+{
+ "schema": "shopify-live-read/v1",
+ "measured_at": "2026-11-24T13:50:56+00:00",
+ "shop": "finddata-recon-poc.myshopify.com",
+ "surface": "inventory",
+ "count": 26,
+ "note": "ok",
+ "response": {
+  "data": {
+   "inventoryItems": {
+    "edges": [
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449458332",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449491100",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449523868",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449556636",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449589404",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449622172",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449654940",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449687708",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449720476",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449753244",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449786012",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449818780",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449851548",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449884316",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449917084",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449949852",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376449982620",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450015388",
+       "sku": "sku-untracked-1",
+       "tracked": false
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450048156",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450080924",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450113692",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450244764",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450343068",
+       "sku": "sku-managed-1",
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450375836",
+       "sku": "sku-hosted-1",
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450408604",
+       "sku": null,
+       "tracked": true
+      }
+     },
+     {
+      "node": {
+       "id": "gid://shopify/InventoryItem/50376450474140",
+       "sku": null,
+       "tracked": true
+      }
+     }
+    ]
+   }
+  },
+  "extensions": {
+   "cost": {
+    "requestedQueryCost": 9,
+    "actualQueryCost": 6,
+    "throttleStatus": {
+     "maximumAvailable": 2000.0,
+     "currentlyAvailable": 1994,
+     "restoreRate": 100.0
+    }
+   }
+  }
+ }
+}

@@ -124,7 +124,7 @@
   "orders": {
    "flow": "orders",
    "by_platform": {
-    "shopify": "unmapped",
+    "shopify": "available",
     "tiktok_shop": "unmapped",
     "taobao": "unmapped",
     "tmall": "unmapped",
@@ -132,12 +132,12 @@
     "merchant_erp": "unmapped",
     "pinduoduo": "unavailable"
    },
-   "supplied_by_any": false
+   "supplied_by_any": true
   },
   "payments": {
    "flow": "settlements",
    "by_platform": {
-    "shopify": "unmapped",
+    "shopify": "unavailable",
     "tiktok_shop": "unmapped",
     "taobao": "unmapped",
     "tmall": "unmapped",
@@ -150,7 +150,7 @@
   "inventory": {
    "flow": "inventory",
    "by_platform": {
-    "shopify": "unmapped",
+    "shopify": "available",
     "tiktok_shop": "unmapped",
     "taobao": "unmapped",
     "tmall": "unmapped",
@@ -158,17 +158,17 @@
     "merchant_erp": "unmapped",
     "pinduoduo": "unavailable"
    },
-   "supplied_by_any": false
+   "supplied_by_any": true
   }
  },
  "capability_source": {
   "path": "capability-matrix.json",
-  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e",
+  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a",
   "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e"
+  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a"
  },
  "metric_calibers": [
   {

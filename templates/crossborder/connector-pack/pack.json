@@ -2,7 +2,7 @@
  "schema": "erp-vertical-connector-pack/v1",
  "name": "跨境电商对账连接器包",
  "version": "1.5.8",
- "description": "跨境电商对账模板·连接器 pack。能力面以包内 capability-matrix.json 为准：Shopify：需一次接入（provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture））；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）。凭证 BYOK 经连接器运行时注入，零落库零日志；对外部系统零写入。真实店读写沿 crm-board 2026-10-30 裁决逐店开通。",
+ "description": "跨境电商对账模板·连接器 pack。能力面以包内 capability-matrix.json 为准：Shopify：可读 orders, inventory；缺 settlements；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）。凭证 BYOK 经连接器运行时注入，零落库零日志；对外部系统零写入。真实店读写沿 crm-board 2026-10-30 裁决逐店开通。",
  "tags": [
   "ERP",
   "跨境电商",
@@ -218,7 +218,7 @@
  "i18n": {
   "en": {
    "name": "Cross-border e-commerce reconciliation connector pack",
-   "description": "Connector pack for the cross-border e-commerce reconciliation template. Capability surface follows capability-matrix.json in this pack: Shopify: needs one onboarding; TikTok Shop: needs one onboarding; Taobao: needs one onboarding; Tmall: needs one onboarding; JD: needs one onboarding; Merchant e-commerce ERP: needs one onboarding; Pinduoduo: not offered Per-platform reasons and review windows are recorded in capability-matrix.json. Credentials are injected by the connector runtime (BYOK), never stored or logged; zero writes to external systems. Real-store reads open per store under the crm-board ruling of 2026-10-30.",
+   "description": "Connector pack for the cross-border e-commerce reconciliation template. Capability surface follows capability-matrix.json in this pack: Shopify: ready; TikTok Shop: needs one onboarding; Taobao: needs one onboarding; Tmall: needs one onboarding; JD: needs one onboarding; Merchant e-commerce ERP: needs one onboarding; Pinduoduo: not offered Per-platform reasons and review windows are recorded in capability-matrix.json. Credentials are injected by the connector runtime (BYOK), never stored or logged; zero writes to external systems. Real-store reads open per store under the crm-board ruling of 2026-10-30.",
    "tags": [
     "ERP",
     "cross-border e-commerce",
@@ -235,7 +235,7 @@
   },
   "ja": {
    "name": "越境EC照合コネクタパック",
-   "description": "越境EC照合テンプレート用コネクタパック。能力面は同梱の capability-matrix.json に従います：Shopify: 初回接続が必要；TikTok Shop: 初回接続が必要；Taobao: 初回接続が必要；Tmall: 初回接続が必要；JD: 初回接続が必要；事業者向けEC ERP: 初回接続が必要；Pinduoduo: 提供対象外 プラットフォーム別の理由と再確認期限は capability-matrix.json に記載。資格情報はコネクタランタイム側で注入（BYOK）し、保存もログ出力もしません。外部システムへの書き込みはゼロ。実店舗の読み取りは 2026-10-30 の crm-board 決定に従い店舗ごとに開放します。",
+   "description": "越境EC照合テンプレート用コネクタパック。能力面は同梱の capability-matrix.json に従います：Shopify: 利用可能；TikTok Shop: 初回接続が必要；Taobao: 初回接続が必要；Tmall: 初回接続が必要；JD: 初回接続が必要；事業者向けEC ERP: 初回接続が必要；Pinduoduo: 提供対象外 プラットフォーム別の理由と再確認期限は capability-matrix.json に記載。資格情報はコネクタランタイム側で注入（BYOK）し、保存もログ出力もしません。外部システムへの書き込みはゼロ。実店舗の読み取りは 2026-10-30 の crm-board 決定に従い店舗ごとに開放します。",
    "tags": [
     "ERP",
     "越境EC",
@@ -252,7 +252,7 @@
   },
   "es": {
    "name": "Pack de conectores para conciliación de comercio electrónico transfronterizo",
-   "description": "Pack de conectores para la plantilla de conciliación de comercio electrónico transfronterizo. La capacidad sigue a capability-matrix.json incluido en el pack: Shopify: requiere una conexión; TikTok Shop: requiere una conexión; Taobao: requiere una conexión; Tmall: requiere una conexión; JD: requiere una conexión; ERP de comercio electrónico: requiere una conexión; Pinduoduo: no disponible Los motivos por plataforma y las ventanas de revisión están en capability-matrix.json. Las credenciales las inyecta el runtime del conector (BYOK), sin almacenarse ni registrarse; cero escrituras a sistemas externos. La lectura de tiendas reales se abre tienda por tienda según la decisión de crm-board del 2026-10-30.",
+   "description": "Pack de conectores para la plantilla de conciliación de comercio electrónico transfronterizo. La capacidad sigue a capability-matrix.json incluido en el pack: Shopify: listo; TikTok Shop: requiere una conexión; Taobao: requiere una conexión; Tmall: requiere una conexión; JD: requiere una conexión; ERP de comercio electrónico: requiere una conexión; Pinduoduo: no disponible Los motivos por plataforma y las ventanas de revisión están en capability-matrix.json. Las credenciales las inyecta el runtime del conector (BYOK), sin almacenarse ni registrarse; cero escrituras a sistemas externos. La lectura de tiendas reales se abre tienda por tienda según la decisión de crm-board del 2026-10-30.",
    "tags": [
     "ERP",
     "comercio electrónico transfronterizo",
@@ -269,7 +269,7 @@
   },
   "fr": {
    "name": "Pack de connecteurs pour la réconciliation e-commerce transfrontalière",
-   "description": "Pack de connecteurs pour le modèle de réconciliation e-commerce transfrontalière. La capacité suit capability-matrix.json inclus dans le pack : Shopify: connexion à faire ; TikTok Shop: connexion à faire ; Taobao: connexion à faire ; Tmall: connexion à faire ; JD: connexion à faire ; ERP e-commerce marchand: connexion à faire ; Pinduoduo: non proposé Les motifs par plateforme et les fenêtres de revue figurent dans capability-matrix.json. Les identifiants sont injectés par le runtime du connecteur (BYOK), jamais stockés ni journalisés ; aucune écriture vers des systèmes externes. La lecture des boutiques réelles s'ouvre boutique par boutique selon la décision crm-board du 2026-10-30.",
+   "description": "Pack de connecteurs pour le modèle de réconciliation e-commerce transfrontalière. La capacité suit capability-matrix.json inclus dans le pack : Shopify: prêt ; TikTok Shop: connexion à faire ; Taobao: connexion à faire ; Tmall: connexion à faire ; JD: connexion à faire ; ERP e-commerce marchand: connexion à faire ; Pinduoduo: non proposé Les motifs par plateforme et les fenêtres de revue figurent dans capability-matrix.json. Les identifiants sont injectés par le runtime du connecteur (BYOK), jamais stockés ni journalisés ; aucune écriture vers des systèmes externes. La lecture des boutiques réelles s'ouvre boutique par boutique selon la décision crm-board du 2026-10-30.",
    "tags": [
     "ERP",
     "e-commerce transfrontalière",
@@ -287,7 +287,7 @@
  },
  "capability": {
   "source": "capability-matrix.json",
-  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e",
+  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a",
   "platforms": {
    "shopify": {
     "display_zh": "Shopify",
@@ -295,16 +295,16 @@
     "connector": "shopify_admin",
     "flows": {
      "orders": {
-      "status": "unmapped",
-      "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture）"
+      "status": "available",
+      "reason": ""
      },
      "settlements": {
-      "status": "unmapped",
-      "reason": "payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
+      "status": "unavailable",
+      "reason": "开发店未开通 Shopify Payments ⇒ payouts 面如实不可得（需真实商户店开通支付后重测）"
      },
      "inventory": {
-      "status": "unmapped",
-      "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录"
+      "status": "available",
+      "reason": ""
      },
      "refunds": {
       "status": "unmapped",
@@ -451,11 +451,11 @@
     }
    }
   },
-  "statement": "Shopify：需一次接入（provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture））；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）"
+  "statement": "Shopify：可读 orders, inventory；缺 settlements；TikTok Shop：需一次接入（通道未实现：全仓仅见一句文案，无 provider、无适配器）；淘宝：需一次接入（骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现）；天猫：需一次接入（骨架待锚点客户（与淘宝共用同一 provider））；京东：需一次接入（骨架待锚点客户：目录无 provider）；商家电商 ERP（旺店通/聚水潭等）：需一次接入（通道未实现；国内库存腿的唯一来源，优先实现）；拼多多：不提供（上游接口 schema 缺失，当前不提供；不声明绑定、不留槽位）"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e"
+  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a"
  },
  "notes": "已上架：市场 v10（packId cv0kj9mRHGrz6nNMA7glVg）。连接器包只声明外部系统绑定契约（connector_bindings）与纪律卡，无 MCP 工具面（运行时账务面在 fd-erp-ledger-mcp）；provider 实现归萬星连接器目录；能力面以同包 capability-matrix.json 为准（内圈全为「需一次接入」，拼多多不提供），Shopify payout 只读动作已落地但无真实店读取记录，结算面仍不承诺；凭证 BYOK 经连接器运行时注入，零落库零日志。"
 }

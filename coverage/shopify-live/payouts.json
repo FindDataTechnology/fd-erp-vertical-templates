@@ -1,0 +1,24 @@
+{
+ "schema": "shopify-live-read/v1",
+ "measured_at": "2026-11-24T13:50:56+00:00",
+ "shop": "finddata-recon-poc.myshopify.com",
+ "surface": "payouts",
+ "count": null,
+ "note": "shopifyPaymentsAccount = null（开发店未开通 Shopify Payments——如实不可得，不是读取失败）",
+ "response": {
+  "data": {
+   "shopifyPaymentsAccount": null
+  },
+  "extensions": {
+   "cost": {
+    "requestedQueryCost": 7,
+    "actualQueryCost": 1,
+    "throttleStatus": {
+     "maximumAvailable": 2000.0,
+     "currentlyAvailable": 1999,
+     "restoreRate": 100.0
+    }
+   }
+  }
+ }
+}

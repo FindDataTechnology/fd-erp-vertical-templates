@@ -1,9 +1,9 @@
 # 待补复核清单（能力矩阵）
 
-> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:60e32d5c658f541811b6370c763f3b84c8f212d7fd53ec6c75e6b374d49bfc6e`）。
-> 生成时刻的矩阵状态：{'available': 0, 'unavailable': 4, 'unmapped': 24}。
+> 由 `scripts/gen_capability_artifacts.py` 从 `capability-matrix.json` 生成，请勿手改（矩阵指纹 `sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a`）。
+> 生成时刻的矩阵状态：{'available': 2, 'unavailable': 5, 'unmapped': 21}。
 
-## 未接通（unmapped）：24 格
+## 未接通（unmapped）：21 格
 
 | 平台 | 流 | 原因 | 下一步 |
 |---|---|---|---|
@@ -15,10 +15,7 @@
 | merchant_erp | orders | 通道未实现；国内库存腿的唯一来源，优先实现 | 在连接器目录立 provider 并实现只读动作 |
 | merchant_erp | refunds | 通道未实现 | 在连接器目录立 provider 并实现只读动作 |
 | merchant_erp | settlements | 通道未实现；取决于所选厂商是否开放结算面 | 在连接器目录立 provider 并实现只读动作 |
-| shopify | inventory | provider 动作存在（动作面已核对 catalog），但无真实店读取记录 | 做一次真实读取并留测量记录 |
-| shopify | orders | provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture） | 做一次真实读取并留测量记录 |
 | shopify | refunds | 退款作为独立流尚未在模板层消费；当前由订单状态与差异类型覆盖 | 在连接器目录立 provider 并实现只读动作 |
-| shopify | settlements | payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格 | 确认承载通道是否已部署，再补证据 |
 | taobao | inventory | 骨架待锚点客户 | 在连接器目录立 provider 并实现只读动作 |
 | taobao | orders | 骨架待锚点客户：目录无 provider，按 ADR 0002 先有客户再实现 | 确认承载通道是否已部署，再补证据 |
 | taobao | refunds | 骨架待锚点客户 | 在连接器目录立 provider 并实现只读动作 |

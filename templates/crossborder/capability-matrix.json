@@ -17,51 +17,66 @@
    "connector": "shopify_admin",
    "flows": {
     "orders": {
-     "status": "unmapped",
-     "channel": "shopify_admin.list_orders / get_order",
+     "status": "available",
+     "channel": "shopify_admin.list_orders（Admin GraphQL orders 查询）",
      "evidence": [
       {
        "kind": "provider_action",
        "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_orders",
-       "note": "list_orders / get_order 已在目录"
-      }
-     ],
-     "measured_at": null,
-     "review_window_days": 90,
-     "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录（真店 POC 未开，现仅合成 fixture）"
-    },
-    "settlements": {
-     "status": "unmapped",
-     "channel": "shopify_admin.list_payouts（GraphQL shopifyPaymentsAccount.payouts）",
-     "evidence": [
-      {
-       "kind": "provider_action",
-       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_payouts",
-       "note": "list_payouts 已在目录（catalog 27 项）"
+       "note": "list_orders / get_order 已在目录（27 项动作）"
       },
       {
        "kind": "runtime_read",
-       "ref": "runtime:POST /v1/actions/shopify_admin.list_payouts → 401（动作已注册，无凭证=AUTH_FAILED 而非 404）",
-       "note": "runtime 冒烟 2026-11-10：动作接线成功，无真实凭证故未读到数据"
+       "ref": "runtime:POST https://finddata-recon-poc.myshopify.com/admin/api/2026-10/graphql.json (surface=orders)",
+       "note": "真实店读取成功，返回 0 行——通道接通、字段可解析；空数组不足以证明字段语义（无测试订单）"
+      },
+      {
+       "kind": "measured_record",
+       "ref": "fd-erp-vertical-templates/coverage/shopify-live/orders.json",
+       "note": "实测读数落盘（0 行）；date 2026-11-24"
       }
      ],
-     "measured_at": null,
+     "measured_at": "2026-11-24",
      "review_window_days": 90,
-     "reason": "payout 动作已落地且 runtime 冒烟接线成功，但无真实店读取记录（真店 POC 未开）：按证据规则仍为 unmapped，待一次真实读取后升格"
+     "reason": ""
+    },
+    "settlements": {
+     "status": "unavailable",
+     "channel": "shopify_admin.list_payouts（GraphQL shopifyPaymentsAccount.payouts）",
+     "evidence": [
+      {
+       "kind": "runtime_read",
+       "ref": "runtime:POST https://finddata-recon-poc.myshopify.com/admin/api/2026-10/graphql.json (shopifyPaymentsAccount)",
+       "note": "实测返回 shopifyPaymentsAccount = null：开发店未开通 Shopify Payments。动作与 scope 都在（read_shopify_payments_payouts 已授），是账户侧未开通，不是通道缺失"
+      }
+     ],
+     "measured_at": "2026-11-24",
+     "review_window_days": 90,
+     "reason": "开发店未开通 Shopify Payments ⇒ payouts 面如实不可得（需真实商户店开通支付后重测）"
     },
     "inventory": {
-     "status": "unmapped",
-     "channel": "shopify_admin.list_inventory_items / get_inventory_item",
+     "status": "available",
+     "channel": "shopify_admin.list_inventory_items（Admin GraphQL inventoryItems）",
      "evidence": [
       {
        "kind": "provider_action",
        "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_inventory_items",
        "note": "list_inventory_items / get_inventory_item 已在目录"
+      },
+      {
+       "kind": "runtime_read",
+       "ref": "runtime:POST https://finddata-recon-poc.myshopify.com/admin/api/2026-10/graphql.json (surface=inventoryItems)",
+       "note": "真实店读到 26 条 inventoryItem（id/sku/tracked 全部可解析）"
+      },
+      {
+       "kind": "measured_record",
+       "ref": "fd-erp-vertical-templates/coverage/shopify-live/inventory.json",
+       "note": "实测读数落盘（26 行）；date 2026-11-24"
       }
      ],
-     "measured_at": null,
+     "measured_at": "2026-11-24",
      "review_window_days": 90,
-     "reason": "provider 动作存在（动作面已核对 catalog），但无真实店读取记录"
+     "reason": ""
     },
     "refunds": {
      "status": "unmapped",
