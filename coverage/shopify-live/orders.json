@@ -1,26 +1,21 @@
 {
  "schema": "shopify-live-read/v1",
- "measured_at": "2026-11-24T13:50:56+00:00",
+ "measured_at": "2026-11-24T14:49:14+00:00",
  "shop": "finddata-recon-poc.myshopify.com",
  "surface": "orders",
- "count": 0,
- "note": "ok",
+ "count": null,
+ "note": "店铺已有 1 笔真实订单（#1001，Paid，$2,629.95），但 Admin API 读取被拒：`This app is not approved to access the Order object`（protected-customer-data 门）。此前返回空数组是因为当时确实没有订单，不是被拦——现在有订单才暴露这道门。",
  "response": {
-  "data": {
-   "orders": {
-    "edges": []
-   }
-  },
-  "extensions": {
-   "cost": {
-    "requestedQueryCost": 9,
-    "actualQueryCost": 2,
-    "throttleStatus": {
-     "maximumAvailable": 2000.0,
-     "currentlyAvailable": 1998,
-     "restoreRate": 100.0
+  "errors": [
+   {
+    "message": "This app is not approved to access the Order object. See https://shopify.dev/docs/apps/launch/protected-customer-data",
+    "extensions": {
+     "code": "ACCESS_DENIED"
     }
    }
-  }
- }
+  ],
+  "data": null
+ },
+ "shop_order_count_via_admin_ui": 1,
+ "blocking": "需要为 app 申请 Protected Customer Data 访问批准（Partner Dashboard → App → API access → Protected customer data），或改用 legacy custom app 的 shpat_ token。"
 }

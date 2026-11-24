@@ -124,7 +124,7 @@
   "orders": {
    "flow": "orders",
    "by_platform": {
-    "shopify": "available",
+    "shopify": "unavailable",
     "tiktok_shop": "unmapped",
     "taobao": "unmapped",
     "tmall": "unmapped",
@@ -132,7 +132,7 @@
     "merchant_erp": "unmapped",
     "pinduoduo": "unavailable"
    },
-   "supplied_by_any": true
+   "supplied_by_any": false
   },
   "payments": {
    "flow": "settlements",
@@ -163,12 +163,12 @@
  },
  "capability_source": {
   "path": "capability-matrix.json",
-  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a",
+  "fingerprint": "sha256:ecadd43de033a1bd61a66c54681d3e9fb6ed3077f00fb198c3cd2f6d98cfe3ce",
   "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:7303522804e501c94d2a893807bdf9890f55dd67d7db24656fc0ce4f8130bf8a"
+  "fingerprint": "sha256:ecadd43de033a1bd61a66c54681d3e9fb6ed3077f00fb198c3cd2f6d98cfe3ce"
  },
  "metric_calibers": [
   {
