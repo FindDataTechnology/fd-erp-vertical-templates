@@ -48,11 +48,18 @@ DEFAULT_REVIEW_WINDOW_DAYS = {
     "merchant_erp": 90,
 }
 
-#: 证据类型：available 必须同时有 provider_action 与 runtime_read。
+#: 证据类型：available 必须同时有**动作面**证据与 runtime_read。
 EVIDENCE_PROVIDER_ACTION = "provider_action"
+#: 自建车道的「动作面」证据：自有实现即动作面，不存在第三方 provider。
+#: 为什么单独一个 kind 而不是复用 provider_action：写 provider_action 会让证据
+#: 指向一个不存在的 provider（谎报外部来源）；写 own_implementation 才是这个格子
+#: 的真实形状。两类都满足「动作面已存在」这条要求。
+EVIDENCE_OWN_IMPLEMENTATION = "own_implementation"
 EVIDENCE_RUNTIME_READ = "runtime_read"
 EVIDENCE_CATALOG = "catalog_entry"
 EVIDENCE_DEPLOYMENT = "deployment"
+#: 动作面证据的两种合法形态（二选一即可）
+EVIDENCE_ACTION_SURFACES = (EVIDENCE_PROVIDER_ACTION, EVIDENCE_OWN_IMPLEMENTATION)
 EVIDENCE_REQUIRED_FOR_AVAILABLE = (EVIDENCE_PROVIDER_ACTION, EVIDENCE_RUNTIME_READ)
 
 #: 报表腿 → 矩阵流（preset 生成与运行期解析共用）。
@@ -399,8 +406,9 @@ def _apply_downgrade(cell: Cell, today: date) -> Cell:
     if cell.status != STATUS_AVAILABLE:
         return cell
     kinds = {e.kind for e in cell.evidence}
-    if EVIDENCE_PROVIDER_ACTION not in kinds:
-        return _demote(cell, "证据缺 provider_action（动作面未登记）")
+    if not (kinds & set(EVIDENCE_ACTION_SURFACES)):
+        return _demote(cell,
+                       "证据缺动作面（既无 provider_action 也无 own_implementation）")
     if EVIDENCE_RUNTIME_READ not in kinds:
         return _demote(cell, "缺真实读取记录：动作存在不等于已验证可读")
     if cell.measured_at is None:

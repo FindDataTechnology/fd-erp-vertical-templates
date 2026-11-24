@@ -45,6 +45,11 @@
      "channel": "shopify_admin.list_payouts（GraphQL shopifyPaymentsAccount.payouts）",
      "evidence": [
       {
+       "kind": "provider_action",
+       "ref": "open-connector-mt/src/providers/shopify_admin/actions.ts#list_payouts",
+       "note": "list_payouts 已在目录（27 项动作）；scope read_shopify_payments_payouts 已授"
+      },
+      {
        "kind": "runtime_read",
        "ref": "runtime:POST https://finddata-recon-poc.myshopify.com/admin/api/2026-10/graphql.json (shopifyPaymentsAccount)",
        "note": "实测返回 shopifyPaymentsAccount = null：开发店未开通 Shopify Payments。动作与 scope 都在（read_shopify_payments_payouts 已授），是账户侧未开通，不是通道缺失"
@@ -343,6 +348,95 @@
      "measured_at": "2026-11-10",
      "review_window_days": 365,
      "reason": "同上：上游 schema 缺失"
+    }
+   }
+  },
+  {
+   "key": "own_channel",
+   "display_zh": "自有渠道（自建店面）",
+   "display_en": "Own channel (self-built storefront)",
+   "channel_kind": "own_channel",
+   "connector": null,
+   "flows": {
+    "orders": {
+     "status": "available",
+     "channel": "自建店面 API：/shop/{tenant}/orders（预付单）+ 内核 retail_payment_received 事实",
+     "evidence": [
+      {
+       "kind": "own_implementation",
+       "ref": "fd-erp-vertical-api/fd_erp_vertical_api/storefront.py#shop_create_order",
+       "note": "自建下单车道：POST /shop/{tenant}/orders（预付单，不占信用）"
+      },
+      {
+       "kind": "runtime_read",
+       "ref": "runtime:POST /shop/acme/orders（本地实测四步链路）+ 内核 business_events 读回",
+       "note": "匿名下单 → 到账登记 → 确认门 → 履约移交，四步真跑通；订单落在内核事件层，payment 事实用独立事件类型 retail_payment_received"
+      },
+      {
+       "kind": "measured_record",
+       "ref": "fd-erp/docs/storefront-runbook.md#2-四步链路验收",
+       "note": "四步链路验收脚本与判据；date 2026-11-24"
+      }
+     ],
+     "measured_at": "2026-11-24",
+     "review_window_days": 90,
+     "reason": ""
+    },
+    "settlements": {
+     "status": "available",
+     "channel": "retail_payment_received（现金进商家自有账户，平台只记事实）",
+     "evidence": [
+      {
+       "kind": "own_implementation",
+       "ref": "fd-erp-ledger-mcp/fd_erp_ledger_mcp/migrations/0022_retail_payment_event.sql#retail_payment_received",
+       "note": "自建到账事实：retail_payment_received（独立事件类型，requires_posting=false）"
+      },
+      {
+       "kind": "runtime_read",
+       "ref": "runtime:POST /shop/{tenant}/orders/{ref}/payment + 内核读回",
+       "note": "到账事实 requires_posting=false（平台不经手资金）；幂等实测重复确认只落一条"
+      },
+      {
+       "kind": "measured_record",
+       "ref": "fd-erp-vertical-templates/templates/supply-chain/... (见 0022 migration)",
+       "note": "retail_payment_received 事件类型随内核 migration 0022 注册；date 2026-11-24"
+      }
+     ],
+     "measured_at": "2026-11-24",
+     "review_window_days": 90,
+     "reason": ""
+    },
+    "inventory": {
+     "status": "available",
+     "channel": "零售取价层 + 商品池渠道可见性（/shop/{tenant}/products 只出可售品）",
+     "evidence": [
+      {
+       "kind": "own_implementation",
+       "ref": "fd-erp-vertical-api/fd_erp_vertical_api/storefront.py#shop_products",
+       "note": "自建公开读面：只出零售渠道可见且已上架且有零售价的商品"
+      },
+      {
+       "kind": "runtime_read",
+       "ref": "runtime:GET /shop/{tenant}/products（匿名）",
+       "note": "只出「零售渠道可见 + 已上架 + 有零售价」的商品；无可售零售价即排除，不回落 B2B 价或商品主档 base_price"
+      },
+      {
+       "kind": "measured_record",
+       "ref": "fd-erp-vertical-api/tests/test_storefront_public.py",
+       "note": "22 条测试覆盖匿名读/跨店 404/无价排除/限流；date 2026-11-24"
+      }
+     ],
+     "measured_at": "2026-11-24",
+     "review_window_days": 90,
+     "reason": ""
+    },
+    "refunds": {
+     "status": "unmapped",
+     "channel": "售后申请车道已有（erp-aftersale-lane），但退款不产生资金事实",
+     "evidence": [],
+     "measured_at": null,
+     "review_window_days": 90,
+     "reason": "退款是资金动作，平台二清红线不碰；售后申请只记流程记录。真要退钱走商家自有支付通道，平台无动作面"
     }
    }
   }

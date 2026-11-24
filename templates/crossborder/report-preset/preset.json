@@ -36,7 +36,7 @@
      ],
      "leg_flow": "settlements",
      "availability_source": "capability-matrix",
-     "unavailable_reason_template": "不可得：当前无通道提供该数据腿（见能力矩阵 jd.settlements, merchant_erp.settlements, pinduoduo.settlements, shopify.settlements, taobao.settlements, tiktok_shop.settlements, tmall.settlements）"
+     "unavailable_reason_template": "不可得：当前无通道提供该数据腿（见能力矩阵 jd.settlements, merchant_erp.settlements, own_channel.settlements, pinduoduo.settlements, shopify.settlements, taobao.settlements, tiktok_shop.settlements, tmall.settlements）"
     },
     {
      "key": "inventory",
@@ -130,7 +130,8 @@
     "tmall": "unmapped",
     "jd": "unmapped",
     "merchant_erp": "unmapped",
-    "pinduoduo": "unavailable"
+    "pinduoduo": "unavailable",
+    "own_channel": "available"
    },
    "supplied_by_any": true
   },
@@ -143,9 +144,10 @@
     "tmall": "unmapped",
     "jd": "unmapped",
     "merchant_erp": "unmapped",
-    "pinduoduo": "unavailable"
+    "pinduoduo": "unavailable",
+    "own_channel": "available"
    },
-   "supplied_by_any": false
+   "supplied_by_any": true
   },
   "inventory": {
    "flow": "inventory",
@@ -156,19 +158,20 @@
     "tmall": "unmapped",
     "jd": "unmapped",
     "merchant_erp": "unmapped",
-    "pinduoduo": "unavailable"
+    "pinduoduo": "unavailable",
+    "own_channel": "available"
    },
    "supplied_by_any": true
   }
  },
  "capability_source": {
   "path": "capability-matrix.json",
-  "fingerprint": "sha256:b6e21615a5339f4a67e61340132220caccf0dfb2ad2b82c15b685d540c58b3fe",
+  "fingerprint": "sha256:d5c42757a03ef3044b33f2ea74ebeaabb96cd14919d41c8f3d8c2a643e9a7e59",
   "rule": "报表腿的可得性以矩阵为准；不可得腿保留位置并标原因，禁止置 0 或省略"
  },
  "_generated_from": {
   "generator": "scripts/gen_capability_artifacts.py",
-  "fingerprint": "sha256:b6e21615a5339f4a67e61340132220caccf0dfb2ad2b82c15b685d540c58b3fe"
+  "fingerprint": "sha256:d5c42757a03ef3044b33f2ea74ebeaabb96cd14919d41c8f3d8c2a643e9a7e59"
  },
  "metric_calibers": [
   {

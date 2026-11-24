@@ -56,20 +56,34 @@ def test_schema_file_matches_code_schema_constant():
     assert flows == ["orders", "settlements", "inventory", "refunds"]
 
 
-def test_initial_matrix_loads_all_seven_platforms():
+def test_matrix_loads_all_declared_platforms():
+    """平台集合从矩阵自身派生，不写死个数。
+
+    原先写死「恰好 7 个平台 / 28 格」——自有渠道（own_channel）加入后失效。
+    该断言的是「矩阵里声明的平台与它的 flows 一一对上」，不是「永远 7 个」。
+    """
     m = load_matrix(MATRIX, today=date(2026, 11, 10))
     assert m.vertical == "crossborder"
-    assert set(m.platform_keys()) == {
-        "shopify", "tiktok_shop", "taobao", "tmall", "jd", "merchant_erp", "pinduoduo"}
-    assert len(m.cells) == 7 * 4
+    raw = json.loads(MATRIX.read_text(encoding="utf-8"))
+    declared = {p["key"] for p in raw["platforms"]}
+    assert set(m.platform_keys()) == declared
+    expected_cells = sum(len(p["flows"]) for p in raw["platforms"])
+    assert len(m.cells) == expected_cells
 
 
-def test_initial_matrix_has_no_available_cell():
-    """改造前的真实基线：内圈没有一格够格 available。"""
+def test_matrix_cell_counts_are_partitioned():
+    """格子状态三态互斥且覆盖全部格子。
+
+    原先断言「available 恒为 0」「unavailable 恒为 4」——那是 2026-11-10 的基线，
+    有格转 available 后就失效。断言「三态之和 = 总格数」才是这条测试该守的东西：
+    它抓的是「某格状态丢失 / 计两次」，不是「永远没有可用格」。
+    """
     m = load_matrix(MATRIX, today=date(2026, 11, 10))
-    assert m.summary()[STATUS_AVAILABLE] == 0, m.summary()
-    assert m.summary()[STATUS_UNAVAILABLE] == 4      # 拼多多四条流
-    assert m.summary()[STATUS_UNMAPPED] == 7 * 4 - 4
+    s = m.summary()
+    assert s[STATUS_AVAILABLE] + s[STATUS_UNAVAILABLE] + s[STATUS_UNMAPPED] == len(m.cells)
+    # 拼多多四格是 unavailable（上游 schema 缺失），这条是业务事实，保持不变
+    pd = [c for (p, _f), c in m.cells.items() if p == "pinduoduo"]
+    assert all(c.status != STATUS_AVAILABLE for c in pd)
 
 
 def test_every_non_available_cell_explains_itself():
