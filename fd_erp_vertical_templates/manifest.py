@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import TemplateError
+from .pricing import RULE_LAYERS as PRICING_LAYERS
 
 TEMPLATE_SCHEMA = "erp-vertical-template/v1"
 ASSET_KINDS = ("connector_pack", "fleet_blueprint", "account_mapping_pack", "report_preset")
@@ -276,6 +277,11 @@ def _check_pricing_rules_payload(payload: dict[str, Any], rel: str) -> None:
     for i, r in enumerate(rules):
         if not isinstance(r, dict) or not str(r.get("layer") or "").strip():
             raise TemplateError("MANIFEST_INVALID", f"{rel}: rules[{i}] 缺 layer")
+        # 层名拼错会让规则在取价时被静默忽略（confirmed_rules 按层过滤），故在此点名
+        if r["layer"] not in PRICING_LAYERS:
+            raise TemplateError(
+                "MANIFEST_INVALID",
+                f"{rel}: rules[{i}] layer={r['layer']!r} 不在 {PRICING_LAYERS}")
         if not str(r.get("rate_source") or "").strip():
             raise TemplateError("MANIFEST_INVALID",
                                 f"{rel}: rules[{i}] 缺 rate_source（无出处规则拒绝上架）")

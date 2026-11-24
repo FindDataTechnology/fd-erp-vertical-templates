@@ -22,6 +22,16 @@ from .manifest import load_template_manifest
 PKG_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PKG_DIR.parent
 
+#: 三处对外站点的**能力表述源文件**（相对工作区根）。它们是 `capability_check` 的
+#: 扫描对象：任一文件里写的能力与矩阵冲突即判红。
+#: 为什么是源码而不是生成物：生成物里没有可信的锚点来源（ERP 独立站的能力段就是
+#: 从矩阵派生的，拿它验矩阵是自证）；营销站/官网的能力文案是手写的，正是要盯的那个。
+EXTERNAL_SITE_DOCS: tuple[str, ...] = (
+    "fd-marketing-web/src/components/AlmanacSite.astro",
+    "fd-official-web/src/components/ErpLanding.astro",
+    "fd-erp/docs/README.md",          # ERP 对外口径唯一出处（章程派生件）
+)
+
 
 def _run_audit() -> int:
     report = audit_template(PKG_DIR, asset_dirs=[
@@ -284,7 +294,10 @@ def _run_capability_check(template: str, docs: list[str] | None,
     from .capability_check import check_template, render_lint
 
     doc_paths = docs if docs else _default_capability_docs()
-    result = check_template(template, doc_paths=doc_paths)
+    # 显式传 --doc 时只扫那几份（人工排查用）；默认路径下三处对外站点是**必扫**，
+    # 缺席判红——见 capability_check.check_template 的 required_docs 说明。
+    required = [] if docs else _external_site_docs()
+    result = check_template(template, doc_paths=doc_paths, required_docs=required)
     if as_json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
@@ -321,7 +334,19 @@ def _default_capability_docs(workspace: Path | None = None,
         candidates = sorted(snapshot_root.glob(f"*/{snap_name}"))
         if candidates:
             out.append(candidates[-1])
+    # 注意：三处对外站点不在这里——它们走 `_external_site_docs()` 的必扫清单
+    # （缺席判红）。两处都放会让同一份文件被扫两遍，锚点计数翻倍（实测 23→27）。
     return out
+
+
+def _external_site_docs(workspace: Path | None = None) -> list[Path]:
+    """三处对外站点源码（**必扫**清单，change establish-ai-native-ecommerce-stack 1.2）。
+
+    能力表述在这些站点上写着，此前完全在雷达外——营销站写「国内八平台」而矩阵里
+    只有 2 个对得上。缺席由 capability_check 判红，不在这里过滤。
+    """
+    workspace = workspace or REPO_ROOT.parent
+    return [workspace / rel for rel in EXTERNAL_SITE_DOCS]
 
 
 def _run_coverage(action: str, args) -> int:

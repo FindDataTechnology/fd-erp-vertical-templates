@@ -125,6 +125,74 @@ def test_pricing_conflict_rejected(tmp_path, md):
     assert redo["status"] == "pending"
 
 
+# ---- 零售取价层（change establish-ai-native-ecommerce-stack 0.1/0.2）----
+
+def _retail_rule(*, product="*", channel="*", price="120.00",
+                 vf="2026-01-01", vt="2027-12-31", source="retail/price-list/v1"):
+    return {"layer": "retail",
+            "scope": {"product_code": product, "channel_id": channel},
+            "price": price, "valid_from": vf, "valid_to": vt,
+            "rate_source": source}
+
+
+def test_retail_rule_requires_rate_source(tmp_path, md):
+    m, _ = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    with pytest.raises(TemplateError) as ei:
+        book.add_rule(_retail_rule(source=""))
+    assert "rate_source" in ei.value.message
+
+
+def test_retail_scope_is_channel_not_customer(tmp_path, md):
+    m, _ = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    # 零售层的作用域维度是 channel_id；缺 channel_id 不报错（通配），但层名必须合法
+    ok = book.add_rule(_retail_rule(channel="retail-online"))
+    book.confirm_rule(ok["request_id"])
+    out = book.resolve_retail_price("tpl-supply", "retail-online", "P001", DAY)
+    assert out["sellable"] is True and out["unit_price"] == "120"
+
+
+def test_retail_price_does_not_fall_back_to_b2b_layers(tmp_path, md):
+    m, _ = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    # 只有 B2B 三层价目，没有任何 retail 规则
+    req = book.add_rule(_rule("customer_price", customer="C001", price="88.00"))
+    book.confirm_rule(req["request_id"])
+    req2 = book.add_rule(_rule("promo", price="92.00"))
+    book.confirm_rule(req2["request_id"])
+    out = book.resolve_retail_price("tpl-supply", "retail-online", "P001", DAY)
+    assert out["sellable"] is False
+    assert out["rule_chain"] == []
+    assert "无可售零售价" in out["reason"]
+
+    # 反向：B2B 取价（resolve_price）不因零售规则存在而拿到 120
+    b2b = book.resolve_price("tpl-supply", "C001", "P001", DAY)
+    assert "retail" not in [c["layer"] for c in b2b["rule_chain"]]
+
+
+def test_retail_price_does_not_use_base_price(tmp_path, md):
+    m, _ = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    # 商品主档有 base_price=100，但零售层无规则 → 不可售，不得回落 100
+    out = book.resolve_retail_price("tpl-supply", "retail-online", "P001", DAY)
+    assert out["sellable"] is False
+    assert "unit_price" not in out
+
+
+def test_retail_channel_scoped_price_wins_over_wildcard(tmp_path, md):
+    m, _ = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    w = book.add_rule(_retail_rule(price="150.00"))
+    book.confirm_rule(w["request_id"])
+    s = book.add_rule(_retail_rule(channel="retail-online", price="120.00"))
+    book.confirm_rule(s["request_id"])
+    out = book.resolve_retail_price("tpl-supply", "retail-online", "P001", DAY)
+    assert out["unit_price"] == "120"  # 更具体作用域优先
+    other = book.resolve_retail_price("tpl-supply", "retail-offline", "P001", DAY)
+    assert other["unit_price"] == "150"  # 通配兜底
+
+
 # ---- 采购编排 ----
 
 def test_procurement_full_flow(tmp_path, md):
@@ -399,3 +467,118 @@ def test_inbound_task_accepts_frontend_line_shape(tmp_path, md):
     with pytest.raises(TemplateError) as ei:
         proc.create_inbound_task(bad["ref"], warehouse="WH-EAST")
     assert ei.value.code == "INVALID_ARGUMENT"
+
+
+# ---- 零售预付单与收款到账（change establish-ai-native-ecommerce-stack 0.6–0.12）----
+
+CHANNEL = "retail-online"
+
+
+def _retail_for(code, price="120.00"):
+    return {"layer": "retail",
+            "scope": {"product_code": code, "channel_id": CHANNEL},
+            "price": price, "valid_from": "2026-01-01", "valid_to": "2099-12-31",
+            "rate_source": "retail/price-list/v1"}
+
+
+@pytest.fixture()
+def retail_board(tmp_path, md):
+    m, _ids = md
+    book = PricingRuleBook("tpl-supply", tmp_path / "data", master=m)
+    for code, price in (("P001", "120.00"), ("P002", "88.00")):
+        book.confirm_rule(book.add_rule(_retail_for(code, price))["request_id"])
+    kernel = FakeCreditKernel(available="0", reserved="0", ar="0", limit="0")
+    board = OrderOrchestrator("tpl-supply", tmp_path / "data", kernel, m, book)
+    return board, kernel, m
+
+
+SHIP = {"name": "张三", "phone": "13800000000", "address": "示例地址"}
+
+
+def test_prepaid_order_succeeds_with_zero_credit(retail_board):
+    """0.8：租户无任何信用额度时零售预付单仍能受理，且不产生占用行。"""
+    board, kernel, _m = retail_board
+    out = board.accept_prepaid_order(
+        [{"product_code": "P001", "qty": 1}], DAY, channel=CHANNEL, ship_to=SHIP)
+    assert out["accepted"] is True
+    assert out["settlement_mode"] == "prepaid"
+    assert out["amount_total"] == "120"
+    assert kernel.reserve_calls == []          # 零占用
+    assert kernel.query_credit is not None
+
+
+def test_prepaid_order_requires_shipping_info(retail_board):
+    """0.9：缺收货信息被拒并指名缺项。"""
+    board, _k, _m = retail_board
+    with pytest.raises(TemplateError) as ei:
+        board.accept_prepaid_order(
+            [{"product_code": "P001", "qty": 1}], DAY, channel=CHANNEL,
+            ship_to={"name": "张三"})          # 缺 phone
+    assert "ship_to.phone" in str(ei.value.detail)
+
+
+def test_prepaid_order_without_retail_price_is_rejected(retail_board):
+    """零售层无价即拒——不得回落 B2B 价或基础价。"""
+    board, _k, m = retail_board
+    req = m.create_entity("product", {"code": "P003", "name": "无零售价品",
+                                      "units": [{"unit": "件", "kind": "base",
+                                                 "rate": "1"}],
+                                      "base_price": "50"})
+    m.confirm_request(req["request_id"])
+    with pytest.raises(TemplateError) as ei:
+        board.accept_prepaid_order(
+            [{"product_code": "P003", "qty": 1}], DAY, channel=CHANNEL, ship_to=SHIP)
+    assert "无可售零售价" in ei.value.message
+
+
+def test_confirm_prepaid_without_payment_is_blocked(retail_board):
+    """0.12：未到账不可确认（确认会放货）。"""
+    board, _k, _m = retail_board
+    out = board.accept_prepaid_order(
+        [{"product_code": "P001", "qty": 1}], DAY, channel=CHANNEL, ship_to=SHIP)
+    with pytest.raises(TemplateError) as ei:
+        board.confirm_order(out["request_id"])
+    assert ei.value.code == "WORKFLOW_STATE"
+    assert "尚未到账" in ei.value.message
+
+
+def test_payment_received_then_confirm(retail_board):
+    """0.11 + 0.12：登记到账后可确认；重复登记幂等不新增事件。"""
+    board, _k, _m = retail_board
+    out = board.accept_prepaid_order(
+        [{"product_code": "P001", "qty": 1}], DAY, channel=CHANNEL, ship_to=SHIP)
+    pmt = board.record_payment_received(
+        out["order_ref"], amount="120", proof_ref="bank-ref-001")
+    assert pmt["received"] and not pmt["duplicate"]
+    assert pmt["requires_posting"] is False
+    again = board.record_payment_received(
+        out["order_ref"], amount="120", proof_ref="bank-ref-001")
+    assert again["duplicate"] is True
+    n_events = sum(1 for e in board._events()
+                   if e.get("record") == "payment_received")
+    assert n_events == 1
+    # 到账后可确认
+    confirmed = board.confirm_order(out["request_id"])
+    assert confirmed["status"] == "confirmed"
+    assert confirmed["handoff_ref"]
+
+
+def test_payment_received_requires_proof_ref(retail_board):
+    board, _k, _m = retail_board
+    out = board.accept_prepaid_order(
+        [{"product_code": "P001", "qty": 1}], DAY, channel=CHANNEL, ship_to=SHIP)
+    with pytest.raises(TemplateError) as ei:
+        board.record_payment_received(out["order_ref"], amount="120", proof_ref="")
+    assert ei.value.code == "INVALID_ARGUMENT"
+
+
+def test_credit_orders_unchanged_by_prepaid_path(retail_board):
+    """0.6：赊销单照旧占用额度——预付路径不改变 B2B 行为。"""
+    board, kernel, _m = retail_board
+    kernel.state.update({"limit": "5000", "ar_balance": "0",
+                         "reserved": "0", "available": "5000"})
+    out = board.accept_order(_m.get_entity_code("customer", "C001") if hasattr(_m, "get_entity_code")
+                             else _m.find_by_code("customer", "C001")["entity_id"],
+                             [{"product_code": "P001", "qty": 1}], DAY)
+    assert out["accepted"] is True
+    assert len(kernel.reserve_calls) == 1

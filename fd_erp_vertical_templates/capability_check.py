@@ -39,10 +39,16 @@ def _load_json(path: Path) -> dict[str, Any] | None:
 
 def check_template(template_dir: str | Path, *,
                    today: date | None = None,
-                   doc_paths: Iterable[str | Path] = ()) -> dict[str, Any]:
+                   doc_paths: Iterable[str | Path] = (),
+                   required_docs: Iterable[str | Path] = ()) -> dict[str, Any]:
     """跑全套检查。返回 `{"ok": bool, "checks": [...], "conflicts": [...]}`。
 
     失败项逐条带 `fix`——只说「不一致」不说怎么修，等于把问题退回给下一个人。
+
+    `required_docs` 与 `doc_paths` 的区别只有一个：**缺席时算不算失败**。
+    带快照兜底的文档（`doc_paths`）本机可以没有活文件，缺席只报「未扫描」；
+    跨仓的对外站点源码（`required_docs`）没有快照可退，缺席就必须判红——
+    否则「仓不在场 → 扫描面缩小 → 仍然报一致」正是本闸（1.2）要堵的形状。
     """
     root = Path(template_dir)
     checks: list[dict[str, Any]] = []
@@ -110,11 +116,21 @@ def check_template(template_dir: str | Path, *,
     anchor_total = 0
     docs_scanned = 0
     docs_missing: list[str] = []
-    for doc in doc_paths:
+    required = [Path(p) for p in required_docs]
+    required_missing: list[str] = []
+    # 跨仓必扫文件：缺席即判红（没有快照可退，「未扫到」不等于「没问题」）
+    for path in required:
+        if not path.is_file():
+            required_missing.append(str(path))
+            conflicts.append({
+                "kind": "required-doc-missing", "doc": str(path),
+                "fix": "检出该仓，或把它从 required_docs 撤下并写明为何不再受闸"})
+    for doc in list(doc_paths) + [str(p) for p in required]:
         path = Path(doc)
         if not path.is_file():
             docs_missing.append(path.name)
-            checks.append({"name": f"doc:{path.name}", "ok": True,
+            # required 的缺席已在上面判红，这里只记「未扫描」不再重复造冲突
+            checks.append({"name": f"doc:{path.name}", "ok": path not in required,
                            "detail": "文件不存在（**未扫描**，不构成验证）"})
             continue
         docs_scanned += 1
@@ -153,6 +169,11 @@ def check_template(template_dir: str | Path, *,
             detail += f"（{len(docs_missing)} 份不在本机未扫描）"
     checks.append({"name": "doc-anchors", "ok": docs_scanned > 0,
                    "detail": detail})
+    if required_missing:
+        checks.append({"name": "required-docs",
+                       "ok": False,
+                       "detail": f"{len(required_missing)} 份必扫文件缺席："
+                                 f"{'、'.join(Path(p).name for p in required_missing)}"})
 
     return {"ok": not conflicts, "matrix": str(matrix_file),
             "fingerprint": fingerprint, "summary": matrix.summary(),

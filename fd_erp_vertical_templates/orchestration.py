@@ -685,6 +685,91 @@ class OrderOrchestrator:
                                        "amount": _fmt(total.quantize(Decimal("0.000001")))},
                 "priced_lines": priced}
 
+    def accept_prepaid_order(self, lines: list[dict[str, Any]], day: str,
+                             *,
+                             channel: str | None = None,
+                             ship_to: dict[str, Any] | None = None,
+                             buyer_ref: str | None = None,
+                             requested_by: str = "storefront") -> dict[str, Any]:
+        """零售预付单受理（change establish-ai-native-ecommerce-stack 0.7/0.8）。
+
+        与 `accept_order` 的差别只有三处，**其余全部复用**（同一张订单事件档、同一
+        确认车道、同一履约移交、同一取价引擎）：
+
+        1. 不需要客户档案：零售买家没有 `customer` 主数据记录，归属用 `buyer_ref`
+           （下单渠道给的买家标识，可为空）。
+        2. 取价走零售层（`resolve_retail_price`，按渠道），**不回落 B2B 三层**。
+        3. **不碰信用额度**：不查 `query_credit`、不调 `reserve_credit`、不产生占用行。
+           预付与赊销的区分写在订单事实的 `settlement_mode` 字段上，不靠「有没有客户
+           档案」推断（spec `erp-credit-reservation`「预付单不进入信用占用生命周期」）。
+        """
+        if not lines:
+            raise TemplateError("INVALID_ARGUMENT", "订单行不得为空")
+        if not ship_to:
+            raise TemplateError(
+                "INVALID_ARGUMENT", "零售订单须提供收货联系信息（ship_to）",
+                detail={"missing": "ship_to"})
+        for field in ("name", "phone"):
+            if not str(ship_to.get(field) or "").strip():
+                raise TemplateError(
+                    "INVALID_ARGUMENT", f"收货信息缺 {field}",
+                    detail={"missing": f"ship_to.{field}"})
+        if not channel:
+            raise TemplateError(
+                "INVALID_ARGUMENT", "零售订单须声明渠道（channel）——零售价按渠道取",
+                detail={"missing": "channel"})
+
+        # ---- 1) 取价（零售层，无可售零售价即拒）----
+        priced: list[dict[str, Any]] = []
+        total = Decimal(0)
+        for ln in lines:
+            code = str(ln.get("product_code") or "").strip()
+            prod = self._master.find_by_code("product", code)
+            if prod is None:
+                raise TemplateError("NOT_FOUND", f"商品未建档：{code}")
+            if prod.get("state") != "active":
+                raise TemplateError("MASTER_DATA_STATE",
+                                    f"商品非可售状态（{prod.get('state')}）：{code}")
+            qty = _dec(ln.get("qty"), "订单数量")
+            if qty <= 0:
+                raise TemplateError("INVALID_ARGUMENT", "订单数量须 > 0")
+            quote = self._pricing.resolve_retail_price(self._tenant, channel, code,
+                                                       day, qty)
+            if not quote.get("sellable"):
+                raise TemplateError(
+                    "MASTER_DATA_STATE",
+                    f"商品在当前渠道无可售零售价：{code}",
+                    detail={"product_code": code, "channel": channel,
+                            "reason": quote.get("reason")})
+            total += Decimal(quote["line_total"])
+            priced.append({**quote, "unit": str(ln.get("unit") or "")})
+
+        amount = _fmt(total.quantize(Decimal("0.000001")))
+        order_ref = _ref("SO", f"{self._tenant}|retail|{day}|{uuid.uuid4().hex}")
+        self._append({"record": "order", "ref": order_ref,
+                      "request_id": uuid.uuid4().hex,
+                      "event": "proposed", "status": "pending",
+                      "payload": {
+                          "settlement_mode": "prepaid",
+                          "customer_id": None,
+                          "buyer_ref": buyer_ref,
+                          "channel": channel,
+                          "ship_to": dict(ship_to),
+                          "day": day,
+                          "lines": priced,
+                          "amount_total": amount,
+                          "currency": self._currency,
+                      },
+                      "requested_by": requested_by,
+                      "note": "零售预付单：不占信用额度；确认后移交履约，"
+                              "到账事实另行登记（payment_received）"})
+        return {"accepted": True, "order_ref": order_ref, "status": "pending",
+                "request_id": self._latest(order_ref)["request_id"],
+                "amount_total": amount, "currency": self._currency,
+                "settlement_mode": "prepaid",
+                "payment_state": "awaiting_payment",
+                "priced_lines": priced}
+
     def confirm_order(self, request_id: str, *,
                       decided_by: str = "owner") -> dict[str, Any]:
         """订单确认（确认车道）→ 履约移交记录（handoff 到交付编排）。"""
@@ -694,6 +779,18 @@ class OrderOrchestrator:
                        and e.get("status") == "pending"), None)
         if target is None:
             raise TemplateError("NOT_FOUND", f"待确认请求不存在或已裁决：{request_id}")
+        # 预付单未到账不得确认（change establish-ai-native-ecommerce-stack 0.12）：
+        # 确认会移交履约，等于放货；「未付款不发货」要在这一道挡住，而不是靠下游自觉。
+        payload = target.get("payload") or {}
+        if payload.get("settlement_mode") == "prepaid" \
+                and not any(e.get("record") == "payment_received"
+                            and e.get("order_ref") == target["ref"]
+                            and e.get("status") == "accepted"
+                            for e in events):
+            raise TemplateError(
+                "WORKFLOW_STATE",
+                f"预付单尚未到账，不可确认（{target['ref']}）",
+                detail={"order_ref": target["ref"], "payment_state": "awaiting_payment"})
         target["status"] = "confirmed"
         target["decided_by"] = decided_by
         target["decided_at_note"] = "confirmed-lane"
@@ -713,6 +810,67 @@ class OrderOrchestrator:
         return {"order_ref": order_ref, "status": "confirmed",
                 "handoff_ref": handoff_ref,
                 "note": "订单确认并移交履约；收入/应收落账随交付确认经内核 proposal 车道"}
+
+    def record_payment_received(self, order_ref: str, *, amount: str,
+                                currency: str = "CNY",
+                                received_at: str | None = None,
+                                proof_ref: str = "",
+                                idempotency_key: str | None = None,
+                                recorded_by: str = "merchant") -> dict[str, Any]:
+        """登记「收款到账」事实（change establish-ai-native-ecommerce-stack 0.11）。
+
+        三条纪律：
+
+        1. **只记事实，不落分录**：钱进的是商家自有账户，平台不代收、不留存。
+           落分录等于虚增平台资产。这条事实不参与过账（`requires_posting: false`）。
+        2. **幂等**：同一 `idempotency_key`（缺省=订单号+金额）重复登记返回首次结果，
+           **不追加第二条事件**——重复确认不能变成二次入账。
+        3. **不改订单状态**：它只是「钱到了」这个事实；订单一律经确认车道前进，
+           两者是不同的事（到账早于确认、或确认后补记到账都合法）。
+        """
+        order = self._latest(order_ref)
+        if order.get("record") != "order":
+            raise TemplateError("NOT_FOUND", f"订单不存在：{order_ref}")
+        try:
+            amt = Decimal(str(amount))
+        except (InvalidOperation, TypeError) as exc:
+            raise TemplateError("INVALID_ARGUMENT", f"到账金额非法：{amount!r}") from exc
+        if amt <= 0:
+            raise TemplateError("INVALID_ARGUMENT", "到账金额须 > 0")
+        if not str(proof_ref or "").strip():
+            raise TemplateError(
+                "INVALID_ARGUMENT", "到账登记须给凭据引用 proof_ref（银行流水/平台回单号）",
+                detail={"missing": "proof_ref"})
+        key = idempotency_key or f"{order_ref}|{_fmt(amt)}|{currency}"
+        for ev in self._events():
+            if ev.get("record") == "payment_received" \
+                    and ev.get("idempotency_key") == key:
+                return {"received": True, "order_ref": order_ref,
+                        "payment_ref": ev.get("ref"), "duplicate": True,
+                        "amount": ev.get("payload", {}).get("amount"),
+                        "currency": ev.get("payload", {}).get("currency"),
+                        "note": "同一幂等键已登记过：返回首次结果，事件层未新增"}
+        payment_ref = _ref("PMT", f"{self._tenant}|{key}")
+        self._append({
+            # ref 用 payment_ref 而不是 order_ref：`_latest(order_ref)` 取的是该 ref 的
+            # **最后一条**事件，付款事件若占用订单号的 ref 会把订单本身顶掉（实测）。
+            "record": "payment_received", "ref": payment_ref,
+            "order_ref": order_ref,
+            "idempotency_key": key,
+            "status": "accepted",
+            "payload": {"order_ref": order_ref, "amount": _fmt(amt),
+                        "currency": currency,
+                        "received_at": received_at or datetime.now(
+                            timezone.utc).isoformat(),
+                        "proof_ref": str(proof_ref),
+                        "requires_posting": False},
+            "requested_by": str(recorded_by),
+            "note": "收款到账事实：钱进商家自有账户，平台只记事实、不落分录、不经手资金",
+        })
+        return {"received": True, "order_ref": order_ref,
+                "payment_ref": payment_ref, "duplicate": False,
+                "amount": _fmt(amt), "currency": currency,
+                "requires_posting": False}
 
     def cancel_order(self, order_ref: str, reason: str, *,
                      requested_by: str = "agent") -> dict[str, Any]:

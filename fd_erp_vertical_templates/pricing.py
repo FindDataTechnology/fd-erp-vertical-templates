@@ -28,8 +28,16 @@ from .errors import TemplateError
 from .eventlog import EventLog
 
 PRICING_SCHEMA = "erp-pricing-rules/v1"
-RULE_LAYERS = ("customer_price", "promo", "coupon")
+# retail 是第四层：作用域不含客户维度，只按「零售渠道 × 商品」；且零售取价只走这一层，
+# 不回落到 B2B 三层、也不把商品主档 base_price 当零售价（无零售价 = 不可售）。
+RULE_LAYERS = ("customer_price", "promo", "coupon", "retail")
 _SCOPE_FIELDS = ("product_code", "customer_id")
+_LAYER_SCOPE_FIELDS = {
+    "customer_price": ("product_code", "customer_id"),
+    "promo": ("product_code", "customer_id"),
+    "coupon": ("product_code", "customer_id"),
+    "retail": ("product_code", "channel_id"),
+}
 
 
 def _day(value: str) -> date:
@@ -105,7 +113,7 @@ class PricingRuleBook:
         scope = rule.get("scope")
         if not isinstance(scope, dict):
             raise TemplateError("INVALID_ARGUMENT", "规则缺作用域 scope")
-        for f in _SCOPE_FIELDS:
+        for f in _LAYER_SCOPE_FIELDS[layer]:
             if not str(scope.get(f) or "*").strip():
                 raise TemplateError("INVALID_ARGUMENT", f"scope.{f} 非法")
         vf, vt = str(rule.get("valid_from") or ""), str(rule.get("valid_to") or "")
@@ -116,7 +124,7 @@ class PricingRuleBook:
         except ValueError as exc:
             raise TemplateError("INVALID_ARGUMENT",
                                 f"生效期日期非法：{vf!r}/{vt!r}（YYYY-MM-DD）") from exc
-        if layer in ("customer_price", "promo"):
+        if layer in ("customer_price", "promo", "retail"):
             try:
                 price = Decimal(str(rule.get("price")))
             except (InvalidOperation, TypeError) as exc:
@@ -229,10 +237,61 @@ class PricingRuleBook:
         return picked, skipped
 
     @staticmethod
-    def _specificity(rule: dict[str, Any]) -> int:
+    def _specificity(rule: dict[str, Any],
+                     fields: tuple[str, ...] = _SCOPE_FIELDS) -> int:
         scope = rule.get("scope") or {}
-        return sum(1 for f in _SCOPE_FIELDS
+        return sum(1 for f in fields
                    if str(scope.get(f) or "*") != "*")
+
+    def resolve_retail_price(self, tenant: str, channel: str, product: str,
+                             day: str, qty: str | int | float = 1) -> dict[str, Any]:
+        """零售取价：只走 retail 层，不回落 B2B 三层、也不回落商品主档 base_price。
+
+        无零售价即可售性为否（`sellable=False` + `reason`），调用方须据此把商品
+        从公开读面排除，MUST NOT 拿 B2B 价或基础价顶替。
+        """
+        if tenant != self._tenant:
+            raise TemplateError("INVALID_ARGUMENT", "租户不匹配（逐租户取价）")
+        d = _day(day)
+        fields = _LAYER_SCOPE_FIELDS["retail"]
+        cands = [r for r in self.confirmed_rules("retail")
+                 if str(r.get("scope", {}).get("product_code") or "*") in (product, "*")
+                 and str(r.get("scope", {}).get("channel_id") or "*") in (channel, "*")
+                 and _day(r["valid_from"]) <= d <= _day(r["valid_to"])]
+        picked: dict[str, Any] | None = None
+        skipped: list[dict[str, Any]] = []
+        for r in sorted(cands, key=lambda x: x["rule_id"]):
+            if not str(r.get("rate_source") or "").strip():
+                skipped.append({"rule_id": r["rule_id"], "layer": "retail",
+                                "note": "无出处规则拒绝参与取价"})
+                continue
+            if picked is None \
+                    or self._specificity(r, fields) > self._specificity(picked, fields) \
+                    or (self._specificity(r, fields) == self._specificity(picked, fields)
+                        and _day(r["valid_from"]) > _day(picked["valid_from"])):
+                picked = r
+        if picked is None:
+            return {"tenant": tenant, "channel": channel, "product": product,
+                    "day": day, "qty": str(qty), "sellable": False,
+                    "reason": "该商品在当前零售渠道无可售零售价",
+                    "rule_chain": [], "unsourced_skipped": skipped}
+        price = Decimal(str(picked["price"]))
+        q = Decimal(str(qty))
+        return {
+            "tenant": tenant, "channel": channel, "product": product, "day": day,
+            "qty": str(qty), "sellable": True,
+            "unit_price": format(price.quantize(Decimal("0.000001")).normalize(), "f"),
+            "line_total": format((price * q).quantize(Decimal("0.000001")).normalize(), "f"),
+            "currency": str(picked.get("currency") or "CNY"),
+            "rule_chain": [{"layer": "retail", "rule_id": picked["rule_id"],
+                            "rate_source": picked["rate_source"],
+                            "valid_from": picked["valid_from"],
+                            "valid_to": picked["valid_to"],
+                            "effect": f"零售价 {price}"}],
+            "unsourced_skipped": skipped,
+            "caliber_note": "零售价只取自 retail 层；不回落到客户价/活动价/券，"
+                            "也不把商品主档 base_price 当零售价",
+        }
 
     def _base_price(self, product: str) -> str:
         if self._master is not None:

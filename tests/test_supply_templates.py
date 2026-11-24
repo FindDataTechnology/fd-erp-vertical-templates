@@ -93,6 +93,9 @@ def test_supply_pricing_pack_rules_sourced():
     rules = pack["pricing_rules"]["rules"]
     assert rules and all(r.get("rate_source") for r in rules)
     assert {r["layer"] for r in rules} <= {"customer_price", "promo", "coupon"}
+    # retail 层存在但**不随包发种子规则**：通配零售价会让所有商品以同一个价对外可售
+    assert "retail" in pack["pricing_rules"]["layers"]
+    assert not [r for r in rules if r["layer"] == "retail"]
 
 
 def test_supply_pagesets_pack_four_ends():
