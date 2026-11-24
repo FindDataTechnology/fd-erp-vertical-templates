@@ -61,18 +61,19 @@
    "id": "kingdee-no-executor-test",
    "capability": "金蝶云星空（凭证/单据同步）",
    "responsible_repo": "open-connector-mt",
-   "blocking": "目录有 kingdee provider，但执行器目录无测试文件（*.test.ts 计数为 0）",
-   "status": "open",
-   "fix": "在 open-connector-mt/src/providers/kingdee 补执行器测试（动作面覆盖 query_records/push_records 的 read/write 归因），随后 build_connector_status.py 的 executor_tests 态自动转绿",
+   "blocking": "目录有 kingdee provider，执行器测试已补齐（17 例覆盖 login 两种成功判定、session 透传、query_records 行/列对齐、嵌套业务失败、非数组载荷拒收、写动作部分成功、全失败、缺 formId/Id/记录号的前置拒绝、凭证校验与打码）；剩余未解除项只有 live（需真实金蝶实例）。",
+   "status": "resolved",
+   "fix": "已解除：open-connector-mt/src/providers/kingdee/executors.test.ts。live 态仍需真实企业实例验收记录（connector-live-acceptance.json），那是另一条缺口，不属本条。",
    "detect": {
     "kind": "executor_tests",
     "provider": "kingdee",
     "min": 1
    },
    "evidence": [
-    "connector-status.json#integrations[kingdee].states.executor_tests.ok = false",
-    "open-connector-mt/src/providers/kingdee（无 *.test.ts）"
-   ]
+    "connector-status.json#integrations[kingdee].states.executor_tests.ok = true",
+    "open-connector-mt/src/providers/kingdee/executors.test.ts（17 passed）"
+   ],
+   "resolved_at": "2026-11-24"
   },
   {
    "id": "chatwoot-facts-not-wired",
