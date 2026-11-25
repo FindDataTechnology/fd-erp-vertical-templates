@@ -117,14 +117,22 @@ def test_partial_flow_declaration_reports_undeclared_legs_as_missing():
     assert missing == {"settlements", "inventory"}, missing
 
 
-def test_recon_shape_is_zero_before_wiring():
-    m = load_matrix(MATRIX, today=date(2026, 11, 10))
+def test_recon_shape_is_zero_when_nothing_is_wired():
+    """用**合成**矩阵守这条不变量，不读仓内真实矩阵。
+
+    2026-11-25 修正：此前后者，断言「所有平台 recon_shape 都是 0」——那是把当时的状态
+    写死成断言。shopify 真接通 orders/inventory 之后它就红了，而代码没坏。判据应问
+    「没接线的矩阵 recon_shape 是否为 0」，不是「今天恰好还没接线」。
+    """
+    m = load_matrix(_matrix({f: _cell(STATUS_UNAVAILABLE)
+                             for f in ("orders", "settlements", "inventory", "refunds")}),
+                    today=date(2026, 11, 10))
     for platform in m.platform_keys():
         assert m.recon_shape(platform) == 0
-    missing = m.missing_legs("shopify")
+    missing = m.missing_legs("p1")
     assert {d["flow"] for d in missing} == {"orders", "settlements", "inventory"}
     assert all(d["kind"] == "capability_missing" for d in missing)
-    assert all(d["matrix_ref"].startswith("shopify.") for d in missing)
+    assert all(d["matrix_ref"].startswith("p1.") for d in missing)
 
 
 # ---------------------------------------------------------------- 降级规则

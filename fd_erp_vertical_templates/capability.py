@@ -38,7 +38,10 @@ STATUS_UNMAPPED = "unmapped"
 STATUSES = (STATUS_AVAILABLE, STATUS_UNAVAILABLE, STATUS_UNMAPPED)
 
 #: 流（对账腿的原子单位）。refunds 当前无模板消费，先立于矩阵以免将来补条目漏审。
-FLOWS = ("orders", "settlements", "inventory", "refunds")
+#: `trade`（询价/报价）不参与对账三腿——它是**协商能力**维度，与「能读到订单」是两种
+#: 不同判定（spec `ecommerce-capability-matrix`「协商能力与读商品能力是两种不同判定」）：
+#: 读商品 available 不蕴含能协商，故各自独立取证。
+FLOWS = ("orders", "settlements", "inventory", "refunds", "trade")
 
 #: 复核窗缺省值（天）。平台 API 一年会滑出受支持版本；静态 schema 缺失属缓慢事实。
 DEFAULT_REVIEW_WINDOW_DAYS = {
