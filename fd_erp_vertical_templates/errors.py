@@ -26,6 +26,7 @@ class TemplateError(Exception):
         "CREDIT_NOT_REGISTERED",  # 客户未登记信用额度（下单前置运维动作缺失）
         "WORKFLOW_STATE",        # 编排工作流状态非法（如未确认的采购单再推送）
         "SHARE_EXECUTION_DENIED",  # 试图输出资金执行面（红线，模板层直接拒绝）
+        "BUDGET_EXHAUSTED",      # 本次委托授权额度不足以支付该笔（agent 自主下单的上限）
     )
 
     def __init__(self, code: str, message: str, detail: dict | None = None):

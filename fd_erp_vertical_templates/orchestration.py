@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import asdict
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -525,6 +526,42 @@ class ProcurementOrchestrator:
                         "入库落账经 KernelClient proposal 车道（由账务面驱动）"}
 
 
+class _InMemoryBudgetLedger:
+    """委托预算账本：落在编排事件档里（只追加、按租户分文件）。
+
+    为什么复用事件档而不是新开一张表：委托消费本身就是一条经营事实
+    （「这个 agent 代这个委托人花了多少」），它该和订单在同一条流水上可查。
+    另建一张表就是第二个真源，而预算的计算必须与订单落账同源。
+
+    shortcut: 每次 spent() 全量扫描事件档。单人店的量级够用；量大了要换成
+    按 scope 预聚合（与 registry 的 mongo_counter 同思路），换的时候改这个类即可，
+    调用方只依赖 spent/consume 两个方法。
+    """
+
+    def __init__(self, log: Any, tenant: str) -> None:
+        self._log = log
+        self._tenant = tenant
+
+    def _spent_events(self) -> list[dict[str, Any]]:
+        return [e for e in self._log.events()
+                if e.get("record") == "budget_consume"
+                and e.get("tenant_id") == self._tenant]
+
+    def spent(self, scope_key: str) -> Decimal:
+        total = Decimal(0)
+        for e in self._spent_events():
+            if str((e.get("payload") or {}).get("scope") or "") == scope_key:
+                total += Decimal(str((e.get("payload") or {}).get("amount") or 0))
+        return total
+
+    def consume(self, scope_key: str, amount: Decimal) -> None:
+        self._log.append({"schema": ORCH_SCHEMA, "tenant_id": self._tenant,
+                          "record": "budget_consume", "status": "accepted",
+                          "payload": {"scope": scope_key,
+                                      "amount": format(amount, "f")},
+                          "requested_by": "order-budget"})
+
+
 class OrderOrchestrator:
     """订单受理编排：信用校验（fail-closed）→ 取价 → 信用占用 → 订单确认 → 履约移交。"""
 
@@ -690,7 +727,10 @@ class OrderOrchestrator:
                              channel: str | None = None,
                              ship_to: dict[str, Any] | None = None,
                              buyer_ref: str | None = None,
-                             requested_by: str = "storefront") -> dict[str, Any]:
+                             requested_by: str = "storefront",
+                             grant_budget: Any | None = None,
+                             grant_jti: str | None = None,
+                             budget_ledger: Any | None = None) -> dict[str, Any]:
         """零售预付单受理（change establish-ai-native-ecommerce-stack 0.7/0.8）。
 
         与 `accept_order` 的差别只有三处，**其余全部复用**（同一张订单事件档、同一
@@ -745,6 +785,32 @@ class OrderOrchestrator:
             priced.append({**quote, "unit": str(ln.get("unit") or "")})
 
         amount = _fmt(total.quantize(Decimal("0.000001")))
+
+        # ---- 1.5) 委托预算闸（agent 自主下单时唯一的上限）----
+        # 价格是上面服务端取的，不接受调用方声明；有 budget 的委托超限即拒。
+        # 无 budget（人或未限额度）→ 只受租户额度约束，本层放行（与
+        # fd-mcp-registry 的 grant_budget 同语义）。
+        budget_verdict = {"allowed": True, "reason": "no_grant_context"}
+        if grant_budget is not None or grant_jti:
+            from .order_budget import BudgetScope, enforce_order_budget
+
+            scope = BudgetScope(grant_jti=str(grant_jti or "unknown"),
+                                run_id=None)
+            ledger = budget_ledger
+            if ledger is None:
+                ledger = _InMemoryBudgetLedger(self._log, self._tenant)
+            budget_verdict = enforce_order_budget(
+                ledger, scope=scope, budget=grant_budget, order_total=amount)
+            if not budget_verdict.allowed:
+                raise TemplateError(
+                    "BUDGET_EXHAUSTED",
+                    f"本次委托额度不足以支付本单：{budget_verdict.reason}",
+                    detail={"grant_jti": str(grant_jti or ""),
+                            "limit": budget_verdict.limit,
+                            "used": budget_verdict.used,
+                            "remaining": budget_verdict.remaining,
+                            "order_total": amount})
+
         order_ref = _ref("SO", f"{self._tenant}|retail|{day}|{uuid.uuid4().hex}")
         self._append({"record": "order", "ref": order_ref,
                       "request_id": uuid.uuid4().hex,
@@ -759,6 +825,9 @@ class OrderOrchestrator:
                           "lines": priced,
                           "amount_total": amount,
                           "currency": self._currency,
+                          "grant_jti": grant_jti,
+                          "budget_verdict": (budget_verdict if isinstance(budget_verdict, dict)
+                                              else asdict(budget_verdict)),
                       },
                       "requested_by": requested_by,
                       "note": "零售预付单：不占信用额度；确认后移交履约，"
