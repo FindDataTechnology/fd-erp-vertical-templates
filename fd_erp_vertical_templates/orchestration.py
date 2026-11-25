@@ -730,7 +730,8 @@ class OrderOrchestrator:
                              requested_by: str = "storefront",
                              grant_budget: Any | None = None,
                              grant_jti: str | None = None,
-                             budget_ledger: Any | None = None) -> dict[str, Any]:
+                             budget_ledger: Any | None = None,
+                             quoted: dict[str, Any] | None = None) -> dict[str, Any]:
         """零售预付单受理（change establish-ai-native-ecommerce-stack 0.7/0.8）。
 
         与 `accept_order` 的差别只有三处，**其余全部复用**（同一张订单事件档、同一
@@ -760,6 +761,19 @@ class OrderOrchestrator:
                 detail={"missing": "channel"})
 
         # ---- 1) 取价（零售层，无可售零售价即拒）----
+        # 带 `quoted` 时成交价取自那条报价（accept-quote 车道）：报价是由 ref 指定的
+        # 一次性承诺，没有「按作用域自动匹配」的语义，所以不做第五个取价层（设计 D5）。
+        # 无 `quoted` 时下面的取价路径**逐字节不变**（与阶 0 上产纪律一致）。
+        quoted = quoted or None
+        if quoted is not None:
+            qprice = _dec(quoted.get("unit_price"), "报价单价")
+            if qprice <= 0:
+                raise TemplateError("INVALID_ARGUMENT", "报价单价须 > 0")
+            qcur = str(quoted.get("currency") or self._currency)
+            qref = str(quoted.get("quote_ref") or "")
+            if not qref:
+                raise TemplateError("INVALID_ARGUMENT", "quoted 须带 quote_ref（成交价须可回溯）",
+                                    detail={"missing": "quoted.quote_ref"})
         priced: list[dict[str, Any]] = []
         total = Decimal(0)
         for ln in lines:
@@ -773,14 +787,30 @@ class OrderOrchestrator:
             qty = _dec(ln.get("qty"), "订单数量")
             if qty <= 0:
                 raise TemplateError("INVALID_ARGUMENT", "订单数量须 > 0")
-            quote = self._pricing.resolve_retail_price(self._tenant, channel, code,
-                                                       day, qty)
-            if not quote.get("sellable"):
-                raise TemplateError(
-                    "MASTER_DATA_STATE",
-                    f"商品在当前渠道无可售零售价：{code}",
-                    detail={"product_code": code, "channel": channel,
-                            "reason": quote.get("reason")})
+            if quoted is not None:
+                # 报价成交：单价来自报价、币种来自报价；仍校验商品可售（主数据状态闸
+                # 不因「谈好了」而跳过——停售商品不能因为有一条旧报价就卖出去）。
+                quote = {
+                    "tenant": self._tenant, "channel": channel, "product": code,
+                    "day": day, "qty": str(qty), "sellable": True,
+                    "unit_price": _fmt(qprice),
+                    "line_total": _fmt((qprice * qty).quantize(Decimal("0.000001"))),
+                    "currency": qcur,
+                    "rule_chain": [{"layer": "quote", "rule_id": qref,
+                                    "rate_source": f"quote/{qref}",
+                                    "effect": f"报价单价 {qprice}"}],
+                    "unsourced_skipped": [],
+                    "caliber_note": "成交价取自报价（协商结果），不回落到零售层",
+                }
+            else:
+                quote = self._pricing.resolve_retail_price(self._tenant, channel, code,
+                                                           day, qty)
+                if not quote.get("sellable"):
+                    raise TemplateError(
+                        "MASTER_DATA_STATE",
+                        f"商品在当前渠道无可售零售价：{code}",
+                        detail={"product_code": code, "channel": channel,
+                                "reason": quote.get("reason")})
             total += Decimal(quote["line_total"])
             priced.append({**quote, "unit": str(ln.get("unit") or "")})
 
@@ -828,6 +858,8 @@ class OrderOrchestrator:
                           "grant_jti": grant_jti,
                           "budget_verdict": (budget_verdict if isinstance(budget_verdict, dict)
                                               else asdict(budget_verdict)),
+                          **({"quote_ref": quoted["quote_ref"]}
+                             if quoted is not None else {}),
                       },
                       "requested_by": requested_by,
                       "note": "零售预付单：不占信用额度；确认后移交履约，"
@@ -837,7 +869,8 @@ class OrderOrchestrator:
                 "amount_total": amount, "currency": self._currency,
                 "settlement_mode": "prepaid",
                 "payment_state": "awaiting_payment",
-                "priced_lines": priced}
+                "priced_lines": priced,
+                **({"quote_ref": quoted["quote_ref"]} if quoted is not None else {})}
 
     def confirm_order(self, request_id: str, *,
                       decided_by: str = "owner") -> dict[str, Any]:
