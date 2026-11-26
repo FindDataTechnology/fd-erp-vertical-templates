@@ -141,7 +141,9 @@ def _audit_connectors_readonly(pkg: Path, violations: list[str]) -> dict[str, An
     if not ok:
         violations.extend(writes)
     return {"name": "connectors-readonly", "ok": ok,
-            "detail": "连接器零外部写方法（read 面only，零外部写入实证）" if ok else writes}
+            "detail": "数据连接器零外部写方法（read 面only；店面在线收款"
+                      " checkout.py 是登记过的写面例外，establish-ai-native-"
+                      "ecommerce-stack 0.13）" if ok else writes}
 
 
 def _collect_connector_writes(pkg: Path) -> list[str]:

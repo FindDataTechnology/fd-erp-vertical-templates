@@ -49,6 +49,11 @@ PAYMENT_HOSTS = (
     "open.meituan.com",
     "waimai.meituan.com",
     "pay.meituan.com",
+    # PayPal（店面在线收款通道，establish-ai-native-ecommerce-stack 0.13）：
+    # 出网唯一口是连接器运行时，模板层出现这些主机名 = 有人想绕过运行时直连。
+    "api-m.paypal.com",
+    "api-m.sandbox.paypal.com",
+    "sandbox.paypal.com",
 )
 
 #: 允许面：文件相对路径 → 理由。出网单口就是这一个文件。

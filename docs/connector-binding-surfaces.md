@@ -30,6 +30,8 @@
 | `crossborder` | `shopify-store` | `shopify_admin` | `get_order`, `list_orders`, `list_inventory_items`, `get_inventory_item`, `list_payouts` | 订单 + 库存 + 结算；`list_payouts` 为 change `wire-ecommerce-merchant-channels`（已归档，见 spec `ecommerce-merchant-channel-wiring`） 新增的只读动作（GraphQL `shopifyPaymentsAccount.payouts`，需 `read_shopify_payments_payouts`）；动作未上线前运行时报 `ACTION_NOT_FOUND`，矩阵把 settlements 记缺口 |
 | `crossborder` | `tiktok-store` | `tiktok_shop` | `list_orders`, `list_settlements`, `list_inventory` | TikTok Shop 三腿只读；待商家授权 + 平台应用审核，未过审前矩阵为 `unmapped` |
 | `crossborder` | `merchant-erp-store` | `merchant_erp`（按厂商落地为实名 provider，如 `wangdiantong`） | `list_orders`, `list_settlements`, `list_inventory` | 国内三腿；**库存腿唯一来源**，国内三方对账缺此腿不成立 |
+| `supply-chain` | `midplatform-file` | `file-service` | `create_upload_url`, `confirm_upload`, `get_download_url`, `list_files` | 供应商发票影像件：预签名直传 → 确认 → 下载/列表（establish-ai-native-ecommerce-stack 3.2）；owner 域隔离 `erp:<tenant>:sp-invoice` |
+| `supply-chain` | `platform-notify` | `inapp-notify` | `send_broadcast` | 对账单推送（底座端内消息通道）；留痕=网关广播账本，客户确认仍走 UE 确认门（3.2） |
 
 > 2026-11-10 起本表的承担动作必须与能力矩阵同步：`list_payouts` 未在目录落地前，
 > 矩阵 `shopify.settlements` 保持 `unmapped`（可接未接），不得对外说「已支持收款对账」。

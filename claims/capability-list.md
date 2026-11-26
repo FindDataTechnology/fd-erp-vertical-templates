@@ -1,6 +1,6 @@
 # ERP 对外能力清单（数据派生）
 
-> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 8 条），不认文档里手写的旧数。
+> 由 `scripts/claim_gate.py render` 从 `claims/claims.json`、`claims/planned-surfaces.json`、`publish-record.json` 与 `gaps.json` 生成，勿手改。已交付段只列有证据的能力；规划中段的条数以挂账清单为准（当前 5 条），不认文档里手写的旧数。
 
 ## 一、已交付（有证据）
 
@@ -39,16 +39,13 @@
 - **库存作业车道：入库/出库/调拨/盘点的提交与查询走内核拟稿车道——提交只落 pending 事实、不投影不过账，拍板（确认门 + 投影 + 过账）是独立权限档；出库与调拨先整单核可用量，不足整单拒绝并点名行号与缺口，一行都不写；调拨同单两笔事实（源仓出 + 目的仓入，数量守恒），只拍一侧时整单状态不推进；盘点只对有差异的行出调整事实（盘盈正、盘亏负），账面数读本板块数量面、不接受调用方递来的账面数；单张读面给逐行当前状态（内核车道，不是提交时快照）与按侧汇总，调拨的「半边已确认」看得见。数量面余额是唯一出处，本面不回写外部 WMS。**  
   证据：endpoint:POST /erp/supply-chain/v1/wh/receipts；endpoint:POST /erp/supply-chain/v1/wh/issues；endpoint:POST /erp/supply-chain/v1/wh/transfers；endpoint:POST /erp/supply-chain/v1/wh/stocktakes；endpoint:GET /erp/supply-chain/v1/wh/documents/{ref}；endpoint:POST /erp/supply-chain/v1/wh/documents/{ref}/confirm；code:fd-erp-vertical-api/fd_erp_vertical_api/faces.py；code:fd-erp-vertical-api/fd_erp_vertical_api/pagesets.py
 
-## 二、规划中（8 条，全部来自挂账清单）
+## 二、规划中（5 条，全部来自挂账清单）
 
 | 能力面 | 域 | 端点 | 规划车道 |
 | --- | --- | --- | --- |
 | supply-chain.cp | dock-slots | `GET /erp/supply-chain/v1/cp/dock-slots` | 仓库作业编排月台资源建模（时段目录 + 占用计算） |
-| supply-chain.se | statements | `POST /erp/supply-chain/v1/se/statements/{statement_id}/push` | 底座端内消息通道（notify 车道）接入后实施推送留痕；客户确认门=UE /ue/statements/{id}/confirm（内核 proposal 车道） |
-| supply-chain.sp | invoices | `GET /erp/supply-chain/v1/sp/invoices` | 同 POST /sp/invoices（上传历史与核验进度 read 面） |
-| supply-chain.sp | invoices | `POST /erp/supply-chain/v1/sp/invoices` | 中台文件服务上传契约 + 发票查验/勾兑车道 + 金蝶连接器回写（contract-only） |
 | supply-chain.sp | settlements | `GET /erp/supply-chain/v1/sp/settlements` | 金蝶付款/结算回写 read 面（只读，无任何支付/账户操作） |
-| supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements` | 金蝶 provider 往来面拉取（任务 3.1）→ 账本内核计算应付 → 单据级对账单派生 + 确认门（内核自平核对 proposal，同 UE 契约） |
+| supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements` | 金蝶 provider 往来面拉取（live 验收后同一入口可用）→ 账本内核计算应付 → 单据级对账单派生 + 确认门（内核自平核对 proposal，同 UE 契约） |
 | supply-chain.sp | statements | `GET /erp/supply-chain/v1/sp/statements/{statement_id}` | 同 GET /sp/statements |
 | supply-chain.sp | statements | `POST /erp/supply-chain/v1/sp/statements/{statement_id}/confirm` | 金额同源到位后确认门=内核自平核对 proposal（超时/失败不假报成功）；异议进处置车道 |
 

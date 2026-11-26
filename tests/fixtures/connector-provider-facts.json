@@ -1,6 +1,6 @@
 {
   "_comment": "open-connector-mt 的 provider 事实快照。CI 只有本仓 checkout，读不到连接器仓；三态必须能离线推导。刷新：scripts/build_connector_status.py --refresh-fixture。",
-  "count": 8,
+  "count": 10,
   "providers": {
     "carrier-portal": {
       "catalog": false,
@@ -10,9 +10,17 @@
       "catalog": false,
       "executor_tests": 0
     },
+    "file-service": {
+      "catalog": true,
+      "executor_tests": 1
+    },
+    "inapp-notify": {
+      "catalog": true,
+      "executor_tests": 1
+    },
     "kingdee": {
       "catalog": true,
-      "executor_tests": 0
+      "executor_tests": 1
     },
     "pos": {
       "catalog": false,

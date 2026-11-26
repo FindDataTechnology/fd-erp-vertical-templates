@@ -153,6 +153,64 @@
     },
     {
       "binding_keys": [
+        "midplatform-file"
+      ],
+      "external_system": "中台文件服务（fd-file-service）",
+      "missing": [
+        "live"
+      ],
+      "optional": false,
+      "provider": "file-service",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/file-service.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": "open-connector-mt/src/providers/file-service/*.test.ts (1)",
+          "ok": true
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
+        "platform-notify"
+      ],
+      "external_system": "底座端内消息通道（壹座网关广播面）",
+      "missing": [
+        "live"
+      ],
+      "optional": false,
+      "provider": "inapp-notify",
+      "provider_role": false,
+      "state": "not_connected",
+      "states": {
+        "catalog": {
+          "evidence": "open-connector-mt/catalog/apps/inapp-notify.json",
+          "ok": true
+        },
+        "executor_tests": {
+          "evidence": "open-connector-mt/src/providers/inapp-notify/*.test.ts (1)",
+          "ok": true
+        },
+        "live": {
+          "accepted_at": null,
+          "evidence": null,
+          "ok": false
+        }
+      },
+      "template": "supply-chain"
+    },
+    {
+      "binding_keys": [
         "kingdee-cloud"
       ],
       "external_system": "金蝶云星空",
@@ -276,10 +334,9 @@
     "available": true,
     "by_capability": {
       "supply-chain.cp": 1,
-      "supply-chain.se": 1,
-      "supply-chain.sp": 6
+      "supply-chain.sp": 4
     },
-    "count": 8
+    "count": 5
   },
   "role_bindings": [
     {
@@ -359,6 +416,8 @@
       "restaurant-chain/pos",
       "restaurant-chain/wechatpay",
       "supply-chain/carrier-portal",
+      "supply-chain/file-service",
+      "supply-chain/inapp-notify",
       "supply-chain/kingdee",
       "supply-chain/supplier-portal",
       "supply-chain/wechatpay",

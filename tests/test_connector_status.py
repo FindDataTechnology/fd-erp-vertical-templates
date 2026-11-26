@@ -38,14 +38,14 @@ def _find(derived, provider, template=None):
     raise AssertionError(f"未找到 provider={provider} template={template}")
 
 
-def test_kingdee_has_catalog_but_no_executor_test(derived):
-    """金蝶：目录有 provider，但执行器无测试 → 不得声明已接通。"""
+def test_kingdee_has_catalog_and_executor_tests_but_no_live(derived):
+    """金蝶：目录+执行器测试双绿（任务 3.1 已补），残余缺口=live（真实金蝶实例）。"""
     item = _find(derived, "kingdee")
     assert item["states"]["catalog"]["ok"] is True
-    assert item["states"]["executor_tests"]["ok"] is False, "金蝶执行器一旦补测试，这条断言会红——届时改成断言 live 才是缺口"
+    assert item["states"]["executor_tests"]["ok"] is True
     assert item["states"]["live"]["ok"] is False
     assert item["state"] == "not_connected"
-    assert item["missing"] == ["executor_tests", "live"]
+    assert item["missing"] == ["live"]
 
 
 def test_payment_provider_has_catalog_and_tests_but_no_live(derived):
